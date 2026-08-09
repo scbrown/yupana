@@ -1,4 +1,4 @@
-//! Tenant-scoped engine methods (hank #2 daemon wiring): the same query
+//! Tenant-scoped engine methods (yupana #2 daemon wiring): the same query
 //! surface as the un-tenanted engine, resolved against the requesting
 //! tenant's `base + overlay` view, plus the FR-30 feed (`edit`).
 //!

@@ -2,7 +2,7 @@
 //!
 //! The node/edge JSON mirrors `quipu_episode` (`name` / `type` / `description`
 //! for a node, `source` / `target` / `relation` for an edge) so ONE adapter
-//! output can feed both stores. Where hank needs more — scalar attributes the
+//! output can feed both stores. Where yupana needs more — scalar attributes the
 //! pattern engine can compare — it adds a field rather than overloading one, so
 //! the shared subset stays byte-identical.
 //!
@@ -49,7 +49,7 @@ pub struct EntitySpec {
     /// Optional human-readable description.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// Scalar attributes — hank's addition, for the pattern engine to compare.
+    /// Scalar attributes — yupana's addition, for the pattern engine to compare.
     #[serde(default)]
     pub attrs: std::collections::BTreeMap<String, AttrValue>,
 }

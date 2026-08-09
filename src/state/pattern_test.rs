@@ -5,7 +5,7 @@ use super::*;
 use crate::state::graph::{StateEdge, StateGraph, StateNode};
 use crate::state::overlay::StateOverlay;
 
-/// The addendum's own vocabulary, prefixes included — Hank does not expand them,
+/// The addendum's own vocabulary, prefixes included — Yupana does not expand them,
 /// so the fixture ingests the tokens verbatim, exactly as an adapter would.
 fn board() -> StateGraph {
     let mut g = StateGraph::new();
@@ -101,7 +101,7 @@ fn edge_traversal_is_OUTGOING_only() {
 
 #[test]
 fn a_prefix_is_NOT_expanded_and_a_mismatch_simply_does_not_match() {
-    // Hank has no prefix map by design. This test exists so the absence is
+    // Yupana has no prefix map by design. This test exists so the absence is
     // deliberate and visible: a pattern written against an unexpanded prefix
     // matches nothing, which looks exactly like a clean board — hence the
     // `vacuous` reporting in the guard.

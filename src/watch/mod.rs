@@ -20,7 +20,7 @@
 //! The tiers **feed** the extraction/overlay entrypoints. Two handlers exist:
 //! - [`GraphRefresh`] (un-tenanted): tree-sitter tier re-parses each changed
 //!   file; heavy tier rebuilds the whole [`crate::graph::CodeGraph`]. Used by
-//!   `hank watch` with no tenant.
+//!   `yupana watch` with no tenant.
 //! - [`OverlayRefresh`] (tenant-aware): tree-sitter tier touches the tenant's
 //!   overlay; heavy tier is the frontier-bounded [`crate::graph::update_frontier`]
 //!   (FR-16), touching only the edited files + their reach — not a full rebuild.
@@ -28,7 +28,7 @@
 //!
 //! Events are filtered by extension/`target`/`.git` ([`is_watch_relevant`]) and
 //! by the repo's `.gitignore` (via the `ignore` crate) before reaching the
-//! scheduler. See `docs/hank-spec.md` §5.5, §7.5, FR-16/17.
+//! scheduler. See `docs/yupana-spec.md` §5.5, §7.5, FR-16/17.
 
 mod overlay_refresh;
 mod schedule;
@@ -70,7 +70,7 @@ pub trait TierHandler: Send {
 /// - heavy tier → rebuild [`CodeGraph`] over `root`.
 ///
 /// For per-tenant, frontier-bounded updates (the FR-16 path) use
-/// [`OverlayRefresh`] instead; this remains for `hank watch` with no tenant.
+/// [`OverlayRefresh`] instead; this remains for `yupana watch` with no tenant.
 pub struct GraphRefresh {
     root: PathBuf,
 }

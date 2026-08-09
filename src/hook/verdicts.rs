@@ -8,16 +8,16 @@ use std::path::Path;
 
 use super::decision::Decision;
 use super::{introduced_text, relative, HookInput};
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 
 /// Sign and spool the decision's verdicts, if a signing key already exists.
 ///
 /// Silent on every absence — no config, no key, no target, nothing evaluated.
-/// The one thing it will not do is CREATE the key: `hank verifier` is the
+/// The one thing it will not do is CREATE the key: `yupana verifier` is the
 /// deliberate act that does that.
 pub(super) fn spool_verdicts(
     decision: &Decision,
-    config: Option<&HankConfig>,
+    config: Option<&YupanaConfig>,
     root: &Path,
     file_path: Option<&str>,
     input: Option<&HookInput>,

@@ -1,5 +1,5 @@
-//! The `hank` binary entrypoint. See the `hank` library crate and
-//! `docs/hank-spec.md` for the design.
+//! The `yupana` binary entrypoint. See the `yupana` library crate and
+//! `docs/yupana-spec.md` for the design.
 
 use clap::error::ErrorKind;
 use clap::Parser;
@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
     // second; the hook fail-open path in `parse_or_fail_open` exits before this
     // point and needs no subscriber.
     let cli = parse_or_fail_open();
-    hank::cli::init_tracing(cli.verbose());
+    yupana::cli::init_tracing(cli.verbose());
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(cli.run())
 }
@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
 /// before any of our code runs, so the fail-open logic inside the guard never
 /// gets a say.
 ///
-/// This is not hypothetical. A `hank` predating `hook pre-edit` answers that
+/// This is not hypothetical. A `yupana` predating `hook pre-edit` answers that
 /// command with clap's "invalid value" error and exit `2` — so rolling out the
 /// hook against a stale binary would block every `Edit`/`Write` in the fleet,
 /// which is precisely the outcome the fail-open clause exists to prevent.
@@ -33,8 +33,8 @@ fn main() -> anyhow::Result<()> {
 /// So an unparseable hook invocation degrades to a silent allow. Every other
 /// command keeps clap's ordinary behaviour, including `--help`/`--version`,
 /// which clap reports as errors but which must still print and exit `0`.
-fn parse_or_fail_open() -> hank::cli::Cli {
-    match hank::cli::Cli::try_parse() {
+fn parse_or_fail_open() -> yupana::cli::Cli {
+    match yupana::cli::Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {
             let display_only = matches!(
@@ -48,8 +48,8 @@ fn parse_or_fail_open() -> hank::cli::Cli {
                 // guard that cannot parse its own arguments must not appear to
                 // have decided anything.
                 eprintln!(
-                    "hank: policy guard failed open: this hank does not understand the \
-                     requested hook invocation ({}). Upgrade hank; edits are UNGUARDED \
+                    "yupana: policy guard failed open: this yupana does not understand the \
+                     requested hook invocation ({}). Upgrade yupana; edits are UNGUARDED \
                      until you do.",
                     e.kind_str()
                 );
@@ -60,7 +60,7 @@ fn parse_or_fail_open() -> hank::cli::Cli {
     }
 }
 
-/// Whether argv looks like `hank hook …`.
+/// Whether argv looks like `yupana hook …`.
 ///
 /// Deliberately a loose match rather than positional parsing: the argument that
 /// fails to parse may be the subcommand itself, so there is nothing structured

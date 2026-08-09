@@ -1,7 +1,7 @@
-//! Docs-drift guard (aegis-0hq0): the set of registered `hank_*` MCP tools must
+//! Docs-drift guard (aegis-0hq0): the set of registered `yupana_*` MCP tools must
 //! match what the docs claim. A tool count nobody enforces is a comment — and it
 //! had already rotted three ways at once: `README.md` said 8, the spec's
-//! Appendix D said 9 (omitting `hank_communities`), `mcp-tools.md` said 10, and
+//! Appendix D said 9 (omitting `yupana_communities`), `mcp-tools.md` said 10, and
 //! the code has 10. This pins them together by NAME, so adding a tool without
 //! documenting it (or vice versa) fails here naming the offender.
 //!
@@ -26,12 +26,12 @@ fn flow(text: &str) -> String {
         .join(" ")
 }
 
-/// Pull `hank_*` identifiers out of a line, e.g. `async fn hank_impact(` or a
-/// `` | `hank_impact` | … `` table row.
-fn hank_names(text: &str) -> BTreeSet<String> {
+/// Pull `yupana_*` identifiers out of a line, e.g. `async fn yupana_impact(` or a
+/// `` | `yupana_impact` | … `` table row.
+fn yupana_names(text: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let mut rest = text;
-    while let Some(i) = rest.find("hank_") {
+    while let Some(i) = rest.find("yupana_") {
         let tail = &rest[i..];
         let end = tail
             .char_indices()
@@ -43,17 +43,17 @@ fn hank_names(text: &str) -> BTreeSet<String> {
     names
 }
 
-/// The tools actually registered on the MCP server: every `async fn hank_*`.
+/// The tools actually registered on the MCP server: every `async fn yupana_*`.
 fn registered_tools() -> BTreeSet<String> {
     read("src/mcp/server.rs")
         .lines()
-        .filter(|l| l.contains("async fn hank_"))
-        .flat_map(hank_names)
+        .filter(|l| l.contains("async fn yupana_"))
+        .flat_map(yupana_names)
         .collect()
 }
 
 /// The tools the `## Live tools` table in the MCP reference documents. Stops at
-/// the next `##` so any later section is excluded. `hank_promote` moved INTO this
+/// the next `##` so any later section is excluded. `yupana_promote` moved INTO this
 /// table when it was wired (Phase 4); it is always registered, so it belongs here.
 fn documented_live_tools() -> BTreeSet<String> {
     let md = read("docs/book/src/reference/mcp-tools.md");
@@ -62,8 +62,8 @@ fn documented_live_tools() -> BTreeSet<String> {
     let end = after.find("\n## ").map_or(after.len(), |e| e);
     after[..end]
         .lines()
-        .filter(|l| l.trim_start().starts_with("| `hank_"))
-        .flat_map(hank_names)
+        .filter(|l| l.trim_start().starts_with("| `yupana_"))
+        .flat_map(yupana_names)
         .collect()
 }
 
@@ -74,7 +74,7 @@ fn registered_tools_match_the_mcp_reference() {
     assert_eq!(
         code.len(),
         14,
-        "expected 14 registered hank_* tools, got {code:?}"
+        "expected 14 registered yupana_* tools, got {code:?}"
     );
     assert_eq!(
         code, docs,
@@ -86,7 +86,7 @@ fn registered_tools_match_the_mcp_reference() {
 
 #[test]
 fn spec_appendix_d_lists_every_registered_tool() {
-    let spec = read("docs/hank-spec.md");
+    let spec = read("docs/yupana-spec.md");
     let code = registered_tools();
     // The count claimed in Appendix D's "MCP tools (N, …)" heading.
     assert!(
@@ -117,11 +117,11 @@ fn readme_and_quickstart_state_the_right_tool_count() {
     ] {
         let text = flow(&read(rel));
         assert!(
-            text.contains("fourteen `hank_*` tools") || text.contains("fourteen MCP tools"),
+            text.contains("fourteen `yupana_*` tools") || text.contains("fourteen MCP tools"),
             "{file} does not state fourteen tools"
         );
         assert!(
-            !text.contains("eleven `hank_*`") && !text.contains("eleven MCP tools"),
+            !text.contains("eleven `yupana_*`") && !text.contains("eleven MCP tools"),
             "{file} still says eleven tools"
         );
     }

@@ -131,7 +131,7 @@ jobs:
           python-version: "3.12"
       - run: pip install pre-commit
       # Both skips are justified ONLY because a dedicated job covers each on the
-      # SAME triggers (hank #84 asked whether this list had outlived its reason):
+      # SAME triggers (yupana #84 asked whether this list had outlived its reason):
       #   cargo-clippy  -> the Clippy matrix above, 5 arms, --all-targets -D warnings
       #   mdbook-build  -> the `book` job below
       # `book` exists because that second claim used to be false. The only mdbook

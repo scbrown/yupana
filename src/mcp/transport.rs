@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use super::server::HankMcpServer;
+use super::server::YupanaMcpServer;
 
 /// Serve over stdio (the default agent transport).
 pub async fn run_stdio(
@@ -16,7 +16,7 @@ pub async fn run_stdio(
     use rmcp::transport::stdio;
     use rmcp::ServiceExt;
 
-    let server = HankMcpServer::new(root, tenant, config);
+    let server = YupanaMcpServer::new(root, tenant, config);
     let service = server.serve(stdio()).await?;
     service.waiting().await?;
     Ok(())
@@ -39,10 +39,10 @@ pub async fn run_http(
     use tokio_util::sync::CancellationToken;
 
     let ct = CancellationToken::new();
-    let service: StreamableHttpService<HankMcpServer, LocalSessionManager> =
+    let service: StreamableHttpService<YupanaMcpServer, LocalSessionManager> =
         StreamableHttpService::new(
             move || {
-                Ok::<_, std::io::Error>(HankMcpServer::new(
+                Ok::<_, std::io::Error>(YupanaMcpServer::new(
                     root.clone(),
                     tenant.clone(),
                     config.clone(),
@@ -58,7 +58,7 @@ pub async fn run_http(
 
     let router = axum::Router::new().nest_service("/mcp", service);
     let addr = format!("{bind}:{port}");
-    eprintln!("Hank MCP server listening on http://{addr}/mcp");
+    eprintln!("Yupana MCP server listening on http://{addr}/mcp");
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, router)

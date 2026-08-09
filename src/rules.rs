@@ -97,14 +97,14 @@ pub struct Rule {
     /// conflating them is what left "may this ever execute?" unanswerable.
     ///
     /// `None` for a rule that does not declare one — a locally-configured rule
-    /// under `[[hank.policy.rules]]`, or a projected policy from a quipu that
+    /// under `[[yupana.policy.rules]]`, or a projected policy from a quipu that
     /// predates the field. Absent means "fall back to the ambient
     /// [`crate::policy::Mode`]", never a guessed class.
     #[serde(default)]
     pub class: Option<ConstraintClass>,
     /// Where this rule is evaluated (SARC §4.1), mirroring
     /// `aegis:verificationPoint`. Carried so a verdict can say which point
-    /// produced it; hank evaluates `PAG` rules at `hook pre-edit` and `PAA`
+    /// produced it; yupana evaluates `PAG` rules at `hook pre-edit` and `PAA`
     /// rules at `hook post-edit`.
     #[serde(default)]
     pub verification_point: Option<VerificationPoint>,
@@ -203,7 +203,7 @@ impl Rule {
         RuleViolation {
             rule: self.name.clone(),
             message: format!(
-                "hank: {location}: rule `{}` — {explanation}.{offending} \
+                "yupana: {location}: rule `{}` — {explanation}.{offending} \
                  ({} tier)",
                 self.name,
                 Tier::TreeSitter.as_str()

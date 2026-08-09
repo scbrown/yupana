@@ -1,10 +1,10 @@
-//! The guard's two RULE planes, lifted out of `pre_edit` for size (hank #83).
+//! The guard's two RULE planes, lifted out of `pre_edit` for size (yupana #83).
 //!
 //! Both answer the same question — "does the text this edit introduces break a
 //! rule?" — and both return a [`Decision`], so the guard applies one verdict per
 //! edit whichever plane produced it:
 //!
-//! - **local** ([`rule_check`]) — the `[[hank.policy.rules]]` set from config,
+//! - **local** ([`rule_check`]) — the `[[yupana.policy.rules]]` set from config,
 //!   language-gated, evaluated against the added text. Not per-tenant: a rule
 //!   like "no ticket id in a comment" governs the code, not who wrote it.
 //! - **governed** ([`governed_check`], `quipu` feature) — the same shape, but
@@ -29,7 +29,7 @@ use super::*;
 /// `new_string`s of an `Edit`/`MultiEdit`), so an agent is answerable for what it
 /// writes, not for pre-existing debt elsewhere in the file — the same "size the
 /// touched region" discipline the blast-radius path uses.
-pub(super) fn rule_check(config: &HankConfig, input: &HookInput, rel: &str) -> Option<Decision> {
+pub(super) fn rule_check(config: &YupanaConfig, input: &HookInput, rel: &str) -> Option<Decision> {
     // Mode::Off disarms the whole guard, rules included.
     if config.policy.mode == Mode::Off {
         return None;
@@ -127,7 +127,7 @@ fn evaluations_for<'a>(
             // copied from the policy's own aegis:hostedAtLayer, because a
             // record that echoed the claim would let an overclaim survive the
             // audit by being asserted twice (SARC I6).
-            .hosted_at(crate::hosting::HANK_HOSTS_AT)
+            .hosted_at(crate::hosting::YUPANA_HOSTS_AT)
         })
         .collect()
 }
@@ -190,7 +190,7 @@ fn rule_verdict_message(
 /// cache, and that seam is deliberately untouched here.
 #[cfg(feature = "quipu")]
 pub(super) fn governed_check(
-    config: &HankConfig,
+    config: &YupanaConfig,
     input: &HookInput,
     root: &Path,
     rel: &str,
@@ -247,7 +247,7 @@ pub(super) fn governed_check(
             // here: the guard did its job, and the operator still needs to know
             // it did so on a catalogue it could not confirm.
             eprintln!(
-                "hank: governed policy served from CACHE ({age_secs}s old) — \
+                "yupana: governed policy served from CACHE ({age_secs}s old) — \
                  live projection failed: {error}"
             );
             crate::metrics::emit(
@@ -314,7 +314,7 @@ pub(super) fn governed_check(
     let mut target_repo: Option<String> = None;
     if !text_violations.is_empty() {
         // Exposure is resolved ONCE per edit, from the graph, via the governed
-        // policy itself — so hank and every other consumer of rule #1 share one
+        // policy itself — so yupana and every other consumer of rule #1 share one
         // definition of "public". Any failure to ask IS the Unknown answer.
         let repo = target_root
             .as_deref()
@@ -419,7 +419,7 @@ pub(super) fn governed_check(
     let blocks = config.policy.mode == Mode::Enforce && any_blocking;
     let message = rule_verdict_message_from(&messages.join("\n"), registry.freshness(), cache_age);
     // The same rule names the `governed` line already reports, carried onto the
-    // `guard` line too (hank #77). Without this a governed deny is the one deny
+    // `guard` line too (yupana #77). Without this a governed deny is the one deny
     // an operator has to JOIN two spool lines to attribute — and the join is by
     // timestamp, which is exactly the correlation that failed during the
     // incident that motivated the issue. Structural violations contribute a
@@ -428,7 +428,7 @@ pub(super) fn governed_check(
     let outcome = if blocks {
         Outcome::Deny(message)
     } else {
-        Outcome::Notify(format!("hank (governed, not blocking): {message}"))
+        Outcome::Notify(format!("yupana (governed, not blocking): {message}"))
     };
     let response = crate::trace::Response::of(&outcome);
 

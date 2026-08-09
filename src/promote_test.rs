@@ -120,7 +120,7 @@ fn snapshot_write_names_one_atomic_replacement_envelope() {
 // language — because the synced node shapes (quipu's registry) now require
 // them. The old label-and-tier-only symbol predates the sync and fails
 // MinCount x2: a "conforming" fixture thinner than any real emission tests
-// a projection hank never writes.
+// a projection yupana never writes.
 const CONFORMING: &str = r#"
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix bobbin: <http://aegis.gastown.local/ontology/> .
@@ -263,9 +263,9 @@ fn a_retained_payload_is_byte_identical_and_overwrites_in_place() {
     // diagnostic that grows without bound is its own outage — and the retained
     // bytes must be the projection itself, not a summary of it.
     let dir = tempfile::tempdir().unwrap();
-    let first = dump_payload_to(dir.path(), CONFORMING, "hank promote demo@abc (cli)")
+    let first = dump_payload_to(dir.path(), CONFORMING, "yupana promote demo@abc (cli)")
         .expect("dump written");
-    let second = dump_payload_to(dir.path(), VIOLATING, "hank promote demo@abc (cli)")
+    let second = dump_payload_to(dir.path(), VIOLATING, "yupana promote demo@abc (cli)")
         .expect("dump written");
     assert_eq!(first, second, "the same source must reuse one dump path");
     assert_eq!(std::fs::read_to_string(&second).unwrap(), VIOLATING);
@@ -346,7 +346,7 @@ fn one_results_focus_node_never_bleeds_into_the_next() {
 fn a_dump_slug_cannot_escape_its_directory() {
     // `source` is caller-supplied and reaches a filename; a path separator or a
     // parent-dir hop must not steer the write outside the dump dir.
-    let slug = payload_slug("hank promote ../../etc/passwd@HEAD (cli)");
+    let slug = payload_slug("yupana promote ../../etc/passwd@HEAD (cli)");
     assert!(!slug.contains('/'), "{slug:?}");
     assert!(!slug.contains(".."), "{slug:?}");
     assert!(!slug.is_empty());
@@ -546,20 +546,20 @@ fn carrying_definitions_repeats_them_without_losing_a_single_fact() {
 /// minutes; this is the harness that answers "does it hold at 65 MB / 71 chunks",
 /// which a synthetic fixture cannot.
 ///
-///     HANK_CHUNK_SOAK_PAYLOAD=/tmp/hank-promote-….ttl \
+///     YUPANA_CHUNK_SOAK_PAYLOAD=/tmp/yupana-promote-….ttl \
 ///       cargo test --features quipu --lib -- --ignored --nocapture chunk_soak
 ///
-/// `HANK_CHUNK_SOAK_DUMP=<dir>` also writes each chunk out. This verdict is
+/// `YUPANA_CHUNK_SOAK_DUMP=<dir>` also writes each chunk out. This verdict is
 /// rudof's, and rudof is not the engine that refused in production — dumping is
-/// what lets the same chunk be put to quipu's own SHACL, so "hank says it
+/// what lets the same chunk be put to quipu's own SHACL, so "yupana says it
 /// conforms" can be checked against the validator that actually gates the write.
 #[test]
-#[ignore = "needs HANK_CHUNK_SOAK_PAYLOAD; minutes, not milliseconds"]
+#[ignore = "needs YUPANA_CHUNK_SOAK_PAYLOAD; minutes, not milliseconds"]
 fn chunk_soak_every_chunk_of_a_real_payload_stands_alone() {
-    let Ok(path) = std::env::var("HANK_CHUNK_SOAK_PAYLOAD") else {
-        panic!("set HANK_CHUNK_SOAK_PAYLOAD to a retained .ttl payload");
+    let Ok(path) = std::env::var("YUPANA_CHUNK_SOAK_PAYLOAD") else {
+        panic!("set YUPANA_CHUNK_SOAK_PAYLOAD to a retained .ttl payload");
     };
-    let dump = std::env::var("HANK_CHUNK_SOAK_DUMP").ok();
+    let dump = std::env::var("YUPANA_CHUNK_SOAK_DUMP").ok();
     let t = std::fs::read_to_string(&path).expect("read payload");
     let chunks = chunk_turtle(&t, CHUNK_LIMIT).expect("chunked");
     println!("payload {} bytes -> {} chunks", t.len(), chunks.len());
@@ -688,7 +688,7 @@ fn multi_chunk_report_names_the_chunk_count() {
 fn a_cfg_duplicate_source_tree_now_conforms_end_to_end() {
     // THE MONEY TEST for aegis-4ba2e. The two tests above prove the refusal is
     // now READABLE; this one proves there is nothing left to refuse. It runs the
-    // real extractor over the real shape that froze hank — two mutually
+    // real extractor over the real shape that froze yupana — two mutually
     // exclusive `#[cfg]` declarations of one name, which tree-sitter sees both
     // of because it parses rather than evaluating cfg — and validates the
     // projection against the shipped shapes.

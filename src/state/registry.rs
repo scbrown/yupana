@@ -1,6 +1,6 @@
 //! Per-game / per-faction tenancy — a fog-of-war **security** boundary (FR-39).
 //!
-//! Hank's code tenancy is one shared base plus a copy-on-write overlay per
+//! Yupana's code tenancy is one shared base plus a copy-on-write overlay per
 //! developer. Mapped onto games: the tenant is `(game_id, faction_id)`, the
 //! shared base is the game's COMMON KNOWLEDGE (map, public treaties, observed
 //! sightings), and each faction's overlay is its private intel (own units and
@@ -100,7 +100,7 @@ pub struct GameStatus {
     pub factions: Vec<FactionStatus>,
 }
 
-/// What `hank status` reports about the board layer.
+/// What `yupana status` reports about the board layer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StateStatus {
     /// The games resident, sorted.
@@ -220,7 +220,7 @@ impl StateRegistry {
         self.overlays.retain(|k, _| k.game_id != game_id);
     }
 
-    /// The board layer as `hank status` reports it.
+    /// The board layer as `yupana status` reports it.
     #[must_use]
     pub fn status(&self) -> StateStatus {
         let games = self

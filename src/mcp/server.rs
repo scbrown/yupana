@@ -1,4 +1,4 @@
-//! The Hank MCP server and its tools.
+//! The Yupana MCP server and its tools.
 //!
 //! Registration mirrors Bobbin: a `#[tool_router]` impl of `#[tool]`-annotated
 //! async methods taking `Parameters<Req>`, a `#[tool_handler] ServerHandler`
@@ -28,7 +28,7 @@ use super::tools::{
     ReconciliationItem, RefItem, ReferencesRequest, ReferencesResponse, StatusResponse, SymbolItem,
     SymbolsRequest, SymbolsResponse, VerifyRequest, VerifyResponse, ViolationItem,
 };
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::dataflow::{Dataflow, FlowDir};
 use crate::extract::{extract_symbols, rust_files};
 use crate::graph::{CodeGraph, Dir, Reached};
@@ -45,13 +45,13 @@ fn graph_tier() -> String {
     Tier::TreeSitter.as_str().to_string()
 }
 
-/// Hank's MCP server. Resolves requests against the analysis root for a tenant.
+/// Yupana's MCP server. Resolves requests against the analysis root for a tenant.
 #[derive(Clone)]
-pub struct HankMcpServer {
+pub struct YupanaMcpServer {
     root: PathBuf,
     tenant: Option<String>,
     /// The `--config` override the server was launched with, if any. Honoured
-    /// on every config read so `hank serve --config` is not silently ignored
+    /// on every config read so `yupana serve --config` is not silently ignored
     /// (aegis-ll3p).
     config: Option<PathBuf>,
     /// The FR-39 board layer this PROCESS holds (see
@@ -63,7 +63,7 @@ pub struct HankMcpServer {
     tool_router: ToolRouter<Self>,
 }
 
-impl HankMcpServer {
+impl YupanaMcpServer {
     /// Construct a server rooted at `root` for an optional `tenant`, honouring
     /// an optional `--config` override.
     #[must_use]
@@ -80,12 +80,12 @@ impl HankMcpServer {
 }
 
 #[tool_router]
-impl HankMcpServer {
+impl YupanaMcpServer {
     #[tool(
-        description = "Show Hank's base ref, tenant, available extraction tiers, the languages this build can parse, and Quipu promotion settings. Check `languages` before trusting an empty impact/callers answer: a language absent there yields no symbols at all."
+        description = "Show Yupana's base ref, tenant, available extraction tiers, the languages this build can parse, and Quipu promotion settings. Check `languages` before trusting an empty impact/callers answer: a language absent there yields no symbols at all."
     )]
-    async fn hank_status(&self) -> Result<CallToolResult, McpError> {
-        let config = HankConfig::resolve(self.config.as_deref(), &self.root).map_err(internal)?;
+    async fn yupana_status(&self) -> Result<CallToolResult, McpError> {
+        let config = YupanaConfig::resolve(self.config.as_deref(), &self.root).map_err(internal)?;
         let response = StatusResponse {
             base_ref: config.base_ref,
             tenant: self
@@ -107,7 +107,7 @@ impl HankMcpServer {
     #[tool(
         description = "List the symbols (functions, structs, traits, ...) defined in one file. Each symbol carries a tier tag. Best for: 'what's defined in src/auth.rs?'."
     )]
-    async fn hank_symbols(
+    async fn yupana_symbols(
         &self,
         Parameters(req): Parameters<SymbolsRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -134,7 +134,7 @@ impl HankMcpServer {
     #[tool(
         description = "Find the definition site(s) of a symbol by name across a subtree. Best for: 'where is authenticate defined?'."
     )]
-    async fn hank_references(
+    async fn yupana_references(
         &self,
         Parameters(req): Parameters<ReferencesRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -144,7 +144,7 @@ impl HankMcpServer {
     #[tool(
         description = "Summarize the structure of a subtree: how many files and symbols. Best for a quick health check of the base graph."
     )]
-    async fn hank_analyze(
+    async fn yupana_analyze(
         &self,
         Parameters(req): Parameters<AnalyzeRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -174,7 +174,7 @@ impl HankMcpServer {
     #[tool(
         description = "List the direct callers of a symbol (who calls it). Best for: 'who calls authenticate?'."
     )]
-    async fn hank_callers(
+    async fn yupana_callers(
         &self,
         Parameters(req): Parameters<NeighborsRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -184,7 +184,7 @@ impl HankMcpServer {
     #[tool(
         description = "List the direct callees of a symbol (what it calls). Best for: 'what does authenticate call?'."
     )]
-    async fn hank_callees(
+    async fn yupana_callees(
         &self,
         Parameters(req): Parameters<NeighborsRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -194,7 +194,7 @@ impl HankMcpServer {
     #[tool(
         description = "Blast radius: the symbols transitively affected by changing a symbol (its callers, up to N hops). Best for: 'what breaks if I change authenticate?'."
     )]
-    async fn hank_impact(
+    async fn yupana_impact(
         &self,
         Parameters(req): Parameters<ImpactRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -248,7 +248,7 @@ impl HankMcpServer {
     #[tool(
         description = "Detect communities: densely-connected clusters of symbols in the call graph (deterministic Louvain). Best for: 'what are the natural modules/subsystems here?'."
     )]
-    async fn hank_communities(
+    async fn yupana_communities(
         &self,
         Parameters(req): Parameters<CommunitiesRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -287,7 +287,7 @@ impl HankMcpServer {
     #[tool(
         description = "Verify a PROPOSED edit buffer before you write it: returns a boolean verdict plus violations (identifier-does-not-exist, wrong-arity, unresolved-import). Best for: 'will this edit break something?'. Note the `unchecked` list — a true verdict is not a compile."
     )]
-    async fn hank_verify(
+    async fn yupana_verify(
         &self,
         Parameters(req): Parameters<VerifyRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -328,7 +328,7 @@ impl HankMcpServer {
     #[tool(
         description = "Promote a subtree's structural code facts into Quipu: emits Turtle, SHACL-validates it IN-PROCESS, and writes it only if it conforms (all-or-nothing). Returns wrote + triple count on success, or violations on refusal. The write is guarded by serve.read_only. Best for: 'get this code's structure into the knowledge graph, validated'."
     )]
-    async fn hank_promote(
+    async fn yupana_promote(
         &self,
         Parameters(req): Parameters<PromoteRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -338,7 +338,7 @@ impl HankMcpServer {
     #[tool(
         description = "Intra-procedural data dependence within a function. With `var`, trace what it depends on (or, with forward=true, what it flows into); without `var`, list all dependence edges. Best for: 'where does this value come from?'."
     )]
-    async fn hank_dataflow(
+    async fn yupana_dataflow(
         &self,
         Parameters(req): Parameters<DataflowRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -346,12 +346,12 @@ impl HankMcpServer {
     }
 
     // The three board tools (FR-35/37/38). Always REGISTERED for the same reason
-    // `hank_promote` is — the `#[tool_router]` macro references every `#[tool]`
+    // `yupana_promote` is — the `#[tool_router]` macro references every `#[tool]`
     // method unconditionally — with the BODY feature-split on `game-state`.
     #[tool(
         description = "Ingest generic (non-code) facts into the hot board graph: {entities[], edges[], game_id, faction_id, visibility, provenance}. The node/edge JSON mirrors quipu_episode, so one adapter output feeds both stores. `visibility` has NO default and MUST be stated: `shared` writes the game's common-knowledge base that every faction reads, `private` writes only this faction's copy-on-write overlay. A shared write carrying a faction is refused and counted — that is a fog-of-war leak. Facts are tagged tier `engine-state`. Best for: 'load this turn's world view before guarding a move'."
     )]
-    async fn hank_ingest(
+    async fn yupana_ingest(
         &self,
         Parameters(req): Parameters<StateIngestRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -359,9 +359,9 @@ impl HankMcpServer {
     }
 
     #[tool(
-        description = "Check proposed orders against game-state policies, over a copy-on-write overlay of THIS faction's board — the (game_state + proposed_orders) analog of hank_verify. Returns violations (deny) and advisories (warn), each naming the offending order ids, plus `unevaluated` and `vacuous` for policies that could not run or whose selector matched nothing. REFUSES if no board was ingested into this process, rather than reporting zero violations over an empty board. COMPLEMENTS the game engine, which remains the sole authority on legality: this can only subtract from, or annotate, moves that are already legal, and it judges an APPROXIMATED post-order board built from each order's declared effects. Best for: 'would these orders break one of our standing rules?'."
+        description = "Check proposed orders against game-state policies, over a copy-on-write overlay of THIS faction's board — the (game_state + proposed_orders) analog of yupana_verify. Returns violations (deny) and advisories (warn), each naming the offending order ids, plus `unevaluated` and `vacuous` for policies that could not run or whose selector matched nothing. REFUSES if no board was ingested into this process, rather than reporting zero violations over an empty board. COMPLEMENTS the game engine, which remains the sole authority on legality: this can only subtract from, or annotate, moves that are already legal, and it judges an APPROXIMATED post-order board built from each order's declared effects. Best for: 'would these orders break one of our standing rules?'."
     )]
-    async fn hank_guard(
+    async fn yupana_guard(
         &self,
         Parameters(req): Parameters<StateGuardRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -369,9 +369,9 @@ impl HankMcpServer {
     }
 
     #[tool(
-        description = "Speculatively apply an order set to this faction's board and return what it changes and what those changes reach, ranked nearest-then-largest — hank_impact generalized from the call graph to the board. Nothing is committed. Structural only: which entities a change reaches, how far, by which relations, over the adapter's own vocabulary — domain judgements like 'is this base exposed' are graph-pattern policies via hank_guard, not hardcoded here. Contrast with quipu_impact, which is durable and cross-game; this is ephemeral, this-turn and tactical. Best for: 'what does this move expose?'."
+        description = "Speculatively apply an order set to this faction's board and return what it changes and what those changes reach, ranked nearest-then-largest — yupana_impact generalized from the call graph to the board. Nothing is committed. Structural only: which entities a change reaches, how far, by which relations, over the adapter's own vocabulary — domain judgements like 'is this base exposed' are graph-pattern policies via yupana_guard, not hardcoded here. Contrast with quipu_impact, which is durable and cross-game; this is ephemeral, this-turn and tactical. Best for: 'what does this move expose?'."
     )]
-    async fn hank_whatif(
+    async fn yupana_whatif(
         &self,
         Parameters(req): Parameters<StateWhatIfRequest>,
     ) -> Result<CallToolResult, McpError> {
@@ -379,10 +379,10 @@ impl HankMcpServer {
     }
 }
 
-impl HankMcpServer {
-    /// Shared body for `hank_callers` / `hank_callees`.
+impl YupanaMcpServer {
+    /// Shared body for `yupana_callers` / `yupana_callees`.
     fn neighbors(&self, req: &NeighborsRequest, dir: Dir) -> Result<CallToolResult, McpError> {
-        // Stage 3c: same cutover shape as `hank_impact` — resident daemon when
+        // Stage 3c: same cutover shape as `yupana_impact` — resident daemon when
         // usable and unscoped, transient fallback otherwise (see there).
         if req.path.is_none() {
             if let Some(response) =
@@ -410,22 +410,22 @@ impl HankMcpServer {
 }
 
 #[tool_handler]
-impl ServerHandler for HankMcpServer {
+impl ServerHandler for YupanaMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
-                name: "hank".to_string(),
-                title: Some("Hank Code Structure".to_string()),
+                name: "yupana".to_string(),
+                title: Some("Yupana Code Structure".to_string()),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 icons: None,
                 website_url: None,
             },
             instructions: Some(
-                "Hank serves live, per-tenant code structure. Use hank_symbols to list a \
-                 file's symbols, hank_references to find where a symbol is defined, \
-                 hank_analyze for a subtree summary, and hank_status for base ref and tiers. \
+                "Yupana serves live, per-tenant code structure. Use yupana_symbols to list a \
+                 file's symbols, yupana_references to find where a symbol is defined, \
+                 yupana_analyze for a subtree summary, and yupana_status for base ref and tiers. \
                  Every fact is tagged with its tier (treesitter/lsp/cpg)."
                     .to_string(),
             ),
@@ -456,8 +456,8 @@ fn reach_item(reached: &Reached) -> ReachItem {
     }
 }
 
-// The bodies of the two heaviest tool handlers (hank #83). Not test-gated —
-// `hank_promote` and `hank_dataflow` call into it at runtime.
+// The bodies of the two heaviest tool handlers (yupana #83). Not test-gated —
+// `yupana_promote` and `yupana_dataflow` call into it at runtime.
 #[path = "handlers.rs"]
 mod handlers;
 

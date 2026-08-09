@@ -4,7 +4,7 @@
 > of its effect on the UI," "this module needs a security review." That process
 > need not happen at edit time, or by the agent that made the edit. This design
 > is how a governed edit assigns a workflow **asynchronously**, across the
-> Hank × Quipu × Shantytown stack, without any tool growing a job that isn't its.
+> Yupana × Quipu × Shantytown stack, without any tool growing a job that isn't its.
 
 ## The shared currency
 
@@ -14,21 +14,21 @@ at exactly one point:
 
 | Tool | One job |
 |---|---|
-| **Hank** | Record structure — promote the entity change to Quipu (FR-19). Structure-only: it does **not** evaluate policy or orchestrate workflows. It informs the *acting agent* in-loop via the `post-edit` hook (configurable). |
+| **Yupana** | Record structure — promote the entity change to Quipu (FR-19). Structure-only: it does **not** evaluate policy or orchestrate workflows. It informs the *acting agent* in-loop via the `post-edit` hook (configurable). |
 | **Quipu** | Own the rule and the record — the `Policy` (`targets` + `assignsWorkflow`), the `Workflow` / `Step` / `Transition`, the resulting `Decision` / `Verdict` — and act as the **event source** (bitemporal transaction log). |
 | **Shantytown** | Subscribe and route — watch Quipu's entity events, evaluate the policy at the subscription boundary, deliver the required workflow to the administrator, who *acts*. |
 
 ## The loop (async-first)
 
 ```text
-agent (via Hank) edits src/ui/widget.rs
- → Hank promotes the entity change to Quipu               (async; a new transaction)
+agent (via Yupana) edits src/ui/widget.rs
+ → Yupana promotes the entity change to Quipu               (async; a new transaction)
  → Shantytown subscribes to Quipu entity events
       sees the change → asks Quipu /policy/check "is a workflow required?"
  → yes: aegis:Workflow "UI-demo-required" → route to the ADMINISTRATOR
  → admin ACTS: creates a bead "demo UI effects of the widget change"
       (assignable to anyone, anytime — not necessarily now, not necessarily that agent)
- → Hank's post-edit hook informs the ORIGINAL agent in-loop (configurable, FR-30)
+ → Yupana's post-edit hook informs the ORIGINAL agent in-loop (configurable, FR-30)
 ```
 
 The requirement surfaces as a **Quipu entity event**, not a synchronous block.
@@ -63,13 +63,13 @@ workflow rather than blocking:
 }
 ```
 
-Even here Hank only **references** the workflow — it names the requirement; it
+Even here Yupana only **references** the workflow — it names the requirement; it
 does not run it. Blocking guards stay opt-in, because a wrong hard-deny is worse
 than none (FR-30).
 
 ## Boundary discipline
 
-- **Hank records structure and (guard only) references a workflow.** It never
+- **Yupana records structure and (guard only) references a workflow.** It never
   evaluates policy on the hot path or orchestrates. Policy evaluation and routing
   live in Shantytown; the record lives in Quipu.
 - **Quipu owns the rule.** "This entity type requires this workflow" is a governed
@@ -93,7 +93,7 @@ than none (FR-30).
 
 1. A `ui-demo` `aegis:Policy` in Quipu `targets` the `src/ui/**` module type and
    `assignsWorkflow` the `ui-demo-required` `aegis:Workflow`.
-2. An agent edits `src/ui/widget.rs`. Hank promotes the entity change; the agent
+2. An agent edits `src/ui/widget.rs`. Yupana promotes the entity change; the agent
    gets the in-loop `post-edit` advisory.
 3. Shantytown's subscription sees the change, asks `/policy/check`, learns a
    workflow is required, and routes it to the administrator.
@@ -103,11 +103,11 @@ than none (FR-30).
 
 ## Status
 
-- **Exists today:** `hank hook post-edit` (the in-loop agent advisory); Quipu's
+- **Exists today:** `yupana hook post-edit` (the in-loop agent advisory); Quipu's
   governance plane (`Workflow` / `Step` / `Policy` / `Verdict`) and
   `tool_policy_check`.
 - **This design adds:** `aegis:assignsWorkflow` and the transactions cursor in
   Quipu; the `QuipuEvents` subscriber and admin routing in Shantytown; the
-  optional `required_workflow` field on the `pre-edit` verdict in Hank.
-- **See also:** [Governed Relations](governed-relations.md) — the Hank ⋈ Quipu
+  optional `required_workflow` field on the `pre-edit` verdict in Yupana.
+- **See also:** [Governed Relations](governed-relations.md) — the Yupana ⋈ Quipu
   join this builds on.

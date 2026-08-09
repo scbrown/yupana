@@ -1,4 +1,4 @@
-//! The §6.3 acceptance suite for hank #2 slice 2: tenant isolation is
+//! The §6.3 acceptance suite for yupana #2 slice 2: tenant isolation is
 //! ABSOLUTE, masking/revert/deletion behave, overlay cost is `O(touched)`,
 //! and FR-15 interning shares parses across tenants. Everything goes through
 //! the public API: `Base` → `TenantRegistry` → `TenantView` → the FR-12 walk.
@@ -8,9 +8,9 @@
 //! same emphasis the prose uses throughout this repo, and it is load-bearing in
 //! a test name: it says which word the assertion turns on. Allowed explicitly,
 //! and scoped to tests, so the lint stays live everywhere else rather than
-//! being switched off crate-wide (hank #83).
+//! being switched off crate-wide (yupana #83).
 #![allow(non_snake_case)]
-use hank::graph::{reachable_over, update_frontier, Base, Dir, TenantRegistry};
+use yupana::graph::{reachable_over, update_frontier, Base, Dir, TenantRegistry};
 use std::sync::Arc;
 
 /// A committed 3-hop chain (leaf ← mid ← top) plus `pad` files so `O(touched)`
@@ -79,7 +79,7 @@ fn an_empty_overlay_views_identically_to_the_base() {
     let view = reg.view("never-seen");
     let via_view = reachable_over(&view, "leaf", Dir::Callers, 5);
     let via_base = reg.base().graph().reachable("leaf", Dir::Callers, 5);
-    let key = |r: &hank::graph::Reached| (r.name.clone(), r.file.clone(), r.distance);
+    let key = |r: &yupana::graph::Reached| (r.name.clone(), r.file.clone(), r.distance);
     let mut a: Vec<_> = via_view.iter().map(key).collect();
     let mut b: Vec<_> = via_base.iter().map(key).collect();
     a.sort();
@@ -418,7 +418,7 @@ fn reset_to_base_clears_the_overlay_but_keeps_the_session() {
 
 #[test]
 fn exceeding_max_overlays_evicts_lru_per_policy_fr18() {
-    use hank::config::TenancyConfig;
+    use yupana::config::TenancyConfig;
     let (_dir, base_reg) = registry();
     let base = std::sync::Arc::clone(base_reg.base());
     // Cap of 2, LRU policy.
@@ -446,7 +446,7 @@ fn exceeding_max_overlays_evicts_lru_per_policy_fr18() {
 
 #[test]
 fn on_session_close_policy_evicts_oldest_as_the_cap_backstop() {
-    use hank::config::TenancyConfig;
+    use yupana::config::TenancyConfig;
     let (_dir, base_reg) = registry();
     let base = std::sync::Arc::clone(base_reg.base());
     let mut reg = TenantRegistry::with_tenancy(

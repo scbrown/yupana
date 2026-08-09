@@ -1,4 +1,4 @@
-//! Tests for `hank_whatif` (FR-38).
+//! Tests for `yupana_whatif` (FR-38).
 #![allow(non_snake_case)]
 
 use super::*;
@@ -157,7 +157,7 @@ fn a_removed_entity_shows_as_removed_and_is_not_ranked() {
 
 #[test]
 fn EVERY_effect_kind_reports_a_subject_that_is_off_the_board() {
-    // The caller and hank disagreeing about what is on the board is the
+    // The caller and yupana disagreeing about what is on the board is the
     // condition under which every later answer is about a different game. It
     // must surface for every effect kind, not just the ones that happen to look
     // up their subject — and a stranger must never be RANKED, which would put a

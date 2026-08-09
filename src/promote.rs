@@ -15,16 +15,16 @@
 //!
 //! WHY IN-PROCESS VALIDATION, NOT QUIPU'S. Quipu exposes `/validate`, and it works.
 //! But validating against the same server you are about to write to proves only
-//! that the server agrees with itself. FR-20 wants hank to hold its own copy of the
-//! shapes and check independently, so a shape drift between hank and Quipu is caught
-//! at hank rather than discovered as bad data already in the graph. rudof_lib is
+//! that the server agrees with itself. FR-20 wants yupana to hold its own copy of the
+//! shapes and check independently, so a shape drift between yupana and Quipu is caught
+//! at yupana rather than discovered as bad data already in the graph. rudof_lib is
 //! that independent checker; `scripts/check-code-shapes.sh` is the cross-check that
 //! the two engines still agree.
 //!
 //! WHY `/knot` OVER HTTP, NOT THE `quipu` CRATE. FR-21 names three promotion
 //! surfaces — `quipu_knot` (MCP) / `POST /knot` (REST) / `Store::transact`
 //! (in-process). The REST surface needs no `quipu` crate dependency (still
-//! rev-unpinned, Cargo.toml), and hank explicitly does NOT stand up its own triple
+//! rev-unpinned, Cargo.toml), and yupana explicitly does NOT stand up its own triple
 //! store (§14.4). So promotion is an HTTP POST of validated Turtle. `/knot` is
 //! bitemporal: a re-promotion of the same facts supersedes rather than duplicating,
 //! which is why re-running is idempotent BY TRIPLE COUNT, not by write count.
@@ -34,7 +34,7 @@ use std::io::Write;
 
 use crate::errors::{Error, Result};
 
-/// The code-edge SHACL shapes hank ships and validates against. Compiled in so a
+/// The code-edge SHACL shapes yupana ships and validates against. Compiled in so a
 /// promotion can never run against shapes that drift from the binary — the file on
 /// disk is for humans and `check-code-shapes.sh`; THIS is what actually gates a
 /// write.
@@ -140,7 +140,7 @@ fn report_field(line: &str, name: &str) -> Option<String> {
 /// symbol, the file, nor the property; the offender was found only by exporting
 /// the payload by hand and diffing cardinalities. The report already carries
 /// `sh:focusNode` and `sh:resultPath` — Quipu's own `/validate` returns both —
-/// so hank was discarding the two fields that make a refusal actionable.
+/// so yupana was discarding the two fields that make a refusal actionable.
 ///
 /// Absent fields degrade to the message alone rather than erroring: a report
 /// shape we did not anticipate must still surface its violation.
@@ -272,11 +272,11 @@ fn write_knot_request(
     let url = format!("{}/knot", endpoint.trim_end_matches('/'));
     let auth = quipu_auth_token();
     // Provenance on every write (promotion tail item 4): quipu records actor +
-    // source per transaction; an anonymous writer is unauditable, and hank was
+    // source per transaction; an anonymous writer is unauditable, and yupana was
     // the only anonymous one left.
     let mut body = serde_json::json!({
         "turtle": turtle,
-        "actor": "hank",
+        "actor": "yupana",
         "source": source
     });
     if let Some(key) = snapshot {
@@ -324,10 +324,10 @@ fn write_knot_request(
         .into_string()
         .map_err(|e| Error::Promote(format!("could not read /knot response: {e}")))?;
     // Quipu can REFUSE the write server-side: its persistent shape registry,
-    // when loaded, validates independently of hank's in-process gate, and a
-    // shape the server holds that hank's copy lacks surfaces HERE as HTTP 200
+    // when loaded, validates independently of yupana's in-process gate, and a
+    // shape the server holds that yupana's copy lacks surfaces HERE as HTTP 200
     // with conforms:false (seen live: a stored symbolKind maxCount(1) refused
-    // a projection hank's shapes accepted). That is a real refusal and must
+    // a projection yupana's shapes accepted). That is a real refusal and must
     // read as one — not as a JSON parse error on a missing `count` field.
     if let Ok(refusal) = serde_json::from_str::<KnotRefusal>(&text) {
         if !refusal.conforms {
@@ -339,7 +339,7 @@ fn write_knot_request(
                 .join("; ");
             return Err(Error::Promote(format!(
                 "quipu refused the write (server-side SHACL, {} violation(s)): {issues}. \
-                 hank's own shapes ACCEPTED this projection — the two shape sets have \
+                 yupana's own shapes ACCEPTED this projection — the two shape sets have \
                  drifted; reconcile shapes/code-edges.ttl with quipu's stored registry.",
                 refusal.violations
             )));
@@ -372,7 +372,7 @@ struct KnotIssue {
 
 /// Quipu `/knot` response. `conforms` here is Quipu's OWN field and is NOT the
 /// validation gate — Quipu's persistent shape registry may be empty, in which case
-/// it reports `conforms:true` for anything. hank's gate is [`validate`] above,
+/// it reports `conforms:true` for anything. yupana's gate is [`validate`] above,
 /// which ran before this. `count` is the load-bearing field for idempotence.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct KnotResult {
@@ -405,10 +405,10 @@ pub struct KnotResult {
 /// Across DIFFERENT failing commits it is one dump each, deliberately: the SHA is
 /// what tells you which projection you are holding, and reusing one name would
 /// overwrite the payload you were still reading. That bound is
-/// distinct-failing-commits, not runs. `HANK_PROMOTE_DUMP_DIR` overrides the
+/// distinct-failing-commits, not runs. `YUPANA_PROMOTE_DUMP_DIR` overrides the
 /// temp-dir default.
 fn dump_payload(turtle: &str, source: &str) -> Option<std::path::PathBuf> {
-    let dir = std::env::var("HANK_PROMOTE_DUMP_DIR")
+    let dir = std::env::var("YUPANA_PROMOTE_DUMP_DIR")
         .ok()
         .filter(|d| !d.is_empty())
         .map_or_else(std::env::temp_dir, std::path::PathBuf::from);
@@ -418,7 +418,7 @@ fn dump_payload(turtle: &str, source: &str) -> Option<std::path::PathBuf> {
 /// [`dump_payload`] with the directory passed in.
 ///
 /// Split so the whole of the write — the naming, the directory creation, the
-/// best-effort contract — is testable without setting `HANK_PROMOTE_DUMP_DIR`:
+/// best-effort contract — is testable without setting `YUPANA_PROMOTE_DUMP_DIR`:
 /// parallel tests race on env vars, and this crate denies `unsafe_code`, which
 /// `std::env::set_var` now requires.
 fn dump_payload_to(
@@ -427,7 +427,7 @@ fn dump_payload_to(
     source: &str,
 ) -> Option<std::path::PathBuf> {
     std::fs::create_dir_all(dir).ok()?;
-    let path = dir.join(format!("hank-promote-{}.ttl", payload_slug(source)));
+    let path = dir.join(format!("yupana-promote-{}.ttl", payload_slug(source)));
     std::fs::write(&path, turtle).ok()?;
     Some(path)
 }
@@ -875,7 +875,7 @@ pub fn promote(endpoint: &str, turtle: &str, source: &str) -> Result<Promotion> 
     };
     for (i, chunk) in chunks.iter().enumerate() {
         let knot = write_knot(endpoint, chunk, source).map_err(|e| {
-            // A server-side refusal names a focus node in a payload only hank
+            // A server-side refusal names a focus node in a payload only yupana
             // held, so this failure needs the projection retained too.
             let dump = dump_payload(turtle, source);
             Error::Promote(with_payload(

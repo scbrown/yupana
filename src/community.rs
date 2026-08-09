@@ -1,6 +1,6 @@
 //! Deterministic Louvain community detection over the in-memory graph (FR-9).
 //!
-//! Quipu runs community detection over *committed* facts; Hank computes it live
+//! Quipu runs community detection over *committed* facts; Yupana computes it live
 //! over the hot per-tenant graph. The implementation is **deterministic** — a
 //! given graph always yields the same partition, with no RNG: nodes are visited
 //! in index order, a move is taken only on a strict modularity gain, ties are

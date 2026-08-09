@@ -61,7 +61,7 @@ fn speculation_does_NOT_touch_the_tenants_own_overlay() {
 
 #[test]
 fn an_effect_on_an_ABSENT_entity_is_reported_not_silently_dropped() {
-    // The caller and hank disagreeing about the board is the condition under
+    // The caller and yupana disagreeing about the board is the condition under
     // which every later answer is about a different game. It must surface.
     let base = board();
     let overlay = StateOverlay::new();

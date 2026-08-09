@@ -1,4 +1,4 @@
-//! Tests for `hank_guard` (FR-37).
+//! Tests for `yupana_guard` (FR-37).
 #![allow(non_snake_case)]
 
 use super::*;
@@ -217,7 +217,7 @@ fn a_selector_that_matches_NOTHING_is_VACUOUS_not_satisfied() {
 }
 
 #[test]
-fn a_policy_hank_cannot_evaluate_is_LISTED_not_dropped() {
+fn a_policy_yupana_cannot_evaluate_is_LISTED_not_dropped() {
     let mut sparql = garrison_policy(Effect::Deny);
     sparql.label = "quipu-owned".to_string();
     sparql.predicate.selector_lang = SelectorLang::Sparql;

@@ -1,16 +1,16 @@
-# hank - Agent Instructions
+# yupana - Agent Instructions
 
 ## Project Overview
 
 In-memory, multi-tenant code-analysis engine — the structural signal for the
-Bobbin × Quipu stack. Hank extracts precise structure (AST, symbols, call graph,
+Bobbin × Quipu stack. Yupana extracts precise structure (AST, symbols, call graph,
 and later control/data dependence and LSP facts), keeps it hot per tenant, and
-serves it over MCP/HTTP. See `docs/hank-spec.md` for the full design and
+serves it over MCP/HTTP. See `docs/yupana-spec.md` for the full design and
 `docs/vision.md` for the north star.
 
 Sibling repos: [`scbrown/bobbin`](https://github.com/scbrown/bobbin) (fusion +
 serving) and [`scbrown/quipu`](https://github.com/scbrown/quipu) (governed
-bitemporal graph). Keep Hank's stack coherent with theirs.
+bitemporal graph). Keep Yupana's stack coherent with theirs.
 
 ## Conventions
 
@@ -20,8 +20,8 @@ bitemporal graph). Keep Hank's stack coherent with theirs.
   single recipe with a subcommand argument (e.g. `just docs build`).
 - **Keep source files small.** The pre-commit file-size check warns at 400 lines
   and fails at 500 (tests exempt). One responsibility per module (see the layout
-  in `docs/hank-spec.md` §7.2).
-- **Tag every fact.** Everything Hank serves carries a `tier` (FR-3) — never
+  in `docs/yupana-spec.md` §7.2).
+- **Tag every fact.** Everything Yupana serves carries a `tier` (FR-3) — never
   present a tree-sitter approximation as LSP-precise. (FR-3's `freshness` half is
   Phase 3, not yet served; a response omits it rather than faking a `fresh` tag.)
 - **Don't let a feature ship dark.** When a phase wires a Cargo feature (`mcp`,

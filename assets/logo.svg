@@ -31,7 +31,7 @@
   <circle cx="256" cy="256" r="232" fill="none" stroke="#2d2d4a" stroke-width="1.5"/>
 
   <!-- The eyes come first so the coiled strands read as the goggle RIMS framing each lens.
-       hank is an agent's vision goggles: the two lobes of the feedback loop are a pair of
+       yupana is an agent's vision goggles: the two lobes of the feedback loop are a pair of
        eyes; the coil is what the agent sees the live code structure THROUGH. -->
   <!-- Right eye (right lobe) -->
   <g filter="url(#soft)">
@@ -50,7 +50,7 @@
     <circle cx="185" cy="266" r="3" fill="#ffffff" opacity="0.5"/>
   </g>
 
-  <!-- A hank wound into an infinity / feedback loop: four yarn strands coiled along the
+  <!-- A yupana wound into an infinity / feedback loop: four yarn strands coiled along the
        lemniscate. Crossing at centre; offset copies read as a wound skein — and as the
        goggle rims around the two eyes above. -->
   <g filter="url(#soft)" fill="none" stroke-linecap="round">
@@ -71,7 +71,7 @@
   <circle cx="110" cy="256" r="7" fill="#81B29A" stroke="#1a1a2e" stroke-width="2"/>
 
   <!-- The knot / goggle bridge: strands cross and are tied at the centre, joining the two
-       lenses like the bridge of a pair of goggles (hank tied at its waist; quipu ties the knot) -->
+       lenses like the bridge of a pair of goggles (yupana tied at its waist; quipu ties the knot) -->
   <circle cx="256" cy="256" r="17" fill="url(#tieGrad)" filter="url(#soft)"/>
   <circle cx="256" cy="256" r="17" fill="none" stroke="#ffffff33" stroke-width="1.5"/>
   <circle cx="256" cy="256" r="5" fill="#ffffff" opacity="0.85"/>

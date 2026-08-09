@@ -21,7 +21,7 @@
 //! attribution tuple `α` — SARC §9.6's `⟨P, planner, executor, tool, auth,
 //! C_eval⟩` — lives next door in [`crate::attribution`], which composes the
 //! other five elements around the `C_eval` this module emits. Only `auth` is
-//! deliberately not hank's to record: the effective authority is the
+//! deliberately not yupana's to record: the effective authority is the
 //! intersection of every link's grant, the grants live in quipu, and a
 //! locally-guessed value would put a number in the field the grant store never
 //! agreed to. Recording `P` is what lets the checker derive it.

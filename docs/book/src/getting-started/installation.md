@@ -1,6 +1,6 @@
 # Installation
 
-Hank is a Rust project built with [`just`](https://github.com/casey/just).
+Yupana is a Rust project built with [`just`](https://github.com/casey/just).
 
 ## Prerequisites
 
@@ -11,12 +11,12 @@ Hank is a Rust project built with [`just`](https://github.com/casey/just).
 ## Build from source
 
 ```bash
-git clone https://github.com/scbrown/hank
-cd hank
+git clone https://github.com/scbrown/yupana
+cd yupana
 just build            # or: cargo build --release
 ```
 
-The binary is produced at `target/debug/hank` (or `target/release/hank`).
+The binary is produced at `target/debug/yupana` (or `target/release/yupana`).
 
 ## Install the git hooks
 

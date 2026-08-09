@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 
 use super::HookInput;
 
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::constraint::VerificationPoint;
 use crate::policy::Mode;
 use crate::rules::Rule;
@@ -60,7 +60,7 @@ impl Audit {
 }
 
 /// The locally-configured rules that declare themselves post-action.
-fn paa_rules(config: &HankConfig) -> Vec<&Rule> {
+fn paa_rules(config: &YupanaConfig) -> Vec<&Rule> {
     config
         .policy
         .rules
@@ -75,7 +75,7 @@ fn paa_rules(config: &HankConfig) -> Vec<&Rule> {
 /// the whole reason this point exists. Returns an empty [`Audit`] when the guard
 /// is off, nothing declares itself here, or the file has no applicable grammar.
 pub(super) fn audit(
-    config: &HankConfig,
+    config: &YupanaConfig,
     source: &str,
     rel: &str,
     language: &str,
@@ -109,7 +109,7 @@ pub(super) fn audit(
             audit.constraints.push(
                 ConstraintEvaluation::new(&rule.name, Outcome::Satisfied, Response::Logged)
                     .placed(rule.class, rule.verification_point)
-                    .hosted_at(crate::hosting::HANK_HOSTS_AT),
+                    .hosted_at(crate::hosting::YUPANA_HOSTS_AT),
             );
             continue;
         }
@@ -133,7 +133,7 @@ pub(super) fn audit(
                     None => (
                         Response::NoAction,
                         format!(
-                            " (declared backoff formula `{formula}` is not one hank \
+                            " (declared backoff formula `{formula}` is not one yupana \
                          understands, so NO throttle was applied — the crossing is \
                          recorded and the response was not)"
                         ),
@@ -149,7 +149,7 @@ pub(super) fn audit(
         audit.constraints.push(
             ConstraintEvaluation::new(&rule.name, Outcome::Unsatisfied, response)
                 .placed(rule.class, rule.verification_point)
-                .hosted_at(crate::hosting::HANK_HOSTS_AT),
+                .hosted_at(crate::hosting::YUPANA_HOSTS_AT),
         );
     }
     audit
@@ -200,7 +200,7 @@ pub fn post_action_audit(input_json: &str, default_root: &Path) -> Option<Vec<St
     let file_path = input.tool_input.file_path.clone()?;
     let file = PathBuf::from(&file_path);
     let root = input.root(default_root);
-    let config = crate::config::HankConfig::resolve(None, &root).ok()?;
+    let config = crate::config::YupanaConfig::resolve(None, &root).ok()?;
 
     let rel = super::measure::relative(&file, &root);
     let ext = file.extension().and_then(OsStr::to_str)?;

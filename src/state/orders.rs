@@ -7,14 +7,14 @@
 //! engine's order semantics outside the engine, and the two can drift.
 //!
 //! This module bounds that risk by refusing to do the thing that creates it. An
-//! [`Order`] carries **declared effects** — hank does not know that `MOVE`
+//! [`Order`] carries **declared effects** — yupana does not know that `MOVE`
 //! implies a supply change, and does not try to. It applies exactly the deltas
-//! the adapter states, so the approximation gap is not "hank's model of the
+//! the adapter states, so the approximation gap is not "yupana's model of the
 //! rules vs. the engine's", it is "what the adapter declared vs. what the engine
 //! will do". That is a gap the adapter's author can see, test, and close;
 //! an inference engine's gap is one nobody can enumerate.
 //!
-//! It also means hank never has an opinion about LEGALITY. The engine remains
+//! It also means yupana never has an opinion about LEGALITY. The engine remains
 //! the sole authority; an order reaching here is one the engine already accepts,
 //! and the guard can only subtract from, or annotate, moves that are legal.
 
@@ -88,7 +88,7 @@ pub struct Order {
     /// The adapter's id for this order — what a violation names so the caller
     /// can strip exactly this one.
     pub id: String,
-    /// What the order is (`MOVE`, `BUILD`, …). Descriptive; hank attaches no
+    /// What the order is (`MOVE`, `BUILD`, …). Descriptive; yupana attaches no
     /// semantics to it (see the module docs).
     #[serde(default)]
     pub kind: Option<String>,
@@ -118,7 +118,7 @@ pub struct Applied {
     pub touched: Vec<String>,
     /// Effects that referenced something absent from the view, described for a
     /// human. NOT silently dropped: an order whose subject does not exist means
-    /// the caller and hank disagree about the board, and a guard run over that
+    /// the caller and yupana disagree about the board, and a guard run over that
     /// disagreement is answering about a different game.
     pub unapplied: Vec<String>,
 }
@@ -185,7 +185,7 @@ fn apply_one(
         OrderEffect::AddEdge { edge } => {
             // Endpoints are checked for the same reason a dangling edge is
             // refused at ingest: an edge to an entity that is not on the board
-            // is a disagreement between the caller and hank about what the board
+            // is a disagreement between the caller and yupana about what the board
             // IS, and a guard run over that disagreement answers about a
             // different game. Reported, never quietly stored.
             let missing: Vec<&str> = [edge.source.as_str(), edge.target.as_str()]

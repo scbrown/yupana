@@ -27,7 +27,7 @@
 //!   pct/docker  -> container the id/name is the operand of a known verb
 //!
 //! Anything else — a pipeline, a shell function, a script that does any of the
-//! above internally — is `Unknown`. That is correct: hank cannot see inside a
+//! above internally — is `Unknown`. That is correct: yupana cannot see inside a
 //! script, and pretending otherwise is how a trace stops being evidence.
 
 /// What kind of thing an action targets. Kept deliberately coarse: these are the
@@ -233,7 +233,7 @@ pub fn resolve(cmd: &str) -> Action {
         }
         "git" => {
             // Only the forms that NAME a remote repo. A bare `git commit` acts
-            // on the cwd, which hank cannot resolve to a repo from the command
+            // on the cwd, which yupana cannot resolve to a repo from the command
             // line alone — that is a different lookup and not this function's.
             let sub = w.get(1).copied().unwrap_or("");
             if !matches!(sub, "clone" | "push" | "pull" | "fetch") {

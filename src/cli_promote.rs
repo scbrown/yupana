@@ -1,5 +1,5 @@
-//! `hank promote` — the Phase-4 Quipu promotion command, split out of `cli` for
-//! size (hank #83). See `cli_analyze` for why this is a child module.
+//! `yupana promote` — the Phase-4 Quipu promotion command, split out of `cli` for
+//! size (yupana #83). See `cli_analyze` for why this is a child module.
 //!
 //! Two `cfg` forms of one method: the real path under `quipu`, and a stub that
 //! prints the phase notice without it.
@@ -22,11 +22,11 @@ impl Cli {
     ) -> anyhow::Result<()> {
         // `--to` IS THE AUTHORIZATION, and it is the only one (aegis-o2h97).
         //
-        // This used to fall back to a discovered `[hank.quipu] endpoint`, which
+        // This used to fall back to a discovered `[yupana.quipu] endpoint`, which
         // reads as reasonable and is not: that key is set in the HOST-WIDE
         // `~/.config/bobbin/config.toml` so the pre-edit guard can READ quipu's
         // rule catalogue (aegis-m9ln), so on every agent machine in this fleet a
-        // bare `hank promote` in any checkout wrote to the live graph. It was
+        // bare `yupana promote` in any checkout wrote to the live graph. It was
         // found by someone running it expecting a dry run and getting a real
         // 25k-triple promotion; the write happened to be the wanted one that
         // time. A config set up to authorize READS must not silently authorize
@@ -50,11 +50,11 @@ impl Cli {
             _ => match discovered {
                 Some(found) => anyhow::bail!(
                     "refusing to promote into a DISCOVERED endpoint: {found}\n  \
-                     `[hank.quipu] endpoint` is configured so the pre-edit guard can READ the \
+                     `[yupana.quipu] endpoint` is configured so the pre-edit guard can READ the \
                      rule catalogue. It does not authorize a write, and a promotion is a live \
                      graph write with no undo.\n  \
-                     To write there, say so:        hank promote --to {found}\n  \
-                     To check it without writing:   hank promote --dry-run"
+                     To write there, say so:        yupana promote --to {found}\n  \
+                     To check it without writing:   yupana promote --dry-run"
                 ),
                 None => anyhow::bail!(
                     "no Quipu endpoint: pass --to <url> for a real promotion, or --dry-run to \
@@ -99,7 +99,7 @@ impl Cli {
         // instead of booking emptiness as done.
         if !replace_snapshot && !turtle.contains("bobbin:CodeModule") {
             eprintln!(
-                "hank promote: extracted NOTHING from {} — no parseable source                  files under this tree for the grammars in this build. Refusing                  to promote an empty graph as success. (Is the language behind                  the `langs-extra` feature? Is the path right?)",
+                "yupana promote: extracted NOTHING from {} — no parseable source                  files under this tree for the grammars in this build. Refusing                  to promote an empty graph as success. (Is the language behind                  the `langs-extra` feature? Is the path right?)",
                 path.display()
             );
             std::process::exit(2);
@@ -110,7 +110,7 @@ impl Cli {
         // follow-up).
         let resolved =
             crate::git::resolve_commit(path, commit).unwrap_or_else(|| commit.to_string());
-        let source = format!("hank promote {repo}@{resolved} (cli)");
+        let source = format!("yupana promote {repo}@{resolved} (cli)");
         let outcome = match (dry_run, &endpoint) {
             (true, ep) => crate::promote::dry_run(ep.as_deref(), &turtle, &source)?,
             (false, Some(ep)) if replace_snapshot => {

@@ -1,7 +1,7 @@
 # Contributing
 
-See [`CONTRIBUTING.md`](https://github.com/scbrown/hank/blob/main/CONTRIBUTING.md)
-and [`AGENTS.md`](https://github.com/scbrown/hank/blob/main/AGENTS.md) at the
+See [`CONTRIBUTING.md`](https://github.com/scbrown/yupana/blob/main/CONTRIBUTING.md)
+and [`AGENTS.md`](https://github.com/scbrown/yupana/blob/main/AGENTS.md) at the
 repository root.
 
 The essentials:

@@ -1,6 +1,6 @@
 # The Pre-Edit Policy Guard — Integration Contract
 
-`hank hook pre-edit` is a Claude Code **`PreToolUse`** hook that can **deny** an
+`yupana hook pre-edit` is a Claude Code **`PreToolUse`** hook that can **deny** an
 edit whose blast radius or target path exceeds the calling agent's capability
 scope (spec §5.8, FR-25/FR-30).
 
@@ -32,16 +32,16 @@ payload:
 }
 ```
 
-Hank reads `cwd`, `tool_name`, and `tool_input`; everything else is ignored but
+Yupana reads `cwd`, `tool_name`, and `tool_input`; everything else is ignored but
 tolerated. `tool_input` shape by tool:
 
-| Tool | Fields Hank uses |
+| Tool | Fields Yupana uses |
 |---|---|
 | `Edit` | `file_path`, `old_string`, `new_string` |
 | `Write` | `file_path`, `content` |
 | `MultiEdit` | `file_path`, `edits[].old_string`, `edits[].new_string` |
 
-Every field is optional as far as the parser is concerned. **A payload Hank
+Every field is optional as far as the parser is concerned. **A payload Yupana
 cannot parse, or one naming a file in no known language, is an ALLOW** — the
 guard only ever speaks up about edits it genuinely understands.
 
@@ -62,7 +62,7 @@ flow exactly as it found it.
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "deny",
-    "permissionDecisionReason": "hank: edit to src/graph/blast.rs exceeds the blast-radius ceiling for tenant `polecat-3` (impacts 47 symbols across 12 files; ceiling is 25/10). Narrow the change, or request a wider capability scope."
+    "permissionDecisionReason": "yupana: edit to src/graph/blast.rs exceeds the blast-radius ceiling for tenant `polecat-3` (impacts 47 symbols across 12 files; ceiling is 25/10). Narrow the change, or request a wider capability scope."
   }
 }
 ```
@@ -70,29 +70,29 @@ flow exactly as it found it.
 `permissionDecisionReason` is fed back to the model, so it is written for a
 model to act on: what was exceeded, by how much, and what to do instead.
 
-**Hank never exits `2`.** Exit `2` is Claude Code's fail-*closed* channel
-(block, stderr to the model). Reserving it means no Hank crash path can ever
+**Yupana never exits `2`.** Exit `2` is Claude Code's fail-*closed* channel
+(block, stderr to the model). Reserving it means no Yupana crash path can ever
 hard-block an agent — a panic exits `101`, which Claude Code treats as a
 non-blocking error and the tool call proceeds.
 
-That guarantee covers Hank's own code, and argument parsing happens before any
-of it runs. A Hank that predates a hook subcommand answers it with the argument
+That guarantee covers Yupana's own code, and argument parsing happens before any
+of it runs. A Yupana that predates a hook subcommand answers it with the argument
 parser's "invalid value" error and exit `2` — so **staleness fails closed even
-though absence fails open.** Since this version, an unparseable `hank hook …`
+though absence fails open.** Since this version, an unparseable `yupana hook …`
 invocation degrades to a silent allow instead (exit `0`, empty stdout, a loud
 stderr line). Binaries older than that fix cannot be repaired retroactively,
 which is why the invocation in (d) is written to be skew-proof on its own.
 
 ## (c) Latency — the sub-100ms budget
 
-The hook is synchronous in the agent's loop (FR-31). Hank enforces its **own**
-wall-clock deadline, `[hank.policy] deadline_ms` (default **100**). When the
+The hook is synchronous in the agent's loop (FR-31). Yupana enforces its **own**
+wall-clock deadline, `[yupana.policy] deadline_ms` (default **100**). When the
 deadline expires, the in-flight analysis is abandoned and the edit is
 **allowed**.
 
 Do not rely on the harness `timeout` field for this: it is expressed in whole
 seconds and defaults to ten minutes — three orders of magnitude past the budget.
-Set it anyway as a backstop (`"timeout": 5`), but the real deadline is Hank's.
+Set it anyway as a backstop (`"timeout": 5`), but the real deadline is Yupana's.
 
 Until the Phase-3 resident daemon lands (FR-31), the guard builds the call graph
 transiently and will exceed 100ms on large trees — which, by the rule above,
@@ -102,14 +102,14 @@ teeth on big repos when the daemon does.
 ## (d) Fail open — non-negotiable
 
 **Every failure mode allows the edit.** The harness launches every crew agent
-through this hook; a guard that fails closed bricks the fleet the moment Hank is
+through this hook; a guard that fails closed bricks the fleet the moment Yupana is
 unavailable.
 
 | Failure | Result |
 |---|---|
-| `hank` not on `PATH` | exit `127` → non-blocking error → edit proceeds |
-| `hank` too old to know the subcommand | exit `2` → **would block**; see below |
-| Hank panics | exit `101` → non-blocking error → edit proceeds |
+| `yupana` not on `PATH` | exit `127` → non-blocking error → edit proceeds |
+| `yupana` too old to know the subcommand | exit `2` → **would block**; see below |
+| Yupana panics | exit `101` → non-blocking error → edit proceeds |
 | Deadline exceeded | exit `0`, silent → edit proceeds |
 | Daemon unreachable, unreadable config, unparseable payload | exit `0` + loud line → edit proceeds |
 | quipu unprojectable, cache servable | exit `0` → **rules still evaluated**, verdict marked STALE |
@@ -132,15 +132,15 @@ graph work is exactly what starves the guard that reads the graph, and the
 guard was least available precisely when it mattered most.
 
 The guard now keeps a **durable projection cache** (`projection.json`, beside
-`metrics.jsonl` under `$XDG_STATE_HOME/hank`, overridable with
-`$HANK_PROJECTION_CACHE_PATH`). Every successful projection writes it; a failed
+`metrics.jsonl` under `$XDG_STATE_HOME/yupana`, overridable with
+`$YUPANA_PROJECTION_CACHE_PATH`). Every successful projection writes it; a failed
 one serves it. The contract around it is what keeps a cache from becoming its
 own silent failure:
 
 - a cache-served verdict is **STALE, never fresh**, and states the cache's AGE
   in seconds — "stale" alone cannot distinguish a slow quipu from a week-old
   catalogue, and those warrant opposite reactions;
-- past `[hank.quipu] projection_cache_ttl_secs` (default 3600, `0` disables
+- past `[yupana.quipu] projection_cache_ttl_secs` (default 3600, `0` disables
   serving) the cache is **refused** and the guard fails open loudly. A retired
   rule that keeps firing from disk is worse than no rule, because it is
   unfalsifiable from the outside;
@@ -159,13 +159,13 @@ you get by rolling the hook out ahead of the binary, which is the normal
 ordering of a deploy. Invoke the guard through this wrapper rather than bare:
 
 ```sh
-out=$(hank hook pre-edit 2>/dev/null) || exit 0
+out=$(yupana hook pre-edit 2>/dev/null) || exit 0
 printf '%s' "$out"
 ```
 
 `|| exit 0` converts *every* non-zero exit — `127` absent, `2` stale, `101`
 panic — into an allow. Capturing first and printing only on success also means
-a Hank that dies mid-write contributes **nothing** to stdout, so a truncated
+a Yupana that dies mid-write contributes **nothing** to stdout, so a truncated
 run can never be parsed as a permission decision. Emitting the command bare is
 safe only once every host is known to be past the skew fix; the wrapper is safe
 now, and stays correct afterwards.
@@ -176,11 +176,11 @@ A hook's stderr is shown **only when it exits `2`**; on exit `0` it goes to the
 debug log, where nobody looks. So a fail-open that only wrote to stderr would be
 silent in practice — exactly the failure this clause exists to prevent.
 
-Hank therefore writes the stderr line *and* emits a user-visible
+Yupana therefore writes the stderr line *and* emits a user-visible
 `systemMessage`:
 
 ```json
-{ "systemMessage": "hank: policy guard failed open (daemon unreachable) — edits are UNGUARDED this session." }
+{ "systemMessage": "yupana: policy guard failed open (daemon unreachable) — edits are UNGUARDED this session." }
 ```
 
 No `hookSpecificOutput` accompanies it, so the edit is untouched. The message is
@@ -197,7 +197,7 @@ alike to ignore it.
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "hank hook pre-edit", "timeout": 5 }
+          { "type": "command", "command": "yupana hook pre-edit", "timeout": 5 }
         ]
       }
     ]
@@ -211,11 +211,11 @@ one hook registration serves every role.
 
 ## Policy configuration
 
-Policy lives in the shared `.bobbin/config.toml` under `[hank.policy]`, with the
+Policy lives in the shared `.bobbin/config.toml` under `[yupana.policy]`, with the
 usual resolution order (project > user > defaults).
 
 ```toml
-[hank.policy]
+[yupana.policy]
 # off     — the guard is inert (default)
 # advise  — compute and report violations, but never deny
 # enforce — deny violations
@@ -224,7 +224,7 @@ deadline_ms = 100
 notify_on_fail_open = true
 
 # Per-tenant capability scopes, keyed by tenant/role id.
-[hank.policy.scopes.polecat-3]
+[yupana.policy.scopes.polecat-3]
 allow_paths = ["src/**", "tests/**"]
 deny_paths = ["src/config.rs"]
 max_impacted_symbols = 25
@@ -261,11 +261,11 @@ Both are computed at the **tree-sitter tier** against the *requesting tenant's*
 graph, and every verdict carries that tier tag (FR-3). A tree-sitter blast radius
 is an approximation; the ceilings should be set with that in mind.
 
-## Observing the guard — `hank status`
+## Observing the guard — `yupana status`
 
 A guard you cannot observe is a guard you cannot trust: enforcement that has
 quietly stopped looks exactly like enforcement that found nothing wrong. So the
-policy layer is visible in `hank status`, resolved for the queried `--tenant`:
+policy layer is visible in `yupana status`, resolved for the queried `--tenant`:
 
 ```text
   policy      : mode=enforce  scope=configured (allow=1 deny=0 sym≤— files≤3)

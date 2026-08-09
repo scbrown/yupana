@@ -42,7 +42,7 @@ import urllib.request
 
 GRAPH = os.environ.get("QUIPU_SERVER", "").rstrip("/")
 NS = "http://aegis.gastown.local/ontology/"
-CACHE = os.path.expanduser("~/.cache/hank-repo-owners.json")
+CACHE = os.path.expanduser("~/.cache/yupana-repo-owners.json")
 
 
 def fetch_owner_map():
@@ -176,14 +176,14 @@ def selftest():
     def W(p):
         return {"kind": "write", "path": p}
     B = {"kind": "bead"}
-    owners = {"shantytown": "arnold", "hank": "gennaro", "bobbin": "gennaro"}
+    owners = {"shantytown": "arnold", "yupana": "gennaro", "bobbin": "gennaro"}
     cases = [
         ("MUST FIRE   edit in ANOTHER owner's repo after a bead",
          [B, W("/home/x/gt/shantytown/shantytown/cli.py")], "gennaro", 1),
         ("MUST FIRE   edit in ANOTHER agent's crew clone after a bead",
          [B, W("/home/x/gt/beads_aegis/crew/arnold/CLAUDE.local.md")], "sattler", 1),
         ("must stay SILENT  edit in your OWN repo after a bead",
-         [B, W("/home/x/gt/hank/scripts/z.py")], "gennaro", 0),
+         [B, W("/home/x/gt/yupana/scripts/z.py")], "gennaro", 0),
         ("must stay SILENT  edit in your OWN crew clone",
          [B, W("/home/x/gt/beads_aegis/crew/gennaro/notes.md")], "gennaro", 0),
         ("must stay SILENT  edit BEFORE any bead exists (nothing to delegate yet)",

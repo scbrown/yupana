@@ -1,7 +1,7 @@
 //! Doc→code reference extraction — the markdown side of the referential graph
 //! (spec §5.10 / FR-33).
 //!
-//! This is Hank's build-free markdown scanner. It splits a document into headed
+//! This is Yupana's build-free markdown scanner. It splits a document into headed
 //! [`DocSection`]s and, within each, harvests candidate *code-symbol mentions*:
 //! backtick code spans (`` `foo` ``, `` `graph::reachable` ``), fenced code
 //! blocks, and markdown link targets (`[..](mod::sym)`). Each mention is a

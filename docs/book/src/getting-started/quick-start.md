@@ -4,16 +4,16 @@ Build the binary, then point it at a source tree.
 
 ```bash
 # Build the base graph for a directory and print a summary
-hank analyze src
+yupana analyze src
 
 # Find the definition sites of a symbol by name
-hank refs authenticate src
+yupana refs authenticate src
 
 # Show the base ref, active tiers, and configuration
-hank status
+yupana status
 
 # Generate shell completions
-hank completions bash > hank.bash
+yupana completions bash > yupana.bash
 ```
 
 Every command accepts the global flags `--json`, `--quiet`, `--verbose`,
@@ -23,21 +23,21 @@ Every command accepts the global flags `--json`, `--quiet`, `--verbose`,
 
 ```bash
 # Direct callers and callees of a symbol
-hank callers authenticate src
+yupana callers authenticate src
 
 # Blast radius: what changing a symbol transitively affects
-hank impact authenticate src --hops 5 --json
+yupana impact authenticate src --hops 5 --json
 
 # Reconcile the structural impact against a co-change set (from Bobbin):
 # corroborated = real coupling; co-change-only = possible refactoring smell
-hank impact authenticate src --cochange cochange.json
+yupana impact authenticate src --cochange cochange.json
 
 # Intra-procedural data dependence: where a value comes from / flows to
-hank dataflow authenticate src --var token           # what `token` depends on
-hank dataflow authenticate src --var token --forward # what `token` flows into
+yupana dataflow authenticate src --var token           # what `token` depends on
+yupana dataflow authenticate src --var token --forward # what `token` flows into
 
 # Export the referential structure (modules, symbols, calls, imports) as governed RDF
-hank export src --repo myrepo --format turtle
+yupana export src --repo myrepo --format turtle
 ```
 
 The export is the governed projection of the live graph — precise, typed
@@ -47,8 +47,8 @@ It is the substrate under Phase-4 promotion into Quipu; see the
 
 ## The MCP server
 
-Built with the `mcp` feature, `hank serve` exposes fourteen `hank_*` tools over MCP —
-starting with `hank_status`, `hank_symbols`, `hank_references`, and `hank_analyze`
+Built with the `mcp` feature, `yupana serve` exposes fourteen `yupana_*` tools over MCP —
+starting with `yupana_status`, `yupana_symbols`, `yupana_references`, and `yupana_analyze`
 (the full set is in the [MCP Tools reference](../reference/mcp-tools.md)):
 
 ```bash

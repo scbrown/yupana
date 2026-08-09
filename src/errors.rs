@@ -1,4 +1,4 @@
-//! Error and result types for Hank.
+//! Error and result types for Yupana.
 
 use thiserror::Error;
 

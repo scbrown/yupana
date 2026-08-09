@@ -1,9 +1,9 @@
 //! `pre_bash` — the input path the action resolver never had.
 //!
 //! `crate::action::resolve` was written for gap 2 of the trace phase and shipped
-//! **unreachable**: hank supported only `PreEdit`/`PostEdit`, the only live
+//! **unreachable**: yupana supported only `PreEdit`/`PostEdit`, the only live
 //! wiring was `post-edit` on `Write|Edit`, and the fleet's Bash guard chain
-//! referenced hank zero times. So a resolver with tests and documentation sat in
+//! referenced yupana zero times. So a resolver with tests and documentation sat in
 //! the tree with no caller and no way to acquire a command line — present,
 //! plausible, and structurally incapable of running.
 //!
@@ -24,7 +24,7 @@
 //!
 //! No `pre_bash_invoked` at all across known Bash traffic means the hook is not
 //! wired into the settings THAT SESSION loads — which is a settings-scope
-//! question, not a hank one.
+//! question, not a yupana one.
 //!
 //! RECORD-ONLY. This never denies, never warns, and prints NOTHING — not even
 //! on a resolved dangerous-looking command. Enforcement on the action path is a

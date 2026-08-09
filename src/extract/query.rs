@@ -2,7 +2,7 @@
 //!
 //! The extractor (the parent module) walks trees by hand to build the symbol
 //! graph. A *policy* needs the opposite: to MATCH nodes declaratively, so an
-//! operator can write `(line_comment) @c` and have Hank find every comment. This
+//! operator can write `(line_comment) @c` and have Yupana find every comment. This
 //! is the crate's only use of the tree-sitter query language (`.scm`), kept
 //! behind one function so [`crate::rules`] carries no grammar detail.
 //!

@@ -116,7 +116,7 @@ impl TieredScheduler {
         }
     }
 
-    /// Build a scheduler from the `[hank.freshness]` config: `debounce_ms` is the
+    /// Build a scheduler from the `[yupana.freshness]` config: `debounce_ms` is the
     /// tree-sitter window; `heavy_debounce_ms` the deferred window.
     #[must_use]
     pub fn from_config(freshness: &FreshnessConfig) -> Self {

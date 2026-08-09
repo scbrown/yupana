@@ -2,7 +2,7 @@
 //! daemon.
 //!
 //! When a daemon is EXPECTED (`serve.use_daemon`), reachable, and serving THIS
-//! root, `hank_callers` / `hank_callees` / `hank_impact` are answered from the
+//! root, `yupana_callers` / `yupana_callees` / `yupana_impact` are answered from the
 //! RESIDENT graph — no per-call `CodeGraph::build`, which is the daemon's whole
 //! point. In every other case these functions return `None` and the tool falls
 //! back to the transient build it has always done.
@@ -28,7 +28,7 @@ use std::time::Duration;
 use super::tools::{
     ImpactResponse, NeighborsResponse, ReachItem, ReconciliationItem, RefItem, ReferencesResponse,
 };
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::daemon::client::{
     expected_same_root_daemon, fetch_impact, fetch_neighbors, fetch_references,
 };
@@ -46,13 +46,13 @@ const DAEMON_TIMEOUT: Duration = Duration::from_millis(500);
 /// (the transient path will surface that error itself, once, rather than this
 /// probe pre-empting it).
 fn usable_daemon(config_override: Option<&Path>, root: &Path) -> Option<(String, u16)> {
-    let config = HankConfig::resolve(config_override, root).ok()?;
+    let config = YupanaConfig::resolve(config_override, root).ok()?;
     // The expected/same-root logic is the shared client helper's (stage 5) —
     // one implementation of "would this daemon confidently lie to us".
     match expected_same_root_daemon(&config, root, DAEMON_TIMEOUT)? {
         Ok(addr) => Some(addr),
         Err(reason) => {
-            eprintln!("hank mcp: daemon expected but unusable, transient fallback: {reason}");
+            eprintln!("yupana mcp: daemon expected but unusable, transient fallback: {reason}");
             None
         }
     }
@@ -72,7 +72,7 @@ fn reach_item(r: &ReachedItem, tier: &str) -> ReachItem {
     }
 }
 
-/// `hank_callers` / `hank_callees` from the resident daemon, or `None` to fall
+/// `yupana_callers` / `yupana_callees` from the resident daemon, or `None` to fall
 /// back to the transient build.
 pub(super) fn neighbors(
     config_override: Option<&Path>,
@@ -94,13 +94,13 @@ pub(super) fn neighbors(
             tier: reply.tier,
         }),
         Err(reason) => {
-            eprintln!("hank mcp: daemon neighbors query failed, transient fallback: {reason}");
+            eprintln!("yupana mcp: daemon neighbors query failed, transient fallback: {reason}");
             None
         }
     }
 }
 
-/// `hank_impact` from the resident daemon, or `None` to fall back. The
+/// `yupana_impact` from the resident daemon, or `None` to fall back. The
 /// co-change reconciliation (FR-11) is computed HERE, over the daemon's file
 /// set — the daemon serves structure; reconciliation stays a client concern so
 /// both sources produce it identically.
@@ -115,7 +115,7 @@ pub(super) fn impact(
     let reply = match fetch_impact(&host, port, symbol, hops, DAEMON_TIMEOUT) {
         Ok(reply) => reply,
         Err(reason) => {
-            eprintln!("hank mcp: daemon impact query failed, transient fallback: {reason}");
+            eprintln!("yupana mcp: daemon impact query failed, transient fallback: {reason}");
             return None;
         }
     };
@@ -145,7 +145,7 @@ pub(super) fn impact(
     })
 }
 
-/// `hank_references` from the resident node index, or `None` to fall back to
+/// `yupana_references` from the resident node index, or `None` to fall back to
 /// the transient every-file walk — the biggest per-call saving of the three
 /// cutovers, since the transient path re-extracts the whole subtree per query.
 pub(super) fn references(
@@ -176,14 +176,14 @@ pub(super) fn references(
             tier: reply.tier.clone(),
         }),
         Err(reason) => {
-            eprintln!("hank mcp: daemon references query failed, transient fallback: {reason}");
+            eprintln!("yupana mcp: daemon references query failed, transient fallback: {reason}");
             None
         }
     }
 }
 
 /// The daemon's tenant layer (base commit + active overlays) for
-/// `hank_status`, when a usable daemon holds one. `None` collapses "no daemon
+/// `yupana_status`, when a usable daemon holds one. `None` collapses "no daemon
 /// expected", "daemon unusable", and "layer absent (not a repo)" — the
 /// daemon's own `/status` distinguishes them; here absence just means the
 /// status has no tenant facts to add.
@@ -203,7 +203,7 @@ pub(super) fn tenant_layer(
 // emphasis the prose and comments use throughout this repo, and it is load-
 // bearing in a test name: it says which word the assertion turns on. Allowed
 // explicitly, and scoped to tests, so the lint stays live everywhere else
-// rather than being switched off crate-wide (hank #83).
+// rather than being switched off crate-wide (yupana #83).
 #[allow(non_snake_case)]
 mod tests {
     use super::*;
@@ -221,11 +221,11 @@ mod tests {
     // repo layering (passed as an override) so a developer's user config can
     // never leak into these tests.
     fn daemon_config(dir: &Path, port: u16) -> std::path::PathBuf {
-        let path = dir.join("hank-test-config.toml");
+        let path = dir.join("yupana-test-config.toml");
         std::fs::write(
             &path,
             format!(
-                "[hank.serve]\nuse_daemon = true\nbind_address = \"127.0.0.1\"\n\
+                "[yupana.serve]\nuse_daemon = true\nbind_address = \"127.0.0.1\"\n\
                  mcp_http_port = {port}\n"
             ),
         )

@@ -2,7 +2,7 @@
 //!
 //! [`crate::git`] could already read a base tree and diff two commits, but
 //! nothing in the product ever called the diff: `changed_paths` had no
-//! production caller, so Hank could answer *what a tree contains* and never
+//! production caller, so Yupana could answer *what a tree contains* and never
 //! *what a change does*. Those are different questions, and change-time policy —
 //! "what does this proposed change violate" — is only the second one. A rule
 //! evaluated against tree contents silently answers the wrong question with a
@@ -54,7 +54,7 @@ pub struct EntityChange {
 /// A file the change touched that could NOT be turned into entities, and why.
 ///
 /// This is the half that must never be silent. A rule written about entities is
-/// not enforced on a file that produced none because Hank could not parse it —
+/// not enforced on a file that produced none because Yupana could not parse it —
 /// and "produced no entities" and "was not looked at" are indistinguishable
 /// unless the second is named.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -5,8 +5,8 @@ use super::*;
 #[test]
 fn a_stronger_claim_than_the_placement_is_reported() {
     // The failure the check exists for: `tool` is the layer an agent cannot
-    // route around, and hank's hook is not it.
-    let why = overclaims("secrets-guard", Some(HostingLayer::Tool), HANK_HOSTS_AT)
+    // route around, and yupana's hook is not it.
+    let why = overclaims("secrets-guard", Some(HostingLayer::Tool), YUPANA_HOSTS_AT)
         .expect("a tool claim enforced at orchestration must be reported");
     assert!(why.contains("secrets-guard"), "{why}");
     assert!(why.contains("\"tool\""), "names the claim: {why}");
@@ -23,13 +23,13 @@ fn a_stronger_claim_than_the_placement_is_reported() {
 
 #[test]
 fn the_policy_layer_claim_is_reported_too() {
-    assert!(overclaims("p", Some(HostingLayer::Policy), HANK_HOSTS_AT).is_some());
+    assert!(overclaims("p", Some(HostingLayer::Policy), YUPANA_HOSTS_AT).is_some());
 }
 
 #[test]
 fn an_honest_claim_is_silent() {
     // The control. Without it the check could be flagging every declaration.
-    assert!(overclaims("p", Some(HostingLayer::Orchestration), HANK_HOSTS_AT).is_none());
+    assert!(overclaims("p", Some(HostingLayer::Orchestration), YUPANA_HOSTS_AT).is_none());
 }
 
 #[test]
@@ -46,14 +46,14 @@ fn an_absent_claim_is_silent() {
     // An absent claim overclaims nothing. Treating "undeclared" as a defect
     // would flag every pre-Phase-1 policy in the catalog on every edit, and the
     // notice would stop being read.
-    assert!(overclaims("p", None, HANK_HOSTS_AT).is_none());
+    assert!(overclaims("p", None, YUPANA_HOSTS_AT).is_none());
 }
 
 #[test]
-fn hank_hosts_at_orchestration_and_that_is_not_configurable() {
+fn yupana_hosts_at_orchestration_and_that_is_not_configurable() {
     // A hook in the agent's loop IS the orchestration layer. If this ever reads
     // as anything else, the check above is measuring against a fiction.
-    assert_eq!(HANK_HOSTS_AT, HostingLayer::Orchestration);
+    assert_eq!(YUPANA_HOSTS_AT, HostingLayer::Orchestration);
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn a_catalog_audit_reports_only_the_overclaims_and_keeps_order() {
         ("overclaims-tool".to_string(), Some(HostingLayer::Tool)),
         ("overclaims-policy".to_string(), Some(HostingLayer::Policy)),
     ];
-    let notices = audit_projection(&catalog, HANK_HOSTS_AT);
+    let notices = audit_projection(&catalog, YUPANA_HOSTS_AT);
     assert_eq!(notices.len(), 2, "{notices:#?}");
     assert!(notices[0].contains("overclaims-tool"));
     assert!(notices[1].contains("overclaims-policy"));
@@ -106,5 +106,5 @@ fn a_clean_catalog_produces_no_notices() {
         ("a".to_string(), Some(HostingLayer::Orchestration)),
         ("b".to_string(), None),
     ];
-    assert!(audit_projection(&catalog, HANK_HOSTS_AT).is_empty());
+    assert!(audit_projection(&catalog, YUPANA_HOSTS_AT).is_empty());
 }

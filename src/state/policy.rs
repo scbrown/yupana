@@ -22,8 +22,8 @@
 //!
 //! ## `sparql` is reserved, and refused rather than approximated
 //!
-//! Hank is not an RDF store. A policy declaring `selectorLang "sparql"` is one
-//! **Quipu** evaluates; hank REFUSES it, loudly, via [`errors`] and
+//! Yupana is not an RDF store. A policy declaring `selectorLang "sparql"` is one
+//! **Quipu** evaluates; yupana REFUSES it, loudly, via [`errors`] and
 //! [`StatePolicy::evaluable`]. It is not skipped and it is not best-effort
 //! matched by the [`super::pattern`] engine — a policy silently not evaluated is
 //! a policy that reports a clean board it never looked at, which is precisely
@@ -43,9 +43,9 @@ pub enum SelectorLang {
     /// ([`crate::rules`]). Not evaluable against a board.
     TreeSitter,
     /// The compact ASK-style pattern over the generic fact graph
-    /// ([`super::pattern`]). The only value hank evaluates on this plane.
+    /// ([`super::pattern`]). The only value yupana evaluates on this plane.
     GraphPattern,
-    /// Reserved for Quipu. Hank refuses it; see the module docs.
+    /// Reserved for Quipu. Yupana refuses it; see the module docs.
     Sparql,
 }
 
@@ -151,7 +151,7 @@ pub struct StatePolicy {
 }
 
 impl StatePolicy {
-    /// Whether hank can evaluate this policy at the ORDER boundary, or the
+    /// Whether yupana can evaluate this policy at the ORDER boundary, or the
     /// reason it cannot.
     ///
     /// Returning the reason — rather than a bare `bool` — is what lets the guard
@@ -174,7 +174,7 @@ impl StatePolicy {
                 SelectorLang::Sparql => {
                     return Err(format!(
                         "{part} declares selectorLang `sparql`, which is RESERVED for Quipu — \
-                         hank is not an RDF store and refuses rather than approximating it. \
+                         yupana is not an RDF store and refuses rather than approximating it. \
                          Project the datalinks it needs into the board and restate the {part} \
                          as `graph-pattern`, or evaluate this policy in Quipu."
                     ))

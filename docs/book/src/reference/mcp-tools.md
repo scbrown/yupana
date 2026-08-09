@@ -1,49 +1,49 @@
 # MCP Tools
 
-Hank exposes its capabilities as MCP tools, over stdio and streamable-HTTP.
-Tools use the `hank_*` naming convention, alongside Bobbin's `bobbin_*` and
+Yupana exposes its capabilities as MCP tools, over stdio and streamable-HTTP.
+Tools use the `yupana_*` naming convention, alongside Bobbin's `bobbin_*` and
 Quipu's `quipu_*` on the same agent.
 
 A parallel REST HTTP API (a per-tool endpoint for the broker and other
-non-MCP consumers) is served by the [resident daemon](daemon.md) (`hank
-daemon`, FR-27/FR-31). With `[hank.serve] use_daemon = true`, the graph tools
+non-MCP consumers) is served by the [resident daemon](daemon.md) (`yupana
+daemon`, FR-27/FR-31). With `[yupana.serve] use_daemon = true`, the graph tools
 here become thin clients of the same resident engine.
 
-Build with the `mcp` feature and run `hank serve` (stdio) or `hank serve --http`
-(streamable-HTTP on `[hank.serve] mcp_http_port`, default 3040).
+Build with the `mcp` feature and run `yupana serve` (stdio) or `yupana serve --http`
+(streamable-HTTP on `[yupana.serve] mcp_http_port`, default 3040).
 
 ```bash
 cargo build --features mcp
-hank serve            # stdio, for a local agent
-hank serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
+yupana serve            # stdio, for a local agent
+yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 ```
 
 ## Live tools
 
 | Tool | Purpose |
 |------|---------|
-| `hank_status` | Base ref, tenant, available tiers, Quipu settings |
-| `hank_symbols` | Symbol tree for a file |
-| `hank_references` | Definition site(s) of a symbol, by name or by position |
-| `hank_analyze` | Files/symbols summary for a subtree |
-| `hank_callers` | Direct callers of a symbol (who calls it) |
-| `hank_callees` | Direct callees of a symbol (what it calls) |
-| `hank_communities` | Densely-connected symbol clusters (deterministic Louvain, FR-9) |
-| `hank_impact` | Blast radius — transitive callers, N hops; reconciles against a `cochange` set (FR-11) |
-| `hank_dataflow` | Intra-procedural data dependence within a function |
-| `hank_verify` | Verdict on a **proposed** edit buffer, before you write it (FR-23/FR-24) |
-| `hank_promote` | Promote a subtree's facts to Quipu — SHACL-validate, then write (needs the `quipu` feature) |
-| `hank_ingest` | Load generic (non-code) facts into the hot board graph (FR-35; needs the `game-state` feature) |
-| `hank_guard` | Check proposed orders against game-state policies (FR-37; needs the `game-state` feature) |
-| `hank_whatif` | Speculative, uncommitted impact of an order set over the board (FR-38; needs the `game-state` feature) |
+| `yupana_status` | Base ref, tenant, available tiers, Quipu settings |
+| `yupana_symbols` | Symbol tree for a file |
+| `yupana_references` | Definition site(s) of a symbol, by name or by position |
+| `yupana_analyze` | Files/symbols summary for a subtree |
+| `yupana_callers` | Direct callers of a symbol (who calls it) |
+| `yupana_callees` | Direct callees of a symbol (what it calls) |
+| `yupana_communities` | Densely-connected symbol clusters (deterministic Louvain, FR-9) |
+| `yupana_impact` | Blast radius — transitive callers, N hops; reconciles against a `cochange` set (FR-11) |
+| `yupana_dataflow` | Intra-procedural data dependence within a function |
+| `yupana_verify` | Verdict on a **proposed** edit buffer, before you write it (FR-23/FR-24) |
+| `yupana_promote` | Promote a subtree's facts to Quipu — SHACL-validate, then write (needs the `quipu` feature) |
+| `yupana_ingest` | Load generic (non-code) facts into the hot board graph (FR-35; needs the `game-state` feature) |
+| `yupana_guard` | Check proposed orders against game-state policies (FR-37; needs the `game-state` feature) |
+| `yupana_whatif` | Speculative, uncommitted impact of an order set over the board (FR-38; needs the `game-state` feature) |
 
 The last three are the **game-state harness**. They are registered on every
-build, as `hank_promote` is, and refuse with a message naming the feature when
+build, as `yupana_promote` is, and refuse with a message naming the feature when
 it is absent — a tool that accepted a board and silently did nothing would be
 worse than one that is missing, because the caller would believe it had guarded.
 See [The Game-State Harness](../concepts/game-state.md).
 
-## `hank_references`
+## `yupana_references`
 
 Give it `symbol` **or** a position (`at_file` + `at_line`), not both concerns at
 once.
@@ -69,7 +69,7 @@ with "all of them".
 Position requests always take the transient build, never the resident daemon:
 `/references` does not carry the node spans a position needs.
 
-## `hank_verify`
+## `yupana_verify`
 
 Pass the full proposed contents of a file; get back `ok` plus any violations.
 Only violations the edit *introduces* are reported — the file's current contents

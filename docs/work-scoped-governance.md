@@ -1,7 +1,7 @@
 # Work-scoped agent governance: one scope, three consumers
 
 **Status:** design. Nothing here is implemented yet.
-**Scope:** how hank, Quipu and a work-item tracker combine to govern, trace, and
+**Scope:** how yupana, Quipu and a work-item tracker combine to govern, trace, and
 contextualise what an autonomous agent does.
 
 ## The problem this solves
@@ -52,7 +52,7 @@ open items:
 | provenance | source | trust |
 |---|---|---|
 | `declared` | explicit edges on the item | highest |
-| `derived` | labels, parent epic, named repos/hosts, hank's structural graph | medium |
+| `derived` | labels, parent epic, named repos/hosts, yupana's structural graph | medium |
 | `observed` | what previous sessions on this item actually touched | grows with use |
 
 **Unknown scope advises; it never blocks.** A guard that strands an operator with no way
@@ -103,7 +103,7 @@ plus an effect, which buys three properties at once:
   *before* anyone is affected
 - **explain** a refusal by pointing at the records that justified the rule
 
-hank already ships a fail-silent JSONL telemetry spool with per-event agent and tenant
+yupana already ships a fail-silent JSONL telemetry spool with per-event agent and tenant
 labels. It is currently *edit-shaped*: it records a file extension where a target entity
 belongs, carries no work item, and its command events hold a raw command string that no
 policy can be written against. Closing those three gaps is the whole of phase 1. Note the
@@ -133,10 +133,10 @@ cumulative — the second session on an item starts where the first finished.
 
 ## Architecture
 
-**Ownership seam.** The tracker is the authority on `(agent → work item)`. hank is the
+**Ownership seam.** The tracker is the authority on `(agent → work item)`. yupana is the
 decision engine. The resident daemon is a cache with **push-invalidation from the
 authority** — the tracker pushes the binding when it changes (dispatch, re-anchor), rather
-than hank polling or shelling out per action.
+than yupana polling or shelling out per action.
 
 **Why the daemon is load-bearing rather than an optimisation.** The guard already costs
 157–322 ms per edit *before* any scope resolution. Adding a subprocess plus a graph
@@ -217,7 +217,7 @@ substitute. Described any other way it becomes another false "handled".
 6. **Daemon thin-client cutover.** Enforcement begins to depend on the daemon.
 7. **Flip to enforce, per rule, on the promotion ladder.**
 
-**A prerequisite spanning 4–7:** hank's text-rule projection is bound to a single graph
+**A prerequisite spanning 4–7:** yupana's text-rule projection is bound to a single graph
 type in compiled Rust, so a new rule class projects zero rows and is *silently absent*.
 Widening it to a supertype — with the existing type as a subclass, so every current rule
 keeps projecting — is a code change plus a shapes update, not a data write. The projection

@@ -27,8 +27,8 @@ fn paa_rule(name: &str, backoff: Option<&str>) -> Rule {
     }
 }
 
-fn config_with(rules: Vec<Rule>, mode: Mode) -> HankConfig {
-    let mut config = HankConfig::default();
+fn config_with(rules: Vec<Rule>, mode: Mode) -> YupanaConfig {
+    let mut config = YupanaConfig::default();
     config.policy.mode = mode;
     config.policy.rules = rules;
     config
@@ -101,7 +101,7 @@ fn a_pag_rule_is_not_evaluated_here() {
 
 #[test]
 fn an_undeclared_point_is_not_evaluated_here_either() {
-    // Absent means "wherever hank ran it before the field existed", which is the
+    // Absent means "wherever yupana ran it before the field existed", which is the
     // gate. Auditing it here too would evaluate it twice and record two verdicts
     // for one action.
     let mut rule = paa_rule("legacy", None);

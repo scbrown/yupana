@@ -2,7 +2,7 @@
 
 ```text
 USAGE:
-    hank <COMMAND>
+    yupana <COMMAND>
 
 COMMANDS:
     serve       Run the MCP server (stdio; --http for streamable-HTTP)
@@ -45,31 +45,31 @@ when set, still wins and can target individual modules, so the precedence is
 ## Examples
 
 ```bash
-hank analyze src
-hank analyze src --at main     # structure of the tree at a baseline commit (FR-13)
-hank refs authenticate src --json
-hank status                    # resolves base_ref to a commit SHA (in a git repo)
-hank impact authenticate src --hops 5   # lookup is by bare symbol name, not file::symbol
-hank communities src --json         # symbol clusters, largest-first
-hank verify --file src/auth.rs --buffer /tmp/edited.rs
-hank promote --dry-run                  # would this projection conform? writes nothing
-hank promote --to $QUIPU --commit HEAD  # the write; --to is what authorizes it
+yupana analyze src
+yupana analyze src --at main     # structure of the tree at a baseline commit (FR-13)
+yupana refs authenticate src --json
+yupana status                    # resolves base_ref to a commit SHA (in a git repo)
+yupana impact authenticate src --hops 5   # lookup is by bare symbol name, not file::symbol
+yupana communities src --json         # symbol clusters, largest-first
+yupana verify --file src/auth.rs --buffer /tmp/edited.rs
+yupana promote --dry-run                  # would this projection conform? writes nothing
+yupana promote --to $QUIPU --commit HEAD  # the write; --to is what authorizes it
 ```
 
-## `hank promote` — what authorizes the write
+## `yupana promote` — what authorizes the write
 
 **`--to` is the only thing that authorizes a promotion.** A configured
-`[hank.quipu] endpoint` is deliberately *not* enough, and a bare `hank promote`
+`[yupana.quipu] endpoint` is deliberately *not* enough, and a bare `yupana promote`
 refuses even where one is set — naming the endpoint it found and both remedies:
 
 ```console
-$ hank promote
+$ yupana promote
 Error: refusing to promote into a DISCOVERED endpoint: http://quipu.example
-  `[hank.quipu] endpoint` is configured so the pre-edit guard can READ the rule
+  `[yupana.quipu] endpoint` is configured so the pre-edit guard can READ the rule
   catalogue. It does not authorize a write, and a promotion is a live graph write
   with no undo.
-  To write there, say so:        hank promote --to http://quipu.example
-  To check it without writing:   hank promote --dry-run
+  To write there, say so:        yupana promote --to http://quipu.example
+  To check it without writing:   yupana promote --dry-run
 ```
 
 That asymmetry is the point. The endpoint key is set once, deployment-wide, so
@@ -81,18 +81,18 @@ It was found by an operator who ran it expecting a dry run (aegis-o2h97). One
 config supplying both a read capability and a write capability is the defect;
 requiring the write to be spelled out on the command line is the fix.
 
-The MCP `hank_promote` tool keeps its own fallback to the configured endpoint:
+The MCP `yupana_promote` tool keeps its own fallback to the configured endpoint:
 there the target comes from a server an operator deliberately started and pointed
 somewhere, not from whatever config happens to be ambient in an agent's shell.
 
-## `hank promote --dry-run` — validate without writing
+## `yupana promote --dry-run` — validate without writing
 
 `--dry-run` extracts the projection and runs the **same** SHACL gate a real
 promotion runs, then stops. It needs no target — validation is in-process — and
 reports the graph a real run *would* have written to:
 
 ```console
-$ hank promote --dry-run
+$ yupana promote --dry-run
   DRY RUN — conforms. WROTE NOTHING.
     would post: 4041881 bytes of Turtle in 4 chunk(s)
     would target: http://quipu.example/knot
@@ -102,17 +102,17 @@ A non-conforming projection produces the identical refusal (and identical
 retained payload) that `promote` would produce, so a dry run cannot green-light
 something the write path would reject.
 
-## `hank promote` — diagnosing a refusal
+## `yupana promote` — diagnosing a refusal
 
 A promotion is all-or-nothing: one SHACL violation refuses the whole commit and
 writes nothing. So the refusal has to say enough to act on, because the
 projection it refused is generated on the fly and would otherwise be gone.
 
 ```console
-$ hank promote --to $QUIPU
+$ yupana promote --to $QUIPU
   REFUSED — promotion did not pass SHACL, wrote nothing:
-    - MaxCount(1) not satisfied — on …/code/hank/src%2Fmcp%2Fstate_tools.rs::StateIngestRequest (path …/symbolKind)
-    payload retained at: /tmp/hank-promote-hank-promote-hank-45c7b660….ttl
+    - MaxCount(1) not satisfied — on …/code/yupana/src%2Fmcp%2Fstate_tools.rs::StateIngestRequest (path …/symbolKind)
+    payload retained at: /tmp/yupana-promote-yupana-promote-yupana-45c7b660….ttl
 ```
 
 Two things make that actionable, and both are load-bearing:
@@ -126,7 +126,7 @@ Two things make that actionable, and both are load-bearing:
   fact the error gives you is unusable.
 
 The dump also lands on an invalid-Turtle failure and on a partial chunked write.
-It goes to `$HANK_PROMOTE_DUMP_DIR`, else the system temp dir.
+It goes to `$YUPANA_PROMOTE_DUMP_DIR`, else the system temp dir.
 
 The name carries the repo and the resolved commit, so a scheduled promotion
 refusing the same commit hour after hour overwrites **one** file. A *different*
@@ -137,13 +137,13 @@ reading. So the bound is distinct failing commits, not runs.
 Retention is best-effort: a promotion that is already failing never fails
 *differently* because a dump could not be written.
 
-## `hank status`
+## `yupana status`
 
 Reports the resolved baseline, the tiers this binary serves, and — the part a
 script gates on — **the state of the policy rule plane**.
 
 ```console
-$ hank status
+$ yupana status
   policy      : mode=advise  scope=none for this tenant
   mode source : ~/.config/bobbin/config.toml
   tamper state: TAMPER-EVIDENT, NOT TAMPER-PROOF — a local agent can alter policy; a clean report is no evidence that tampering was prevented
@@ -157,7 +157,7 @@ the counts alone cannot reveal. It is computed over the fields that decide
 enforcement (rule identity, pattern, tier, exemptions), so a rationale typo does
 not churn it. It is **not** a version — there is no signed rule set yet, and
 `verification` reports `unsigned` to say so rather than implying provenance
-hank does not have.
+yupana does not have.
 
 `mode source` identifies the layer that set the effective mode. If a
 workspace-writable `.bobbin/config.toml` lowers a user policy (for example,
@@ -188,15 +188,15 @@ reason it exists. A status surface that went red once in ten runs from a
 transient blip would be routed around, and then the real red would be invisible
 too.
 
-## `hank refs`
+## `yupana refs`
 
 Definition sites of a symbol, by name, from the same graph `callers`, `impact`
 and `communities` read — so every language this build has a grammar for is
 searched, not just Rust. (Grammars beyond Rust need the `langs-extra` feature;
-`hank status` lists what a given binary can parse.)
+`yupana status` lists what a given binary can parse.)
 
 ```console
-$ hank refs derive_agents
+$ yupana refs derive_agents
 quipu.py:1 derive_agents (function) [TreeSitter]
 ```
 
@@ -204,10 +204,10 @@ A zero result says **which** kind of nothing it is, because the two are not the
 same fact:
 
 ```console
-$ hank refs no_such_symbol           # a populated graph, name genuinely absent
+$ yupana refs no_such_symbol           # a populated graph, name genuinely absent
 no definition found for no_such_symbol (searched 412 symbol(s))
 
-$ hank refs anything ./docs          # nothing here was parseable at all
+$ yupana refs anything ./docs          # nothing here was parseable at all
 no definition found for anything (nothing parseable under ./docs — the graph is
 empty, so this is not evidence the symbol is absent)
 ```
@@ -241,11 +241,11 @@ are reading code you know *where* you are, not which of the twelve it is, so
 point at it instead (FR-4):
 
 ```console
-$ hank refs build                 # by name: ambiguous
+$ yupana refs build                 # by name: ambiguous
 a.rs:3 build (function) [TreeSitter]
 a.rs:7 build (function) [TreeSitter]
 
-$ hank refs --at a.rs:7           # by position: the one you pointed at
+$ yupana refs --at a.rs:7           # by position: the one you pointed at
 a.rs:7 build (function) [TreeSitter]
 ```
 
@@ -258,7 +258,7 @@ the search path rather than a symbol name.
 A **column is refused, not ignored**:
 
 ```console
-$ hank refs --at a.rs:3:9
+$ yupana refs --at a.rs:3:9
 error: --at takes FILE:LINE, not FILE:LINE:COL (got column `9`). The tree-sitter
 tier resolves to the innermost symbol on a LINE; column-precise resolution needs
 the LSP tier (FR-2), which is not built. Retry as `a.rs:3`.
@@ -273,15 +273,15 @@ A position that resolves to nothing explains which kind of nothing it is,
 rather than borrowing the vocabulary of "no such symbol":
 
 ```console
-$ hank refs --at a.rs:3
+$ yupana refs --at a.rs:3
 no symbol encloses a.rs:3 — it falls between definitions (a blank line, an
 import, a top-level comment). `a.rs` defines: one:1-1, two:5-5
 ```
 
 `refs` answers "where is this **defined**". For "what **reaches** this", use
-`hank callers`; for the transitive form, `hank impact`.
+`yupana callers`; for the transitive form, `yupana impact`.
 
-## `hank verifier` and `hank verdicts`
+## `yupana verifier` and `yupana verdicts`
 
 Both require the `quipu` feature. The guard signs a verdict the moment a
 constraint fires and appends it locally; these are the registration and the
@@ -289,25 +289,25 @@ drain. Full field list and the reasoning in
 [The Enforcement Trace](enforcement-trace.md).
 
 ```bash
-hank verifier --key-path hank-signing.pk8   # public key to register in quipu
-hank verdicts --to http://localhost:7878    # drain the spool
+yupana verifier --key-path yupana-signing.pk8   # public key to register in quipu
+yupana verdicts --to http://localhost:7878    # drain the spool
 ```
 
-`hank verifier` is the **deliberate key-creation act** — it mints the signing key
+`yupana verifier` is the **deliberate key-creation act** — it mints the signing key
 if absent. The hook path never does: a signing identity materialising from an
 agent's edit is not something that should happen quietly.
 
-`hank verdicts` truncates the spool only when every verdict was accepted, so a
+`yupana verdicts` truncates the spool only when every verdict was accepted, so a
 partial drain leaves the remainder intact rather than losing it.
 
-## `hank verify`
+## `yupana verify`
 
-Checks a *proposed* buffer against the graph Hank already holds and returns a
+Checks a *proposed* buffer against the graph Yupana already holds and returns a
 boolean verdict plus violations (FR-23/FR-24). Exits **non-zero** when the buffer
 has violations, so scripts and CI can gate on it.
 
 ```console
-$ hank verify --file src/a.rs --buffer /tmp/proposed.rs
+$ yupana verify --file src/a.rs --buffer /tmp/proposed.rs
 violations src/a.rs [TreeSitter]
   ghost:2 `ghost` is called here but is defined nowhere in this buffer or the
           project graph, and is not brought into scope by a `use`.
@@ -333,20 +333,20 @@ calls, imports, locals, closures, and function-typed parameters are all left
 alone rather than guessed at. `ok: true` means "nothing this tier can see is
 wrong", not "this compiles".
 
-`hank status` resolves the configured `base_ref` (default `main`) to a concrete
+`yupana status` resolves the configured `base_ref` (default `main`) to a concrete
 commit via the system `git`; outside a git repository the base commit shows as
-unresolved and Hank falls back to the working tree.
+unresolved and Yupana falls back to the working tree.
 
-`hank analyze --at <ref>` builds the summary from the **git tree** at a baseline
+`yupana analyze --at <ref>` builds the summary from the **git tree** at a baseline
 commit (FR-13) rather than the working copy — the shared read-only base the
 Phase-3 resident graph will hold. It reads blob content at the ref (never the
 working tree), and degrades to an empty result outside a repo or for an
 unresolved ref.
 
-`hank communities` partitions the call graph into densely-connected symbol
+`yupana communities` partitions the call graph into densely-connected symbol
 clusters using deterministic Louvain (FR-9) — the same partition on every run,
 no RNG. Communities are ordered largest-first; members carry a `tier` tag.
-Quipu runs community detection over *committed* facts; Hank computes it live
+Quipu runs community detection over *committed* facts; Yupana computes it live
 over the hot graph.
 
 Commands marked with a phase print a notice until their engine lands; see the

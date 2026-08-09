@@ -14,7 +14,7 @@ use crate::graph::{CodeGraph, Dir};
 use crate::reconcile::reconcile;
 use crate::render::{print_reached, reached_json};
 
-/// `hank callers` — direct callers and callees of a symbol.
+/// `yupana callers` — direct callers and callees of a symbol.
 pub(crate) fn callers(json: bool, quiet: bool, symbol: &str, path: &Path) -> anyhow::Result<()> {
     let graph = CodeGraph::build(path)?;
     if !graph.has_symbol(symbol) {
@@ -41,7 +41,7 @@ pub(crate) fn callers(json: bool, quiet: bool, symbol: &str, path: &Path) -> any
     Ok(())
 }
 
-/// `hank communities` — densely-connected clusters of symbols (FR-9, Louvain).
+/// `yupana communities` — densely-connected clusters of symbols (FR-9, Louvain).
 pub(crate) fn communities(json: bool, quiet: bool, path: &Path) -> anyhow::Result<()> {
     let graph = CodeGraph::build(path)?;
     let comms = graph.communities();
@@ -98,7 +98,7 @@ pub(crate) fn communities(json: bool, quiet: bool, path: &Path) -> anyhow::Resul
     Ok(())
 }
 
-/// `hank impact` — the blast radius (transitive callers) of a symbol,
+/// `yupana impact` — the blast radius (transitive callers) of a symbol,
 /// optionally reconciled against a caller-supplied co-change set (FR-11).
 pub(crate) fn impact(
     json: bool,
@@ -206,7 +206,7 @@ fn print_bucket(label: &str, files: &[String], quiet: bool) {
     println!("  {}: {}", label.bold(), files.join(", "));
 }
 
-/// `hank dataflow` — intra-procedural data dependence within a function.
+/// `yupana dataflow` — intra-procedural data dependence within a function.
 pub(crate) fn dataflow(
     json: bool,
     quiet: bool,
@@ -281,8 +281,8 @@ pub(crate) fn dataflow(
     Ok(())
 }
 
-/// `hank export` — emit the referential structure as Turtle.
-/// `hank census` — same-file symbol-name collisions, the sizing input for the
+/// `yupana export` — emit the referential structure as Turtle.
+/// `yupana census` — same-file symbol-name collisions, the sizing input for the
 /// scope-qualified IRI migration.
 ///
 /// Walks the tree exactly like `export` and asks the extractor for each file's
@@ -431,7 +431,7 @@ fn not_found(json: bool, quiet: bool, name: &str, what: &str) -> anyhow::Result<
     Ok(())
 }
 
-/// `hank verify` — a verdict on a proposed edit buffer (FR-23/FR-24).
+/// `yupana verify` — a verdict on a proposed edit buffer (FR-23/FR-24).
 ///
 /// Exits non-zero when the buffer has violations, so CI and scripts can gate on
 /// it. The verdict always reports the tier it was reached at and what that tier

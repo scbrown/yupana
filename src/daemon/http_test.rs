@@ -6,7 +6,7 @@
 //! same emphasis the prose uses throughout this repo, and it is load-bearing in
 //! a test name: it says which word the assertion turns on. Allowed explicitly,
 //! and scoped to tests, so the lint stays live everywhere else rather than
-//! being switched off crate-wide (hank #83).
+//! being switched off crate-wide (yupana #83).
 #![allow(non_snake_case)]
 use super::*;
 use crate::daemon::client::{probe, Reachability};

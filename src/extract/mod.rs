@@ -1,6 +1,6 @@
 //! Fast structural extraction via tree-sitter — the always-on breadth tier.
 //!
-//! This is Hank's build-free extractor: it works on a syntactically-broken
+//! This is Yupana's build-free extractor: it works on a syntactically-broken
 //! buffer and produces a symbol tree with line spans and intra-file call sites,
 //! tagged [`Tier::TreeSitter`]. Precise LSP facts (`lsp` feature) and
 //! CPG/dataflow (`cpg` feature) layer on top in later phases.
@@ -113,7 +113,7 @@ fn grammar_spec(language: &str) -> Option<GrammarSpec> {
 
 /// The languages this BUILD can actually extract, in a stable order.
 ///
-/// This exists to be REPORTED (`hank status`), because the failure it guards is
+/// This exists to be REPORTED (`yupana status`), because the failure it guards is
 /// silent by construction: a build without `langs-extra` has no grammar for five
 /// of the six languages, so [`source_files`] never selects those files, the
 /// extractor is never asked, and `export`/`promote` emit a well-formed document
@@ -271,7 +271,7 @@ fn is_vendored_or_minified(path: &Path) -> bool {
 /// This is where the `languages` config key becomes real (aegis-ltjo). It was
 /// documented as "languages to extract" and read by nothing: a user who set
 /// `languages = ["rust"]` to RESTRICT analysis got no restriction, because every
-/// walk yielded every compiled grammar. Now `hank analyze` passes the configured
+/// walk yielded every compiled grammar. Now `yupana analyze` passes the configured
 /// set here and the count reflects it. `allowed` holds language NAMES (the
 /// canonical `language_for_extension` output — "rust", "python", …), so a name
 /// this build cannot parse simply matches nothing rather than erroring.

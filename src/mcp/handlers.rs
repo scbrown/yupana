@@ -1,5 +1,5 @@
-//! Bodies for the two heaviest `hank_*` tool handlers, lifted out of `server`
-//! for size (hank #83).
+//! Bodies for the two heaviest `yupana_*` tool handlers, lifted out of `server`
+//! for size (yupana #83).
 //!
 //! `#[tool_router]` collects every `#[tool]` method from ONE impl block, so the
 //! handlers themselves cannot move — only their bodies. Each is a plain function
@@ -12,9 +12,9 @@
 
 use super::*;
 
-/// Body of `hank_promote`.
+/// Body of `yupana_promote`.
 pub(super) fn promote(
-    server: &HankMcpServer,
+    server: &YupanaMcpServer,
     req: &PromoteRequest,
 ) -> Result<CallToolResult, McpError> {
     #[cfg(not(feature = "quipu"))]
@@ -24,13 +24,13 @@ pub(super) fn promote(
         // existing discard rather than becoming an `_server` in the signature.
         let _ = (req, server);
         Err(internal(crate::errors::Error::Config(
-            "hank_promote needs the `quipu` feature; this server was built without it".to_string(),
+            "yupana_promote needs the `quipu` feature; this server was built without it".to_string(),
         )))
     }
     #[cfg(feature = "quipu")]
     {
         let config =
-            HankConfig::resolve(server.config.as_deref(), &server.root).map_err(internal)?;
+            YupanaConfig::resolve(server.config.as_deref(), &server.root).map_err(internal)?;
         // Promotion is a WRITE — honour the same guard the CLI does. Refused
         // before any work, so read_only means read_only even here.
         config.write_guard("promotion").map_err(internal)?;
@@ -42,7 +42,7 @@ pub(super) fn promote(
             .or_else(|| Some(config.quipu.endpoint.clone()).filter(|e| !e.is_empty()))
             .ok_or_else(|| {
                 internal(crate::errors::Error::Promote(
-                    "no Quipu endpoint: set [hank.quipu] endpoint or pass one in the \
+                    "no Quipu endpoint: set [yupana.quipu] endpoint or pass one in the \
                      request. Refusing rather than guessing a graph."
                         .to_string(),
                 ))
@@ -69,7 +69,7 @@ pub(super) fn promote(
         };
         let turtle = crate::export::to_turtle(&base, &repo).map_err(internal)?;
 
-        let source = format!("hank promote {repo} (mcp)");
+        let source = format!("yupana promote {repo} (mcp)");
         let response =
             match crate::promote::promote(&endpoint, &turtle, &source).map_err(internal)? {
                 crate::promote::Promotion::Wrote(k) => PromoteResponse {
@@ -113,7 +113,7 @@ pub(super) fn promote(
                     violations: vec![format!(
                         "internal invariant broken: `promote` returned a dry-run result \
                          ({chunks} chunks, {bytes} bytes) instead of writing. NOTHING WAS \
-                         WRITTEN. This is a bug in hank, not in the projection — please report it."
+                         WRITTEN. This is a bug in yupana, not in the projection — please report it."
                     )],
                 },
             };
@@ -121,9 +121,9 @@ pub(super) fn promote(
     }
 }
 
-/// Body of `hank_dataflow`.
+/// Body of `yupana_dataflow`.
 pub(super) fn dataflow(
-    server: &HankMcpServer,
+    server: &YupanaMcpServer,
     req: &DataflowRequest,
 ) -> Result<CallToolResult, McpError> {
     let base = req
@@ -176,12 +176,12 @@ pub(super) fn dataflow(
     json_result(&response)
 }
 
-/// Body of `hank_references`.
+/// Body of `yupana_references`.
 pub(super) fn references(
-    server: &HankMcpServer,
+    server: &YupanaMcpServer,
     req: &ReferencesRequest,
 ) -> Result<CallToolResult, McpError> {
-    // A position-based request (FR-4, hank #8) needs the node SPANS, which
+    // A position-based request (FR-4, yupana #8) needs the node SPANS, which
     // the daemon's `/references` reply does not carry — so it takes the
     // transient path, like a `path`-scoped one. Slower, and correct;
     // answering it from a name lookup would hand back every same-named
@@ -204,7 +204,7 @@ pub(super) fn references(
     // resolves against one. This walked `rust_files` and parsed every hit as
     // `"rust"`, so a `path`-scoped request (which always lands here, daemon
     // or not) over a Python tree searched ZERO files and answered "no
-    // definitions" — the CLI-side hank #76 bug, same cause, second surface.
+    // definitions" — the CLI-side yupana #76 bug, same cause, second surface.
     let graph = match CodeGraph::build(&base) {
         Ok(graph) => graph,
         Err(e) => return Err(McpError::internal_error(e.to_string(), None)),

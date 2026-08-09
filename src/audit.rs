@@ -1,4 +1,4 @@
-//! audit — what a guard decision RECORDS about its subject (hank #77).
+//! audit — what a guard decision RECORDS about its subject (yupana #77).
 //!
 //! The spool (`crate::metrics`) answers "how many denies, of what kind". This
 //! module answers the question that follows it: **which file, and under which

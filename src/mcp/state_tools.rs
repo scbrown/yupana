@@ -1,5 +1,5 @@
-//! Request DTOs for the board tools — `hank_ingest`, `hank_guard`,
-//! `hank_whatif` (FR-35/37/38).
+//! Request DTOs for the board tools — `yupana_ingest`, `yupana_guard`,
+//! `yupana_whatif` (FR-35/37/38).
 //!
 //! Each type is defined TWICE, once per `game-state` arm. The tool methods
 //! themselves are registered unconditionally — `#[tool_router]` references every
@@ -14,11 +14,11 @@
 
 use serde::Deserialize;
 
-/// Request for `hank_ingest`.
+/// Request for `yupana_ingest`.
 #[cfg(feature = "game-state")]
 pub type StateIngestRequest = crate::state::IngestRequest;
 
-/// Request for `hank_ingest` on a build without the `game-state` engine. Fields
+/// Request for `yupana_ingest` on a build without the `game-state` engine. Fields
 /// are accepted and ignored; the handler refuses.
 #[cfg(not(feature = "game-state"))]
 #[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
@@ -30,7 +30,7 @@ pub struct StateIngestRequest {
     pub faction_id: String,
 }
 
-/// Request for `hank_guard` — FR-37.
+/// Request for `yupana_guard` — FR-37.
 #[cfg(feature = "game-state")]
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct StateGuardRequest {
@@ -54,13 +54,13 @@ pub struct StateGuardRequest {
     /// The proposed orders, each carrying its declared board effects.
     #[serde(default)]
     #[schemars(
-        description = "Proposed orders with their DECLARED effects. Hank applies exactly these — \
+        description = "Proposed orders with their DECLARED effects. Yupana applies exactly these — \
                        it does not infer what an order kind implies."
     )]
     pub orders: Vec<crate::state::Order>,
 }
 
-/// Request for `hank_guard` on a build without the engine.
+/// Request for `yupana_guard` on a build without the engine.
 #[cfg(not(feature = "game-state"))]
 #[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
 #[serde(default)]
@@ -71,7 +71,7 @@ pub struct StateGuardRequest {
     pub faction_id: String,
 }
 
-/// Request for `hank_whatif` — FR-38.
+/// Request for `yupana_whatif` — FR-38.
 #[cfg(feature = "game-state")]
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct StateWhatIfRequest {
@@ -94,7 +94,7 @@ pub struct StateWhatIfRequest {
     pub hops: Option<u32>,
 }
 
-/// Request for `hank_whatif` on a build without the engine.
+/// Request for `yupana_whatif` on a build without the engine.
 #[cfg(not(feature = "game-state"))]
 #[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
 #[serde(default)]

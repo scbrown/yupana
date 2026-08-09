@@ -1,16 +1,16 @@
-# Governed Relations — Hank ⋈ Quipu
+# Governed Relations — Yupana ⋈ Quipu
 
-> Hank knows the *live* structure of the code. Quipu knows the *governed record*
+> Yupana knows the *live* structure of the code. Quipu knows the *governed record*
 > of everything related to it — docs, work items, commits, policies, decisions.
-> They share one IRI scheme, so Hank can tell you, at the moment you touch a
+> They share one IRI scheme, so Yupana can tell you, at the moment you touch a
 > symbol, **everything the governed graph already knows about what you changed.**
 
 ## The idea
 
-Hank exports its structure in the **same `bobbin:` code ontology that Quipu
+Yupana exports its structure in the **same `bobbin:` code ontology that Quipu
 stores** (FR-20; `src/export.rs` mirrors Quipu's `namespace.rs`). A `CodeSymbol`
-IRI in Hank's live graph *is* the same node in Quipu's governed graph. That
-shared IRI is a free join key: Hank's live blast radius on one side, Quipu's
+IRI in Yupana's live graph *is* the same node in Quipu's governed graph. That
+shared IRI is a free join key: Yupana's live blast radius on one side, Quipu's
 committed neighborhood on the other, joined by identity.
 
 This turns a single question into a general one. "Which docs reference this
@@ -22,12 +22,12 @@ facts relate to these IRIs?"**
 > Given a symbol — or the impacted set from an edit — ask Quipu for the governed
 > neighborhood of those IRIs, and fold it back **tagged as the past.**
 
-Hank keeps ownership of the live structural answer (blast radius, dataflow). The
-neighborhood is Quipu's governed answer. Hank does the join and annotates its own
+Yupana keeps ownership of the live structural answer (blast radius, dataflow). The
+neighborhood is Quipu's governed answer. Yupana does the join and annotates its own
 output — it never re-derives or re-owns Quipu's edges.
 
 ```text
-impacted set (Hank, live)          governed neighborhood (Quipu, committed)
+impacted set (Yupana, live)          governed neighborhood (Quipu, committed)
   foo::bar  ─────────────┐         Section --references--> foo::bar   (docs/x.md#y)
   foo::baz  ─────────────┼──⋈──►   GitCommit --modifies--> foo::bar   (bead st-42)
   ...                    │         Policy --targets--> <type of foo::bar>
@@ -36,8 +36,8 @@ impacted set (Hank, live)          governed neighborhood (Quipu, committed)
 
 ## The join key: one ontology
 
-- Hank promotes / exports `CodeModule` / `CodeSymbol` with `definedIn` / `calls`
-  / `imports` in the `bobbin:` ontology (FR-19/FR-20, `hank export`).
+- Yupana promotes / exports `CodeModule` / `CodeSymbol` with `definedIn` / `calls`
+  / `imports` in the `bobbin:` ontology (FR-19/FR-20, `yupana export`).
 - Quipu's `shapes/code-entities.ttl` defines the same `CodeModule` / `CodeSymbol`
   / `Document` / `Section`, and the governance plane
   (`shapes/governance.ttl`) extends that model in the same namespace.
@@ -46,10 +46,10 @@ impacted set (Hank, live)          governed neighborhood (Quipu, committed)
 
 ## Tiering: this is the past, and it says so
 
-Every fact Hank serves carries a `tier` and `freshness` (FR-3). Governed
+Every fact Yupana serves carries a `tier` and `freshness` (FR-3). Governed
 relations come back tagged `committed` (or `attested` for signed verdicts) —
 **never mixed into the live `treesitter` / `lsp` structural tier.** This is the
-present-vs-past split (§9) made legible at the fact level: Hank annotates the
+present-vs-past split (§9) made legible at the fact level: Yupana annotates the
 *present* (its live edit) with the *past* (Quipu's settled record), and the
 consumer always knows which is which.
 
@@ -68,8 +68,8 @@ One query, different predicate filters:
 ## Principles
 
 - **Borrow, don't derive (§9.6).** Quipu is the single source of truth for
-  governed relations. Hank *reads* them and tags them `committed`; it never
-  promotes them back or treats them as its own structural facts. The day Hank
+  governed relations. Yupana *reads* them and tags them `committed`; it never
+  promotes them back or treats them as its own structural facts. The day Yupana
   re-owns a Quipu edge is the day there are two sources of truth.
 - **Optional, and it degrades.** Gate the enrichment behind the existing `quipu`
   feature. If Quipu is unreachable, the enrichment is simply *absent* — the code
@@ -82,10 +82,10 @@ One query, different predicate filters:
 
 ## Surfaces
 
-- **`hank relations <symbol>` / `hank_relations` (MCP)** — the governed
+- **`yupana relations <symbol>` / `yupana_relations` (MCP)** — the governed
   neighborhood of a symbol, with an optional predicate filter, tier-tagged
   `committed`.
-- **Folded into `hank impact`** — the impact response gains a `governed_relations`
+- **Folded into `yupana impact`** — the impact response gains a `governed_relations`
   section for the impacted set.
 - **Folded into the `post-edit` hook** — the advisory gains a "governed relations
   touching your change" block.
@@ -93,7 +93,7 @@ One query, different predicate filters:
 ## Worked example: doc-staleness
 
 Doc-staleness is the `references` filter over the primitive. On an edit to
-`foo::bar`, Hank's blast radius yields the affected symbols; the join asks Quipu
+`foo::bar`, Yupana's blast radius yields the affected symbols; the join asks Quipu
 for `Section --references-->` edges into that set; the advisory says:
 
 ```text
@@ -108,11 +108,11 @@ durable one.
 
 ## Status
 
-- **Exists today:** `hank export --format turtle` emits the code side
+- **Exists today:** `yupana export --format turtle` emits the code side
   (`CodeModule` / `CodeSymbol` + `definedIn` / `calls` / `imports`) and, via
   `src/docref.rs`, the doc→code `Section --references--> CodeSymbol` edges.
-- **This design adds:** the *read* direction — Hank querying Quipu by shared IRI
+- **This design adds:** the *read* direction — Yupana querying Quipu by shared IRI
   to enrich its live output, tier-tagged `committed`, behind the `quipu` feature,
-  exposed as `hank_relations` and folded into `impact` / `post-edit`.
-- **Boundary held:** Hank owns structural references; embeddings and semantic
+  exposed as `yupana_relations` and folded into `impact` / `post-edit`.
+- **Boundary held:** Yupana owns structural references; embeddings and semantic
   retrieval stay in Bobbin, the governed record stays in Quipu (§5.10).

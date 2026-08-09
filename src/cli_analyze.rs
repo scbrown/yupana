@@ -1,5 +1,5 @@
 //! `analyze`, `refs` and `changed` — the commands that BUILD structure and
-//! report it, split out of `cli` for size (hank #83).
+//! report it, split out of `cli` for size (yupana #83).
 //!
 //! A child module of `cli`, not a sibling: these stay `impl Cli` methods reading
 //! the global output flags (`--json`, `--quiet`) and `load_config` straight off
@@ -107,8 +107,8 @@ impl Cli {
     /// Reads the SAME graph `callers`/`impact` read, deliberately. This walked
     /// `rust_files` and parsed every hit as `"rust"`, so on a Python (or Go,
     /// or TypeScript) tree it scanned ZERO files and printed "no definition
-    /// found" — while `hank callers` on the same symbol in the same tree
-    /// answered from the multi-language graph and listed call sites (hank #76).
+    /// found" — while `yupana callers` on the same symbol in the same tree
+    /// answered from the multi-language graph and listed call sites (yupana #76).
     /// That is the `from_sources` "parse each file as the language it IS" bug
     /// surviving in the one command whose name advertises symbol lookup, and it
     /// failed in the worst direction: a confident "this symbol does not exist"
@@ -121,7 +121,7 @@ impl Cli {
     ) -> anyhow::Result<()> {
         // With `--at`, the lone positional is the search PATH, not a symbol: a
         // name is redundant once a position names the symbol, and reading it as
-        // one would reject the natural `hank refs --at a.rs:3 .` as a conflict.
+        // one would reject the natural `yupana refs --at a.rs:3 .` as a conflict.
         let root = match (at, symbol) {
             (Some(_), Some(positional)) => PathBuf::from(positional),
             _ => path.to_path_buf(),
@@ -129,7 +129,7 @@ impl Cli {
         let graph = crate::graph::CodeGraph::build(&root)?;
         let (nodes, _) = graph.stats();
 
-        // `--at FILE:LINE` names the symbol by POSITION (FR-4, hank #8), and
+        // `--at FILE:LINE` names the symbol by POSITION (FR-4, yupana #8), and
         // answers with THAT symbol — not with every symbol sharing its name.
         // Resolving the position to a name and then looking the name up would
         // hand back all twelve `build`s again, which is the exact
@@ -220,7 +220,7 @@ impl Cli {
     /// that the answer was partial.
     pub(super) fn changed(&self, base: Option<&str>, to: Option<&str>) -> anyhow::Result<()> {
         let root = std::env::current_dir()?;
-        let config = HankConfig::load(&root)?;
+        let config = YupanaConfig::load(&root)?;
         let base = base.unwrap_or(&config.base_ref);
 
         let set = match crate::change::changed_entities(&root, base, to) {
@@ -235,7 +235,7 @@ impl Cli {
                         serde_json::json!({ "error": e.to_string(), "evaluated": false })
                     );
                 } else {
-                    eprintln!("hank: {e}");
+                    eprintln!("yupana: {e}");
                 }
                 std::process::exit(2);
             }
@@ -244,7 +244,7 @@ impl Cli {
         if self.json {
             println!("{}", serde_json::to_string_pretty(&set)?);
         } else {
-            println!("{}", "hank changed".bold());
+            println!("{}", "yupana changed".bold());
             println!("  base : {}", set.base);
             println!("  to   : {}", set.to);
             if set.entities.is_empty() {
@@ -275,7 +275,7 @@ impl Cli {
     /// `Ok(None)` means "said why, nothing to report" — the caller returns
     /// quietly. Every miss is EXPLAINED rather than silently answered as an
     /// absent symbol, because a position that resolves to nothing is exactly the
-    /// confident-wrong-answer shape hank #76 was about: "no definitions" reads
+    /// confident-wrong-answer shape yupana #76 was about: "no definitions" reads
     /// as "this does not exist" when the truth is "I could not find what you
     /// pointed at".
     fn resolve_at<'g>(

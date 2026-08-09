@@ -73,7 +73,7 @@ impl Throttle {
     pub fn advisory(&self, now: u64) -> String {
         let remaining = self.until.saturating_sub(now);
         format!(
-            "hank: soft constraint `{}` crossed its window on a previous edit; \
+            "yupana: soft constraint `{}` crossed its window on a previous edit; \
              backing off for another {remaining}s. This is advisory — nothing is \
              blocked. If the work genuinely needs to continue at this rate, it \
              does; the crossing is recorded either way.",
@@ -82,8 +82,8 @@ impl Throttle {
     }
 }
 
-/// Where throttle state lives: `$HANK_THROTTLE_PATH`, else
-/// `$XDG_STATE_HOME/hank/throttles.jsonl`, else the `~/.local/state` form.
+/// Where throttle state lives: `$YUPANA_THROTTLE_PATH`, else
+/// `$XDG_STATE_HOME/yupana/throttles.jsonl`, else the `~/.local/state` form.
 #[must_use]
 pub fn resolve_path(
     explicit: Option<&str>,
@@ -94,20 +94,20 @@ pub fn resolve_path(
         return Some(PathBuf::from(p));
     }
     if let Some(x) = xdg_state {
-        return Some(PathBuf::from(x).join("hank").join("throttles.jsonl"));
+        return Some(PathBuf::from(x).join("yupana").join("throttles.jsonl"));
     }
     home.map(|h| {
         PathBuf::from(h)
             .join(".local")
             .join("state")
-            .join("hank")
+            .join("yupana")
             .join("throttles.jsonl")
     })
 }
 
 fn state_path() -> Option<PathBuf> {
     resolve_path(
-        std::env::var("HANK_THROTTLE_PATH").ok().as_deref(),
+        std::env::var("YUPANA_THROTTLE_PATH").ok().as_deref(),
         std::env::var("XDG_STATE_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
     )

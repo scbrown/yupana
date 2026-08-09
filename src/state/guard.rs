@@ -1,4 +1,4 @@
-//! `hank_guard` — the `(game_state + proposed_orders)` analog of `hank_verify`
+//! `yupana_guard` — the `(game_state + proposed_orders)` analog of `yupana_verify`
 //! (FR-37).
 //!
 //! Apply the proposed orders to a copy-on-write overlay, run each policy's
@@ -14,7 +14,7 @@
 //!    fine" are otherwise the same JSON. A guard that answers `ok` over a board
 //!    it does not have is a green light over a dead backend.
 //! 2. **[`GuardReport::unevaluated`].** A policy that could not be compiled or
-//!    is not hank's to evaluate (`sparql`) is listed, not dropped. A dropped
+//!    is not yupana's to evaluate (`sparql`) is listed, not dropped. A dropped
 //!    policy is indistinguishable from a satisfied one.
 //! 3. **[`GuardReport::vacuous`].** A policy whose SELECTOR matched nothing
 //!    neither passed nor failed — it was never asked. A selector that has rotted

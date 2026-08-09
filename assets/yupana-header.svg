@@ -17,8 +17,8 @@
     .coil { stroke: url(#coilGrad); stroke-width: 2.5; fill: none; }
     .dot { fill: #9B72AA; }
   </style>
-  <!-- HANK wordmark -->
-  <text x="410" y="92" text-anchor="middle" class="title">HANK</text>
+  <!-- YUPANA wordmark -->
+  <text x="410" y="92" text-anchor="middle" class="title">YUPANA</text>
   <!-- Coiled skein line under the wordmark -->
   <path d="M 150 122 Q 230 104, 310 122 T 470 122 T 630 122 Q 690 122, 700 120" class="coil"/>
   <path d="M 150 132 Q 230 150, 310 132 T 470 132 T 630 132 Q 690 132, 700 134" class="coil" opacity="0.5"/>

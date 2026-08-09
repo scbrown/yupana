@@ -2,7 +2,7 @@
 
 A team means there is no single "the AST." Each developer sits at some
 branch/commit plus an uncommitted working delta, and those deltas diverge.
-Hank resolves this with **shared base + per-tenant overlay (copy-on-write)**.
+Yupana resolves this with **shared base + per-tenant overlay (copy-on-write)**.
 
 - **Shared base.** The full structural graph is computed once at a baseline
   commit and held read-only in memory.
@@ -28,7 +28,7 @@ algorithm, eviction policy, and high-fan-in handling.
 
 ## Implementation state
 
-The engine above exists as a library (hank #2): `graph::Base` (shared,
+The engine above exists as a library (yupana #2): `graph::Base` (shared,
 read-only, `Arc`-shared, built at a resolved commit with per-file content
 hashes), `graph::Overlay` (owned re-parses of touched files only —
 `O(touched)`, never `O(repo)`), and `graph::TenantRegistry` /
@@ -44,7 +44,7 @@ registry (base at the startup `HEAD`), `POST /edit` is the FR-30 feed (the
 post-edit hook calls it per save), query endpoints take `tenant=`, and
 `/status` reports the base commit and active overlays.
 
-The FR-16 frontier is `graph::update_frontier` (hank #3): editing a symbol
+The FR-16 frontier is `graph::update_frontier` (yupana #3): editing a symbol
 perturbs its transitive callers AND callees, so the recompute is bounded to
 that reachable frontier — the *second* caller of the one `reachable()` BFS
 (FR-12), never a second traversal. The base also keeps a call-site index
@@ -52,15 +52,15 @@ that reachable frontier — the *second* caller of the one `reachable()` BFS
 symbol (one with zero base definitions) find its base callers — the case a
 naive per-file update misses.
 
-On-disk edits drive this automatically (FR-17, hank #5): a `notify` watcher
+On-disk edits drive this automatically (FR-17, yupana #5): a `notify` watcher
 (`watch::OverlayRefresh`), `.gitignore`-filtered and debounced, touches the
 tenant's overlay on the fast tier and runs `update_frontier` on the deferred
 heavy tier, tracking per-file freshness (`recomputing` while the frontier is
 pending, `fresh` after).
 
-Overlay lifecycle (FR-18/§14.2, hank #6) is the registry's job: sessions open
+Overlay lifecycle (FR-18/§14.2, yupana #6) is the registry's job: sessions open
 on first touch and close explicitly (`close_session`), `reset` clears a tenant
-to base, and live overlays are capped at `[hank.tenancy].max_overlays` — a new
+to base, and live overlays are capped at `[yupana.tenancy].max_overlays` — a new
 overlay past the cap evicts one per `overlay_eviction` (`lru`, or oldest-created
 as the `on_session_close` backstop), always logged. A symbol whose direct
 fan-in exceeds `high_fanin_threshold` has its frontier cascade clipped to one

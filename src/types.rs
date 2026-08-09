@@ -1,4 +1,4 @@
-//! The typed fact model Hank serves.
+//! The typed fact model Yupana serves.
 //!
 //! Every served fact carries a [`Tier`] (how it was derived) — the confidence
 //! tag FR-3 requires so a consumer never mistakes a tree-sitter approximation
@@ -31,7 +31,7 @@ pub enum Tier {
     Lsp,
     /// Control/data dependence from the code property graph.
     Cpg,
-    /// A fact an engine ADAPTER stated, not one Hank derived from source
+    /// A fact an engine ADAPTER stated, not one Yupana derived from source
     /// (FR-35). Its provenance is an adapter id + turn + faction, never a
     /// `file:line` — see [`crate::state`].
     ///
@@ -91,7 +91,7 @@ impl Tier {
     }
 
     /// The tiers this build can ACTUALLY serve — the single source of truth for
-    /// `hank status` / `hank_status` (aegis-qe5z).
+    /// `yupana status` / `yupana_status` (aegis-qe5z).
     ///
     /// It reports a tier only when that tier has a registered extractor. Today
     /// that is tree-sitter ALONE: the LSP tier (FR-2) and the CPG tier (FR-7) are
@@ -181,7 +181,7 @@ impl SymbolKind {
 }
 
 /// A structural edge between two symbols or modules. These become predicates in
-/// the `bobbin:` code ontology on promotion (see `docs/hank-spec.md` §9.2).
+/// the `bobbin:` code ontology on promotion (see `docs/yupana-spec.md` §9.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeKind {

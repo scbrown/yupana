@@ -209,7 +209,7 @@ fn rust_extension_maps() {
 /// Every language `languages()` advertises must actually resolve to a grammar in
 /// THIS build. This is the drift guard: `languages()` and `grammar_spec` carry
 /// the same `cfg` gates in two places, and a list that outran its grammars would
-/// re-create aegis-ah0q1 one layer up — `hank status` claiming a language the
+/// re-create aegis-ah0q1 one layer up — `yupana status` claiming a language the
 /// extractor still silently skips.
 #[test]
 fn advertised_languages_all_resolve() {

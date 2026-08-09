@@ -1,6 +1,6 @@
 # Tiers and Freshness
 
-Full LSP-grade resolution on every keystroke is too expensive, so Hank serves
+Full LSP-grade resolution on every keystroke is too expensive, so Yupana serves
 tiered facts — and **every fact it serves is tagged** so a consumer never
 mistakes an approximation for ground truth.
 
@@ -8,7 +8,7 @@ mistakes an approximation for ground truth.
 
 - `treesitter` — fast, build-free, approximate. Always-on breadth; works on a
   syntactically-broken buffer. **This is the only tier served today** — every fact
-  Hank currently produces is `treesitter`, and `hank status` advertises only it.
+  Yupana currently produces is `treesitter`, and `yupana status` advertises only it.
 - `lsp` — precise defs/refs/types where a build resolves. *Planned (FR-2); not yet
   implemented or served.*
 - `cpg` — control/data dependence from the code property graph. *Planned (Phase 2,

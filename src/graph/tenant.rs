@@ -1,4 +1,4 @@
-//! Tenant registry + the composed `base + overlay` view (slice 2 of hank #2).
+//! Tenant registry + the composed `base + overlay` view (slice 2 of yupana #2).
 //!
 //! [`TenantRegistry`] holds ONE shared [`Base`] and a fully-owned [`Overlay`]
 //! per tenant, plus the FR-15 intern cache: parses are keyed by content hash,
@@ -22,7 +22,7 @@
 //! identity changed hands). A base caller's call to a name the overlay
 //! INTRODUCED (zero base definitions, so no materialized edge) is resolved
 //! through the base's FR-16 frontier index (`callers_of_name`) — this is
-//! what closes the slice-2 overlay-new-name gap (hank #3).
+//! what closes the slice-2 overlay-new-name gap (yupana #3).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -59,7 +59,7 @@ pub struct TenantRegistry {
     /// Content-hash → parse. Immutable entries; retained past revert until a
     /// tenant is closed (then swept — see [`close_session`](Self::close_session)).
     intern: HashMap<String, Arc<ParsedFile>>,
-    /// The `[hank.tenancy]` limits: cap, eviction policy, fan-in threshold.
+    /// The `[yupana.tenancy]` limits: cap, eviction policy, fan-in threshold.
     tenancy: crate::config::TenancyConfig,
     /// Monotonic clock for recency; bumped on every touch/open.
     tick: u64,
@@ -75,8 +75,8 @@ impl TenantRegistry {
         Self::with_tenancy(base, crate::config::TenancyConfig::default())
     }
 
-    /// A registry over `base` with explicit `[hank.tenancy]` limits — what the
-    /// resident daemon and `hank watch` build so the configured cap/policy/
+    /// A registry over `base` with explicit `[yupana.tenancy]` limits — what the
+    /// resident daemon and `yupana watch` build so the configured cap/policy/
     /// fan-in threshold are actually honored.
     #[must_use]
     pub fn with_tenancy(base: Arc<Base>, tenancy: crate::config::TenancyConfig) -> Self {
@@ -207,7 +207,7 @@ impl TenantRegistry {
         let total_touches: usize = self.overlays.values().map(Overlay::touched_count).sum();
         // Distinct parses ACTUALLY referenced by a live overlay — not
         // `intern.len()`, which also counts parses whose only holders have
-        // since reverted (retained until FR-18 eviction, hank #6).
+        // since reverted (retained until FR-18 eviction, yupana #6).
         let mut live: std::collections::BTreeSet<*const ParsedFile> =
             std::collections::BTreeSet::new();
         for overlay in self.overlays.values() {
@@ -264,7 +264,7 @@ impl TenantRegistry {
         }
     }
 
-    /// What `hank_status` reports about the tenant layer: the base commit and
+    /// What `yupana_status` reports about the tenant layer: the base commit and
     /// active overlays, by tenant, with their `O(touched)` sizes.
     #[must_use]
     pub fn status(&self) -> RegistryStatus {
@@ -297,7 +297,7 @@ pub struct SharingStats {
     pub unique_parses: usize,
     /// Entries in the intern cache — `>= unique_parses`, the excess being
     /// parses retained after all their overlays reverted (freed by FR-18
-    /// eviction, hank #6; the excess is logged, never silently dropped).
+    /// eviction, yupana #6; the excess is logged, never silently dropped).
     pub interned: usize,
 }
 
@@ -333,7 +333,7 @@ pub struct OverlayStatus {
 }
 
 /// The registry's status snapshot: base commit + active overlays. Serialized
-/// into `hank_status`/`/status` when the resident daemon holds a registry.
+/// into `yupana_status`/`/status` when the resident daemon holds a registry.
 #[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
 pub struct RegistryStatus {
     /// The resolved commit the shared base was built at.
@@ -342,7 +342,7 @@ pub struct RegistryStatus {
     pub active_overlays: Vec<OverlayStatus>,
 }
 
-// The per-query composed view lives beside this module (hank #83).
+// The per-query composed view lives beside this module (yupana #83).
 #[path = "tenant_view.rs"]
 mod tenant_view;
 pub use tenant_view::*;

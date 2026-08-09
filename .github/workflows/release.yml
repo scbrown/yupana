@@ -1,6 +1,6 @@
 name: Release
 
-# Publish a downloadable hank binary on every version tag. CI (ci.yml) proves the
+# Publish a downloadable yupana binary on every version tag. CI (ci.yml) proves the
 # code builds/tests; this proves it SHIPS — a build with no release artifact is a
 # tool nobody downstream can install (aegis-dh32).
 on:
@@ -80,7 +80,7 @@ jobs:
                 # the tag from the manifest avoids depending on the shape of the
                 # action's undocumented `releases` JSON output.
                 TAG="v$(cargo metadata --no-deps --format-version 1 \
-                  | jq -r '.packages[] | select(.name == "hank") | .version')"
+                  | jq -r '.packages[] | select(.name == "yupana") | .version')"
               fi ;;
           esac
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -103,9 +103,9 @@ jobs:
             ${{ runner.os }}-cargo-release-
             ${{ runner.os }}-cargo-
 
-      # mcp + langs-extra = the useful runtime set (`hank serve` + all grammars);
+      # mcp + langs-extra = the useful runtime set (`yupana serve` + all grammars);
       # quipu added 2026-07-23 (aegis-ucoh): the promote seam shipped feature-less,
-      # so the DEPLOYED `hank promote` was a stub — and its exit-0 made the
+      # so the DEPLOYED `yupana promote` was a stub — and its exit-0 made the
       # quipu-ingest cron advance its marker past a commit that was never
       # promoted. All arms pass in ci.yml (quipu + mcp,quipu arms), so this
       # remains a proven build.
@@ -117,11 +117,11 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          bin=target/release/hank
+          bin=target/release/yupana
           test -x "$bin" || { echo "no binary at $bin"; exit 1; }
           "$bin" --version
-          tarball="hank-${TAG}-x86_64-linux-gnu.tar.gz"
-          tar -czf "$tarball" -C target/release hank
+          tarball="yupana-${TAG}-x86_64-linux-gnu.tar.gz"
+          tar -czf "$tarball" -C target/release yupana
           sha256sum "$tarball" | tee "$tarball.sha256"
           echo "TARBALL=$tarball" >> "$GITHUB_ENV"
 

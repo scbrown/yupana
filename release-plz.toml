@@ -4,7 +4,7 @@ publish = false
 git_release_enable = true
 git_tag_enable = true
 # release-plz's DEFAULT tag template is `{{ package }}-v{{ version }}`, i.e. it
-# hunts for `hank-v0.3.1`. Every real tag in this repo is `v{{ version }}`. So it
+# hunts for `yupana-v0.3.1`. Every real tag in this repo is `v{{ version }}`. So it
 # found NO baseline tag, concluded the package had never been released, and
 # answered with a changelog regenerated from the scaffold commits and NO version
 # bump — over 16 `feat` commits sitting above v0.3.1.
@@ -20,4 +20,4 @@ git_tag_enable = true
 git_tag_name = "v{{ version }}"
 
 [[package]]
-name = "hank"
+name = "yupana"

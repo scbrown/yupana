@@ -3,7 +3,7 @@
 //!
 //! ## This is deliberately not SPARQL, and the boundary is the point
 //!
-//! Hank is not an RDF store. `selectorLang "sparql"` is RESERVED for policies
+//! Yupana is not an RDF store. `selectorLang "sparql"` is RESERVED for policies
 //! **Quipu** evaluates, and this module refuses to evaluate one rather than
 //! approximating it (see [`super::policy`]). What is implemented here is a
 //! fixed, small subset with no inference, no property paths, no `OPTIONAL`, no
@@ -22,7 +22,7 @@
 //!
 //! `?b a smac:BaseState ; smac:isBorderBase true` reads as: bind `?b` to nodes
 //! whose kind is `smac:BaseState` and whose `isBorderBase`… — **no**. It reads
-//! as: whose `smac:isBorderBase` attribute is `true`. **Hank performs no prefix
+//! as: whose `smac:isBorderBase` attribute is `true`. **Yupana performs no prefix
 //! expansion.** A name is matched against what the adapter ingested, byte for
 //! byte, so `smac:garrisonCount` matches an attribute literally called
 //! `smac:garrisonCount`. Inventing a prefix map here would create a second,

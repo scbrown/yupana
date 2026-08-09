@@ -10,7 +10,7 @@ use super::Outcome;
 /// They are separate because the model-facing text and the operator-facing
 /// record answer different questions: the model needs to know what to do
 /// instead, the operator needs to know which rule fired so a false positive can
-/// be told from a correct deny (hank #77).
+/// be told from a correct deny (yupana #77).
 #[derive(Debug, Clone)]
 pub(super) struct Decision {
     pub(super) outcome: Outcome,
@@ -73,9 +73,9 @@ impl Decision {
     /// from the outcome it produced.
     ///
     /// The convenience form for the capability-scope checks, which have no
-    /// declared class or verification point to carry: they are hank's own
+    /// declared class or verification point to carry: they are yupana's own
     /// path/blast-radius rules rather than projected quipu policies. Recording
-    /// them with `class: None` is honest — they are constraints hank enforces
+    /// them with `class: None` is honest — they are constraints yupana enforces
     /// and nobody declared a class for.
     pub(super) fn ruled(outcome: Outcome, rule: impl Into<String>) -> Self {
         let response = crate::trace::Response::of(&outcome);
@@ -86,7 +86,7 @@ impl Decision {
                 crate::trace::Outcome::Unsatisfied,
                 response,
             )],
-            // hank's own scope rules: no cache between the rule and the check.
+            // yupana's own scope rules: no cache between the rule and the check.
             crate::types::Freshness::Fresh,
         )
     }

@@ -1,6 +1,6 @@
 //! The generic fact graph: nodes and edges NOT tied to a source span (FR-35).
 //!
-//! Hank's [`CodeGraph`](crate::graph::CodeGraph) node is a `SymbolNode` — a
+//! Yupana's [`CodeGraph`](crate::graph::CodeGraph) node is a `SymbolNode` — a
 //! name anchored to `file:start_line..end_line`. Everything about it assumes a
 //! parsed source file. A board fact ("base Alpha holds 2 garrison units") has no
 //! file and no line; forcing it into a span-anchored node would mean inventing
@@ -11,12 +11,12 @@
 //! A [`StateNode`] is identified by an opaque `id`, typed by a free-form `kind`,
 //! and carries an attribute map. Its provenance is an adapter id + turn +
 //! faction ([`Provenance`]), and its tier is always
-//! [`Tier::EngineState`](crate::types::Tier::EngineState) — Hank did not derive
+//! [`Tier::EngineState`](crate::types::Tier::EngineState) — Yupana did not derive
 //! this fact, an adapter stated it.
 //!
 //! ## What is deliberately NOT here
 //!
-//! No inference, no schema, no closed vocabulary of kinds or relations. Hank is
+//! No inference, no schema, no closed vocabulary of kinds or relations. Yupana is
 //! not an RDF store and this is not a triple store with the serial numbers filed
 //! off (see [`super::pattern`] for where that line is drawn). The graph indexes
 //! what it was told and answers pattern queries over it; meaning lives in the
@@ -122,7 +122,7 @@ pub struct StateNode {
     /// Opaque stable identifier — the adapter's entity id. Mirrors the `name`
     /// field of a `quipu_episode` node so one adapter output feeds both stores.
     pub id: String,
-    /// The node's type (`BaseState`, `UnitState`, …). Free-form: Hank enforces
+    /// The node's type (`BaseState`, `UnitState`, …). Free-form: Yupana enforces
     /// no vocabulary, because the vocabulary that matters is SHACL-validated in
     /// Quipu, and duplicating half of it here would be a second, drifting copy.
     pub kind: String,

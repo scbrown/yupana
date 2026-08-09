@@ -1,4 +1,4 @@
-//! The game-state harness (FR-35..FR-39) — Hank as a general in-memory fact
+//! The game-state harness (FR-35..FR-39) — Yupana as a general in-memory fact
 //! graph and policy harness, not only a code-analysis engine.
 //!
 //! Gated behind the `game-state` Cargo feature, which joins the CI matrix in the
@@ -38,14 +38,14 @@
 //!
 //! ## Three standing caveats, all load-bearing
 //!
-//! 1. **Hank is not an RDF store.** `graph-pattern` is a small fixed subset;
+//! 1. **Yupana is not an RDF store.** `graph-pattern` is a small fixed subset;
 //!    `sparql` is reserved for Quipu and REFUSED here, never approximated. If a
 //!    predicate starts wanting property paths or aggregation, the policy belongs
 //!    in Quipu.
 //! 2. **The guard sees an APPROXIMATED post-order board.** Orders carry declared
-//!    effects and hank applies exactly those, so the gap is "what the adapter
+//!    effects and yupana applies exactly those, so the gap is "what the adapter
 //!    declared vs. what the engine does" — visible and closable — rather than
-//!    hank's own reimplementation of the rules. The **game engine remains the
+//!    yupana's own reimplementation of the rules. The **game engine remains the
 //!    sole authority** on legality and effects; this can only subtract from, or
 //!    annotate, moves that are already legal, and `deny` policies should be
 //!    conservative because a false deny removes a legal, possibly correct move.

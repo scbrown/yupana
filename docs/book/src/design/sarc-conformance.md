@@ -1,4 +1,4 @@
-# SARC Conformance — what hank × quipu still needs
+# SARC Conformance — what yupana × quipu still needs
 
 Status: **Phases 1–6 landed.** Constraint metadata
 and placement; the Σ-derived trace record and signed verdict emission; a real
@@ -51,18 +51,18 @@ and nothing checks correspondence. This document names them and orders the work.
 |---|---|---|
 | Constraint specification object | `aegis:Policy` + `aegis:Selector` / `aegis:Predicate` atoms | `quipu/shapes/governance.ttl` |
 | `pred` | `aegis:claim` (SPARQL ASK), or selector `.scm` + predicate regex | `quipu/shapes/policies/treesitter.ttl` |
-| Pre-Action Gate | `hank hook pre-edit`, `Mode::{Off,Advise,Enforce}` | `src/hook/pre_edit.rs`, `src/policy.rs` |
+| Pre-Action Gate | `yupana hook pre-edit`, `Mode::{Off,Advise,Enforce}` | `src/hook/pre_edit.rs`, `src/policy.rs` |
 | Policy-layer reference monitor | quipu pre-commit write gate | `quipu/src/governance/guard.rs` |
 | Verdict as attestation, not claim | ed25519-signed, evidence-hash-bound `aegis:Verdict` | `src/verdict.rs`, `quipu/src/signing.rs` |
 | Root of trust | `aegis:VerifierRegistration`, human-authored | `quipu/shapes/governance.ttl` |
 | Latency budget ([SARC] §5.1) | `policy.deadline_ms`, fail-open on expiry | `src/policy.rs` |
-| One-directional policy projection | quipu canonical → hank read cache | `src/project.rs`, `src/hook/rule_planes.rs` |
+| One-directional policy projection | quipu canonical → yupana read cache | `src/project.rs`, `src/hook/rule_planes.rs` |
 | Confidence inputs | `tier ∈ {live,lsp,tree-sitter,committed,attested}` + `freshness` | shapes, FR-3 |
 | Layer discipline (SARC I6) | no rule lives in the prompt; declared, not yet verified against reality | [Governance Plane](governance-plane.md) |
-| Post-Action Auditor | `hank hook post-edit`, soft class + `throttle` | `src/hook/paa.rs`, `src/throttle.rs` |
+| Post-Action Auditor | `yupana hook post-edit`, soft class + `throttle` | `src/hook/paa.rs`, `src/throttle.rs` |
 | Constraint class + placement | `aegis:constraintClass` / `verificationPoint`, checked at write | `quipu/src/governance/placement.rs` |
 | Σ-derived trace record | `constraints[]` with outcome, response and placement | `src/trace.rs` |
-| Signed verdicts, both sides | hank spools at the gate and the PAA; quipu persists the write gate's | `src/verdict_spool.rs`, `quipu/src/governance/verdict_facts.rs` |
+| Signed verdicts, both sides | yupana spools at the gate and the PAA; quipu persists the write gate's | `src/verdict_spool.rs`, `quipu/src/governance/verdict_facts.rs` |
 
 [Governance Plane](governance-plane.md) independently anticipates much of SARC —
 risk × confidence adaptive effect, verdict integrity, the out-of-band verifier,
@@ -72,7 +72,7 @@ class belongs at which enforcement point) and **checkable correspondence**
 ([SARC] §3.6: a decidable audit). SARC is explicit that this is a *specification
 discipline* layered over a policy-as-code substrate rather than a replacement
 for one (§2.1) — which is exactly the relationship quipu's write gate already
-has to hank's projection.
+has to yupana's projection.
 
 ### The gaps
 
@@ -96,13 +96,13 @@ constraint missing any field is not a constraint; it is a comment").
 §3.5). **Closed in Phase 2**, both halves.
 
 `src/verdict.rs` implemented signing and `promote_verdict` correctly — mirroring
-quipu's scheme so a hank-signed verdict verifies under quipu's root of trust —
-and had **no caller** outside `hank verdict-key`. A pre-edit guard decision, the
+quipu's scheme so a yupana-signed verdict verifies under quipu's root of trust —
+and had **no caller** outside `yupana verdict-key`. A pre-edit guard decision, the
 exact moment a constraint fires, never became a governed fact. Symmetrically,
 quipu's own write-gate decision was not persisted (`Q-VERDICT-PERSIST`).
 
-Both now record. hank signs at the gate and at the PAA and spools locally,
-drained by `hank verdicts`; quipu stages its write-gate verdicts and flushes
+Both now record. yupana signs at the gate and at the PAA and spools locally,
+drained by `yupana verdicts`; quipu stages its write-gate verdicts and flushes
 them *after* the savepoint resolves, so a denial's verdict survives the rollback
 that denial caused.
 
@@ -233,8 +233,8 @@ As first written, and where each rung now stands:
   the shipped `treesitter.ttl` catalog needs backfilling in the same change.
 - **Escalation Router owner**: **quipu**. The engine of record already models
   `Decision`, `assignsWorkflow` and the bitemporal audit trail, and
-  `require-approval` already fails closed there. Hank gets a thin client. This
-  matches the settled "the engine lives in Quipu; hank never originates policy"
+  `require-approval` already fails closed there. Yupana gets a thin client. This
+  matches the settled "the engine lives in Quipu; yupana never originates policy"
   rule.
 - **MVP scope**: Phases 1–3 — SARC-conformant for a single agent in a single
   trust domain, which is exactly the v1 boundary
@@ -254,7 +254,7 @@ class before class exists.*
 - `aegis:verificationPoint`, `sh:in ("PAG" "ATM" "PAA" "tool_layer" "policy_layer")`.
   This replaces nothing — `boundary` stays as the coarse action/transition
   split; `verificationPoint` is the fine placement SARC needs.
-  `tool_layer`/`policy_layer` already appear in hank's projected policies.
+  `tool_layer`/`policy_layer` already appear in yupana's projected policies.
 - `aegis:hostedAtLayer`, `sh:in ("orchestration" "tool" "policy")`. Deliberately
   **no `"prompt"` value**. See [Phase 1, as built](#phase-1-as-built) for why the
   omission is defence in depth rather than the guarantee it first looked like.
@@ -277,7 +277,7 @@ and must declare τ_rev. This is [SARC] Table 3 made mechanical, and it is what
 "placement discipline" means in practice. Backfill `shapes/policies/treesitter.ttl`
 (`no-ticket-in-comment` → hard/PAG, `todo-needs-ticket` → soft/PAA).
 
-**hank:**
+**yupana:**
 
 - `project_queries::POLICY_QUERY` gains `?constraintClass ?verificationPoint
   ?latencyBudgetMs ?fpTolerance ?fnTolerance ?reversibilityWindowSeconds` as
@@ -290,7 +290,7 @@ and must declare τ_rev. This is [SARC] Table 3 made mechanical, and it is what
   closures. An unrecognised `constraintClass` is an `Error::Projection`,
   matching how an unknown `matchType` is handled — never a silent drop.
 - `rules::Rule` gains `class` and `verification_point`, so a locally-configured
-  `[[hank.policy.rules]]` and a projected policy stay one type.
+  `[[yupana.policy.rules]]` and a projected policy stay one type.
 - `hook/rule_planes.rs::governed_check` selects its response by declared class
   (hard ⇒ block under `Enforce`; soft ⇒ never block; escalation ⇒ route) rather
   than by `project::effect_blocks` alone. `Mode::Advise` keeps its ceiling: it
@@ -299,7 +299,7 @@ and must declare τ_rev. This is [SARC] Table 3 made mechanical, and it is what
 ### Phase 1, as built
 
 Shipped in quipu (`shapes/governance.ttl`, `src/governance/placement.rs`) and
-hank (`src/constraint.rs`, `src/project_decode.rs`,
+yupana (`src/constraint.rs`, `src/project_decode.rs`,
 `src/hook/rule_planes.rs`). Three things came out differently from the plan
 above, each because building it surfaced something the analysis had not:
 
@@ -326,7 +326,7 @@ process that opens the store directly, bypasses every check quipu has.
 
 `hostedAtLayer` was **declared but otherwise unconsumed** at this point — I6 was
 checked for *well-formedness* and not for *truth*, so a policy could claim `tool`
-while being enforced only in hank's orchestration-layer hook. [Spec
+while being enforced only in yupana's orchestration-layer hook. [Spec
 B](#spec-b--h-sarc-i6-check-the-hosting-layer-against-reality) is now built; see
 [H-SARC-I6, as built](#h-sarc-i6-as-built).
 
@@ -463,7 +463,7 @@ attemptable against a vocabulary that has none.
 **The gap.** `aegis:hostedAtLayer` is declared and unconsumed. Nothing compares
 it against where a constraint is *actually* evaluated, so a policy may claim
 `"tool"` — the layer an agent cannot route around — while being enforced solely
-by hank's orchestration-layer pre-edit hook, which an agent bypasses by writing
+by yupana's orchestration-layer pre-edit hook, which an agent bypasses by writing
 the file another way. I6 is currently checked for well-formedness and not for
 truth, and a false `tool` claim is worse than an honest `orchestration` one
 because it stops people looking.
@@ -471,13 +471,13 @@ because it stops people looking.
 **What to produce.** A layer-truth check at the projection seam, where both
 halves are known at once:
 
-1. Hank knows what it is. A rule evaluated by `hank hook pre-edit` is hosted at
+1. Yupana knows what it is. A rule evaluated by `yupana hook pre-edit` is hosted at
    the **orchestration** layer, always — that is what the hook is. This is a
    constant in `rule_planes.rs`, not a configurable.
 2. On projection, compare each policy's declared `hostedAtLayer` to the layer
    that will actually evaluate it. A policy declaring `tool` or `policy` while
-   hank is its only evaluator is a **mismatch**.
-3. The response is a loud fail-open, not a block: hank refusing to project a
+   yupana is its only evaluator is a **mismatch**.
+3. The response is a loud fail-open, not a block: yupana refusing to project a
    policy because its metadata overclaims would disable a rule that does still
    work, trading a documentation error for an enforcement gap. Report the
    mismatch, project the rule, evaluate it at the layer that is real.
@@ -492,7 +492,7 @@ check is therefore one-directional: flag when `declared` is more robust than
 `actual`, stay silent otherwise.
 
 **Acceptance.** A projected policy declaring `hostedAtLayer "tool"` and
-evaluated by hank produces a mismatch notice naming the policy, the claimed
+evaluated by yupana produces a mismatch notice naming the policy, the claimed
 layer and the real one; the rule still evaluates and still blocks if it is hard.
 A policy declaring `"orchestration"` produces silence. The negative case — no
 declaration at all — also produces silence, since an absent claim overclaims
@@ -500,18 +500,18 @@ nothing.
 
 #### `H-SARC-I6`, as built
 
-`hank/src/hosting.rs`, `quipu/src/governance/audit/passes.rs::hosting`. The spec
+`yupana/src/hosting.rs`, `quipu/src/governance/audit/passes.rs::hosting`. The spec
 above held up; three things are worth recording about how it landed.
 
-**The check runs twice, on purpose, and they are different checks.** Hank checks
+**The check runs twice, on purpose, and they are different checks.** Yupana checks
 at the **projection seam** — once per refresh, not per edit, because a metadata
 defect repeated on every guard line is a notice people learn to scroll past. That
-one compares the catalog's claim against `HANK_HOSTS_AT`, a constant rather than
+one compares the catalog's claim against `YUPANA_HOSTS_AT`, a constant rather than
 a configurable: a hook in the agent's loop *is* the orchestration layer, and
 making it settable would let a deployment declare itself into a robustness it
 does not have. Quipu checks at **audit time**, comparing the claim in Σ against
 the layer the trace says actually ran the constraint. The second is the one that
-cannot be fooled by hank being wrong about itself.
+cannot be fooled by yupana being wrong about itself.
 
 **The record must not echo the claim.** `ConstraintEvaluation::hosted_at` is
 stamped from the evaluating code's own constant, never copied from the policy's
@@ -601,7 +601,7 @@ directly — sits outside it.
 
 **Verdict emission (G2) closed.** `src/verdict_spool.rs` signs one verdict per
 evaluated constraint at the moment the constraint fires, and appends it locally;
-`hank verdicts` promotes the spool to quipu. It is a spool and not a direct
+`yupana verdicts` promotes the spool to quipu. It is a spool and not a direct
 call because the guard runs inside `PreToolUse` under a `deadline_ms` that
 defaults to 100 ms, and a `/knot` round-trip is not that — the projection path
 already records what an unbounded quipu call does here (a wedged quipu held the
@@ -616,13 +616,13 @@ Four judgement calls in it worth naming:
 - **The guard never mints a signing key.** `verdict::load_or_generate` creates
   one when absent, and a keypair materialising as a side effect of an agent's
   edit should not happen quietly. On the hook path only an *existing* key signs;
-  `hank verifier` is the deliberate act that creates one.
+  `yupana verifier` is the deliberate act that creates one.
 - **The verdict records what the PREDICATE concluded, not what the guard did.**
   A constraint can be unsatisfied while the mode declined to block. Conflating
   them would make an advise-mode fleet indistinguishable from a compliant one in
   the governed record; the response lives in the trace record beside it.
 - **`unknown` spools nothing.** An unknown verdict asserts "there was no
-  evidence", and a constraint hank evaluated had evidence by construction.
+  evidence", and a constraint yupana evaluated had evidence by construction.
   Minting satisfied or unsatisfied for it would be a signed claim about
   something that concluded neither.
 - **A rejected verdict is retained, never dropped.** The drain truncates only
@@ -631,7 +631,7 @@ Four judgement calls in it worth naming:
   exactly the record worth investigating.
 
 **Freshness stopped being a lie in two places.** `verdict_turtle` hardcoded
-`aegis:freshness "fresh"`, so every verdict hank could have promoted would have
+`aegis:freshness "fresh"`, so every verdict yupana could have promoted would have
 claimed currency it never checked. It now takes the real value, and `Decision`
 carries the currency of the policy set that produced it — a parameter rather
 than a defaulted field, because a default would be `Fresh` and every caller who
@@ -644,17 +644,17 @@ record: `aegis:freshness` admits only fresh/stale and the conservative reading i
 the only one that cannot overstate, while a trace record is diagnostic and the
 distinction is real. Two audiences, two mappings, each stated where it applies.
 
-**The attribution tuple, since closed.** Phase 2 shipped `α` partial: hank
+**The attribution tuple, since closed.** Phase 2 shipped `α` partial: yupana
 supplied `tool`, `executor` and `C_eval`, and left the principal chain `P` and
 the intersected authority `auth` absent rather than filled with the single agent
 id — a one-element chain asserted where a real chain belongs reads as "this
 action had one principal" to exactly the auditor the field exists for. The
 stated blocker was multi-tenancy quipu did not have. **That reading was wrong
-about quipu and is now wrong about hank too**; see [Phase 6](#phase-6-as-built)
+about quipu and is now wrong about yupana too**; see [Phase 6](#phase-6-as-built)
 for what named graphs already provided, what authority intersection added, and
-`src/attribution.rs` for the five elements hank now records. `auth` is still not
+`src/attribution.rs` for the five elements yupana now records. `auth` is still not
 one of them, and that is deliberate rather than pending: it is the intersection
-of grants quipu owns, so hank records `P` and the checker derives `auth` from the
+of grants quipu owns, so yupana records `P` and the checker derives `auth` from the
 authoritative source.
 
 ### Phase 3 — Make the PAA a real enforcement point
@@ -725,7 +725,7 @@ outside every symbol body. The auditor must not inherit those exits, or a
 constraint's coverage would depend on a property of the file with nothing to do
 with the rule.
 
-### Phase 4 — Escalation Router (quipu, hank client)
+### Phase 4 — Escalation Router (quipu, yupana client)
 
 *Closes G5. Turns `require-approval` from fail-closed-with-no-channel into
 bounded human oversight.*
@@ -738,7 +738,7 @@ bounded human oversight.*
   Algorithm 1's `goto PagCheck`) — re-validation, not trust.
 - Decisions stay content-bound to the evidence hash (already the shape's
   contract), so approve-then-change goes stale automatically.
-- Hank gets a thin ER client at the pre-edit seam. When the router is
+- Yupana gets a thin ER client at the pre-edit seam. When the router is
   unreachable the escalation-class response is deny, and the fail-open notice
   says so loudly.
 - Emit queue-depth / wait / utilisation metrics, because the operative claim of
@@ -791,7 +791,7 @@ stays open, and it is named here rather than quietly dropped.
   class-placement compatibility, outcome consistency, attribution completeness —
   returning a structured discrepancy report. Deterministic,
   predicate-language-agnostic, and explicitly **not** an LLM call: [SARC] §5.1's
-  design rule, which is the same `O(ℓ_tool)` budget discipline hank already
+  design rule, which is the same `O(ℓ_tool)` budget discipline yupana already
   applies to its own guard.
 - A dispatch-graph inventory for I7: enumerate every tool-call class the harness
   exposes, mark governed/ungoverned, fail the check when an executable class
@@ -981,17 +981,17 @@ beneath a running deployment. The refusal names the chain, the graph, and what
 the chain actually holds, because a refusal that says only "denied" leaves an
 operator guessing which link narrowed it.
 
-#### The attribution tuple — `hank/src/attribution.rs`
+#### The attribution tuple — `yupana/src/attribution.rs`
 
 `α = ⟨P, planner, executor, tool, auth, C_eval⟩`, on the gate record and the PAA
 record alike. Five of the six:
 
-- **`P`** from `HANK_PRINCIPAL_CHAIN`, comma-separated and caller-first. A
+- **`P`** from `YUPANA_PRINCIPAL_CHAIN`, comma-separated and caller-first. A
   dispatcher that spawns a sub-agent appends itself and exports the extended
   chain. **Absent when undeclared** — an undeclared chain is not a one-link
   chain, and this is the same distinction that kept the field out of the record
   in Phase 2.
-- **`planner`** from `HANK_PLANNER`, declared and never derived from the chain's
+- **`planner`** from `YUPANA_PLANNER`, declared and never derived from the chain's
   head. Which link deliberated and which executed is a fact about the dispatch;
   reading it off list position would be an inference wearing a record's clothes.
 - **`executor`** from `$SHANTY_AGENT` — the identity of the process that actually
@@ -999,14 +999,14 @@ record alike. Five of the six:
 - **`tool`** from the hook payload.
 - **`C_eval`** is the `constraints` array Phase 2 already emits.
 
-`auth` is deliberately **not** recorded by hank, and this is a settled decision
+`auth` is deliberately **not** recorded by yupana, and this is a settled decision
 rather than a pending one: the effective authority is the intersection of grants
-that live in quipu, hank cannot read them inside a 100 ms pre-edit budget, and a
+that live in quipu, yupana cannot read them inside a 100 ms pre-edit budget, and a
 locally-guessed value would put a number in the field the grant store never
 agreed to. Recording `P` is what lets the checker derive `auth` from the
 authoritative source. The tuple is completed by the audit, not faked by the hook.
 
-**The conflict flag.** `HANK_PRINCIPAL_CHAIN` is a declaration; `$SHANTY_AGENT`
+**The conflict flag.** `YUPANA_PRINCIPAL_CHAIN` is a declaration; `$SHANTY_AGENT`
 is what is running. When a chain is declared and its tail disagrees with the
 executor, the record says `attribution_conflict` rather than silently preferring
 one. That disagreement is the observable signature of a laundered chain — an
@@ -1077,7 +1077,7 @@ than absent from the model.
 
 **The trace is emitted as a sequence.** Making it structurally a tree means the
 harness emitting a dispatch id per spawn, which is a change in the harness, not
-in hank. Until then, sibling dispatches of the same principal are
+in yupana. Until then, sibling dispatches of the same principal are
 indistinguishable — and `quipu audit tree` says so per node instead of leaving a
 reader to assume otherwise.
 
@@ -1094,7 +1094,7 @@ reader to assume otherwise.
 - `src/signing.rs` — reused unchanged; it is already the root of trust
 - `docs/design/policy-edit-hooks.md` — the SARC gaps land in its backlog table
 
-**hank**
+**yupana**
 
 - `src/project_queries.rs`, `src/project.rs` — projection of the new fields
 - `src/rules.rs` — `Rule` gains class + verification point
@@ -1114,10 +1114,10 @@ Beyond each repo's normal gate:
   new tests that a class↔placement mismatch is *rejected at write* (the
   definition-time half of the discipline), and that an escalation-class policy
   without τ_rev fails validation.
-- **hank** — `just check && just test`, plus two-sided fixtures through the real
+- **yupana** — `just check && just test`, plus two-sided fixtures through the real
   hook binary per `work-scoped-governance.md` §Evals: a RED case and a GREEN
   case per new constraint class, and a non-vacuity mutation check.
-- **End to end** — a policy authored in quipu, projected into hank, fired at
+- **End to end** — a policy authored in quipu, projected into yupana, fired at
   pre-edit, promoted back as a signed verdict, and accepted by
   `quipu_audit_check` against the same Σ. That round trip *is* the
   decidable-audit property of [SARC] Property 1, and it is the acceptance test
@@ -1194,9 +1194,9 @@ here rather than folded into it.
 Internal design documents this analysis builds on, all in-tree:
 
 - [Governance Plane](governance-plane.md) — the verification spine, verdict
-  integrity, risk × confidence, the Hank↔Quipu integration contract.
+  integrity, risk × confidence, the Yupana↔Quipu integration contract.
 - [Policy edit hooks](policy-edit-hooks.md) — evidence locality, the quipu
-  pre-commit gate, the hank projection, and the `Q-*` / `H-*` backlog the
+  pre-commit gate, the yupana projection, and the `Q-*` / `H-*` backlog the
   `Q-SARC-*` beads extend.
 - [Tiers and Freshness](../concepts/tiers-and-freshness.md) — the confidence
   inputs SARC's operating point composes over.

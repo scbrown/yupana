@@ -501,8 +501,8 @@ fn a_declared_hosting_layer_projects() {
 #[test]
 fn an_absent_hosting_layer_is_none_not_a_default() {
     // Defaulting an absent claim to `orchestration` would put a claim in the
-    // record that nobody made, and the I6 check would then be comparing hank's
-    // own guess against hank's own placement — always agreeing, always useless.
+    // record that nobody made, and the I6 check would then be comparing yupana's
+    // own guess against yupana's own placement — always agreeing, always useless.
     let policies = decode_policies(&body(&[policy_row("p", "warn", &[])])).unwrap();
     assert!(policies[0].hosted_at_layer.is_none());
 }
@@ -550,7 +550,7 @@ fn an_overclaiming_policy_still_projects_and_still_blocks() {
         crate::hosting::overclaims(
             "secrets-guard",
             policies[0].hosted_at_layer,
-            crate::hosting::HANK_HOSTS_AT
+            crate::hosting::YUPANA_HOSTS_AT
         )
         .is_some(),
         "and the claim is still reported"

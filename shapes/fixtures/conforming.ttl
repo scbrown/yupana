@@ -4,15 +4,15 @@
 # Node-contract fields present because the real promoter always emits them
 # (verified against live promotions); the node shapes synced 2026-07-23 bind
 # every typed node, so edge-only fixtures must carry the full contract too.
-bobbin:code_hank_src_auth_rs__authenticate a bobbin:CodeSymbol ;
+bobbin:code_yupana_src_auth_rs__authenticate a bobbin:CodeSymbol ;
   rdfs:label "authenticate" ; bobbin:hasTier "lsp" ;
   bobbin:name "authenticate" ; bobbin:symbolKind "function" ;
-  bobbin:definedIn bobbin:code_hank_src_auth_rs ;
-  bobbin:calls bobbin:code_hank_src_db_rs__lookup_user ;
-  bobbin:references bobbin:code_hank_src_types_rs__User .
-bobbin:code_hank_src_auth_rs a bobbin:CodeModule ;
-  bobbin:filePath "src/auth.rs" ; bobbin:repo "hank" ; bobbin:language "rust" ;
-  bobbin:imports bobbin:code_hank_src_db_rs .
+  bobbin:definedIn bobbin:code_yupana_src_auth_rs ;
+  bobbin:calls bobbin:code_yupana_src_db_rs__lookup_user ;
+  bobbin:references bobbin:code_yupana_src_types_rs__User .
+bobbin:code_yupana_src_auth_rs a bobbin:CodeModule ;
+  bobbin:filePath "src/auth.rs" ; bobbin:repo "yupana" ; bobbin:language "rust" ;
+  bobbin:imports bobbin:code_yupana_src_db_rs .
 bobbin:doc_readme_s1 a bobbin:Section ;
   bobbin:heading "Fixture Section" ; bobbin:headingDepth 1 .
 

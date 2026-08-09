@@ -1,15 +1,15 @@
 # Harness Integration (Claude Code Hooks)
 
-Hank can plug into an agent harness so it responds to edits **synchronously**,
+Yupana can plug into an agent harness so it responds to edits **synchronously**,
 the way a language server reacts to a keystroke. The agent's edit tool call *is*
-the change event; a harness hook feeds it to Hank, and Hank replies inline — no
+the change event; a harness hook feeds it to Yupana, and Yupana replies inline — no
 tool call for the agent to remember.
 
 For Claude Code this uses [hooks](https://docs.claude.com/en/docs/claude-code/hooks).
 
 ## Post-edit advisory (available now)
 
-`hank hook post-edit` reads the `PostToolUse` payload on stdin and, when the
+`yupana hook post-edit` reads the `PostToolUse` payload on stdin and, when the
 edited file has symbols called from *other* files, returns a cross-file
 blast-radius advisory as injected context.
 
@@ -22,7 +22,7 @@ Wire it in `.claude/settings.json`:
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "hank hook post-edit" }
+          { "type": "command", "command": "yupana hook post-edit" }
         ]
       }
     ]
@@ -33,7 +33,7 @@ Wire it in `.claude/settings.json`:
 After the agent edits `src/auth.rs`, it sees something like:
 
 ```text
-Hank (tree-sitter): your edit to src/auth.rs touches symbol(s) with callers
+Yupana (tree-sitter): your edit to src/auth.rs touches symbol(s) with callers
 elsewhere — re-check these still compile.
   authenticate <- 3 caller(s)
   verify_token <- 1 caller(s)
@@ -45,7 +45,7 @@ fails the harness (no output = nothing to say).
 
 ## Pre-edit guard (available now)
 
-`hank hook pre-edit` (`PreToolUse`) checks an edit *before* it lands against the
+`yupana hook pre-edit` (`PreToolUse`) checks an edit *before* it lands against the
 calling tenant's capability scope, and can **deny** it with a reason the model
 can act on. Blocking is **opt-in and off by default**.
 
@@ -57,7 +57,7 @@ can act on. Blocking is **opt-in and off by default**.
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "hank hook pre-edit", "timeout": 5 }
+          { "type": "command", "command": "yupana hook pre-edit", "timeout": 5 }
         ]
       }
     ]
@@ -69,7 +69,7 @@ With a scope configured for that tenant (see
 [Configuration](../reference/config.md)), an over-reaching edit comes back as:
 
 ```text
-hank: editing `src/core.rs` reaches 4 symbols (ceiling 2) and 4 files
+yupana: editing `src/core.rs` reaches 4 symbols (ceiling 2) and 4 files
 (ceiling 1) — beyond the blast radius allowed for tenant `polecat-demo`.
 Split this into a narrower change that touches fewer callers, or ask for a
 wider capability scope. (tree-sitter tier: the reach is an approximation.)
@@ -77,14 +77,14 @@ wider capability scope. (tree-sitter tier: the reach is an approximation.)
 
 The guard **always fails open**: every error, timeout, and unparseable payload
 allows the edit, because a guard that fails closed would brick every agent the
-moment Hank is unavailable. Read
+moment Yupana is unavailable. Read
 [the full contract](../reference/policy-guard.md) before wiring it into a fleet
-— particularly the rules that allow is *silence* and that Hank never exits `2`.
+— particularly the rules that allow is *silence* and that Yupana never exits `2`.
 
 ## Performance note
 
 By default the hooks build the call graph transiently on each invocation. With
-a running [resident daemon](../reference/daemon.md) and `[hank.serve]
+a running [resident daemon](../reference/daemon.md) and `[yupana.serve]
 use_daemon = true`, both hooks become thin clients of the resident graph — no
 per-invocation build, which is what meets the sub-100ms budget a synchronous
 guard needs. The daemon being down degrades differently per hook: the pre-edit

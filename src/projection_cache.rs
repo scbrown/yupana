@@ -150,10 +150,10 @@ pub fn miss_label(miss: &CacheMiss) -> &'static str {
     }
 }
 
-/// Where the cache lives: `$HANK_PROJECTION_CACHE_PATH`, else
-/// `$XDG_STATE_HOME/hank/projection.json`, else
-/// `~/.local/state/hank/projection.json` — beside `metrics.jsonl`, the same
-/// precedence as every other piece of hank state.
+/// Where the cache lives: `$YUPANA_PROJECTION_CACHE_PATH`, else
+/// `$XDG_STATE_HOME/yupana/projection.json`, else
+/// `~/.local/state/yupana/projection.json` — beside `metrics.jsonl`, the same
+/// precedence as every other piece of yupana state.
 ///
 /// Pure, so the precedence is testable without touching the process
 /// environment: parallel tests race on env vars, and this crate denies
@@ -168,13 +168,13 @@ pub fn resolve_path(
         return Some(PathBuf::from(p));
     }
     if let Some(x) = xdg_state {
-        return Some(PathBuf::from(x).join("hank").join("projection.json"));
+        return Some(PathBuf::from(x).join("yupana").join("projection.json"));
     }
     home.map(|h| {
         PathBuf::from(h)
             .join(".local")
             .join("state")
-            .join("hank")
+            .join("yupana")
             .join("projection.json")
     })
 }
@@ -184,7 +184,7 @@ pub fn resolve_path(
 #[must_use]
 pub fn cache_path() -> Option<PathBuf> {
     resolve_path(
-        std::env::var("HANK_PROJECTION_CACHE_PATH").ok().as_deref(),
+        std::env::var("YUPANA_PROJECTION_CACHE_PATH").ok().as_deref(),
         std::env::var("XDG_STATE_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
     )

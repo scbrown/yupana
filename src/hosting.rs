@@ -7,7 +7,7 @@
 //! compared the declaration to **where the constraint is actually evaluated**.
 //!
 //! That gap has a specific shape. A policy may declare `"tool"` — the layer an
-//! agent cannot route around — while being enforced solely by hank's pre-edit
+//! agent cannot route around — while being enforced solely by yupana's pre-edit
 //! hook, which an agent bypasses by writing the file some other way. I6 was
 //! checked for well-formedness and not for truth, and a false `tool` claim is
 //! worse than an honest `orchestration` one, because it stops people looking.
@@ -23,7 +23,7 @@
 //!
 //! ## A loud fail-open, never a block
 //!
-//! A mismatch is a **documentation defect**, and hank refusing to project the
+//! A mismatch is a **documentation defect**, and yupana refusing to project the
 //! policy would disable a rule that does still work — trading a metadata error
 //! for an enforcement gap, which is the worse of the two by a wide margin.
 //! [`overclaims`] reports; the caller projects the rule anyway and evaluates it
@@ -55,13 +55,13 @@ pub enum HostingLayer {
     Policy,
 }
 
-/// The layer hank's own hooks enforce at.
+/// The layer yupana's own hooks enforce at.
 ///
 /// A constant, not a configurable. A hook in the agent's loop **is** the
 /// orchestration layer; making this settable would let a deployment declare
 /// itself into a robustness it does not have, which is the exact claim this
 /// module exists to check.
-pub const HANK_HOSTS_AT: HostingLayer = HostingLayer::Orchestration;
+pub const YUPANA_HOSTS_AT: HostingLayer = HostingLayer::Orchestration;
 
 impl HostingLayer {
     /// Parse quipu's lexical form. `None` for anything else — including

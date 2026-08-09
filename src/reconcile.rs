@@ -1,6 +1,6 @@
 //! Reconcile a structural reachable set with a historical co-change set (FR-11).
 //!
-//! Hank computes structural coupling (call/dataflow reachability); Bobbin owns
+//! Yupana computes structural coupling (call/dataflow reachability); Bobbin owns
 //! historical co-change (FP-Growth over git history). Reconciling the two is the
 //! differentiating insight from the vision: a co-change edge backed by a
 //! structural path is *real* coupling; a co-change edge with no structural

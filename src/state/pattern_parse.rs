@@ -14,7 +14,7 @@ use super::{Clause, CmpOp, Filter, Pattern, Pred, Term};
 pub(super) enum Token {
     /// `?name`
     Var(String),
-    /// A bare name — including one carrying a `prefix:` that Hank does not expand.
+    /// A bare name — including one carrying a `prefix:` that Yupana does not expand.
     Name(String),
     /// A quoted string, a number, or `true`/`false`.
     Lit(AttrValue),

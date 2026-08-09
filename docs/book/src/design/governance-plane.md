@@ -1,7 +1,7 @@
 # Governance Plane — Policy, Workflows & Verification
 
 Status: **design — ready to implement.** This describes a governance capability
-that layers on the Hank × Quipu × Bobbin stack. The primitives, trust model,
+that layers on the Yupana × Quipu × Bobbin stack. The primitives, trust model,
 integration contract, and build order are settled; see
 [Implementation phasing](#implementation-phasing) for the MVP and the build order,
 and [Decisions and deferrals](#decisions-and-deferrals) for the calls made. Not
@@ -9,7 +9,7 @@ yet built. Scope for v1 is a single trust domain.
 
 ## Motivation
 
-The stack today is a **knowledge plane** — Hank (live code structure), Quipu
+The stack today is a **knowledge plane** — Yupana (live code structure), Quipu
 (governed bitemporal record), Bobbin (search / fusion / RAG). Its job is to
 *know things about the code and feed context to agents*.
 
@@ -24,7 +24,7 @@ make it **load-bearing**:
   that matter.
 
 The governance plane *uses* the knowledge plane; it is not part of it. Policies
-query Hank/Quipu/Bobbin for the facts they evaluate over.
+query Yupana/Quipu/Bobbin for the facts they evaluate over.
 
 ## The verification spine
 
@@ -51,12 +51,12 @@ of `Entity`; the rest are base primitives.
 
 - **Entity** — a governed, typed node in Quipu (bitemporal, provenanced).
 - **Reference** — an entity's handle to a *concrete target*: a commit, a file, a
-  Hank code-symbol IRI, a URL. The entity is the governed abstraction; the
+  Yupana code-symbol IRI, a URL. The entity is the governed abstraction; the
   reference points at the real thing.
 - **Claim** — the verifiable assertion an entity carries (e.g. *"exists and is
   approved"*).
 - **Evidence** — facts that bear on a claim, drawn from the knowledge plane
-  (Hank), the record (Quipu), or external systems (git, CI). Evidence is either
+  (Yupana), the record (Quipu), or external systems (git, CI). Evidence is either
   **canonical** (read directly from a source of truth) or an **attestation** (a
   signed statement from the system that owns the fact).
 - **Verifier (= Policy)** — a **pure predicate** mapping evidence → verdict
@@ -115,7 +115,7 @@ therefore an **attestation, not a claim**, with four properties:
 
 - **Authenticity** — every verdict is signed by a *registered* verifier
   identity. Quipu accepts a verdict-fact only if signed by a verifier registered
-  for that predicate. An agent cannot mint Hank's signature.
+  for that predicate. An agent cannot mint Yupana's signature.
 - **Binding** — the verdict names the *content hash* of the evidence it saw.
   Change the referent → hash changes → the stored verdict is automatically
   stale. Kills tamper-after-the-fact and replay.
@@ -124,7 +124,7 @@ therefore an **attestation, not a claim**, with four properties:
   same evidence and must get the same result. Verdicts are **checked, not
   trusted**. (Purity is the security property, not just clean design.) The
   verdict retains `evidence-hash + predicate-id` so third parties can re-derive.
-- **Evidence provenance** — every evidence input is either **canonical** (Hank
+- **Evidence provenance** — every evidence input is either **canonical** (Yupana
   reads the source of truth directly from its own live map — the agent's edit
   *is* the evidence, nothing to fake) or a **signed attestation** from the owning
   system (CI signs "green over hash H"; the approver signs the approval). The
@@ -163,7 +163,7 @@ least-confident leaf (a selector's tier bounds the predicate quantified over it)
 
 An attribute of an action / change / step:
 
-- **blast radius** (Hank) — more dependents reached, more risk.
+- **blast radius** (Yupana) — more dependents reached, more risk.
 - **criticality** — a human-authored **risk map** (`auth/**`, `payments/**` =
   high). A governed artifact; sovereignty applies.
 - **reversibility / sensitivity** — a deploy or a data migration outranks a lint.
@@ -192,14 +192,14 @@ already produces.
 
 ## Roles in the stack
 
-- **Hank — live verifier, gatekeeper, guide.** Holds the code in memory, so it
+- **Yupana — live verifier, gatekeeper, guide.** Holds the code in memory, so it
   evaluates code-grounded claims *before commit* at `tier=live`, and that live
   verdict stream *is* the propulsion: it tells the agent which claims are not yet
   green. It enforces gates (via a harness adapter) and injects workflow context.
   It also **exports its verification capabilities** into the catalog — predicates
   like `has-tests`, `blast-radius-within`, `doc-section-exists` that only the
   live map can evaluate. It runs a **co-located decision point**: Quipu pushes the
-  relevant policy *bundle* and Hank evaluates the live-tier leaves locally at the
+  relevant policy *bundle* and Yupana evaluates the live-tier leaves locally at the
   edit boundary — no per-tick round-trip (the OPA-bundle pattern). Runs as a
   **service**, out-of-band from the agent.
 - **Quipu — the policy / workflow engine of record.** Holds the entities,
@@ -233,7 +233,7 @@ bolted on. Where Quipu already has a governance type, reuse it:
 | Selector / predicate | new classes | evidence-source-bound catalog leaves |
 
 References resolve to existing stack IRIs: a code-grounded Artifact or PlanStep
-points at `bobbin:code/{repo}/{path}::{symbol}` — the same identity Hank mints on
+points at `bobbin:code/{repo}/{path}::{symbol}` — the same identity Yupana mints on
 promotion — so intent, structure, and governance reconcile on one identifier.
 
 Each class ships a SHACL shape; a definition that violates its shape is rejected
@@ -242,39 +242,39 @@ the code-entities ontology (`CodeModule`, `CodeSymbol`, `Document`, `Section`,
 `Bundle`) already in Quipu — governance facts and code facts live in one graph,
 queryable together in a single SPARQL query.
 
-## Integration contract (Hank ↔ Quipu)
+## Integration contract (Yupana ↔ Quipu)
 
-Four exchanges across the seam. Quipu signs bundles; Hank signs verdicts; both
+Four exchanges across the seam. Quipu signs bundles; Yupana signs verdicts; both
 verify against the shared verifier registry.
 
 ```text
-Quipu (engine of record)                         Hank (co-located decision point)
+Quipu (engine of record)                         Yupana (co-located decision point)
   │  1. bundle pull ─────────────────────────────▶  cache live-evaluable policies
   │◀──── 2. signed live verdicts (at milestones) ──  evaluate live-tier leaves
   │◀──── 4. milestone promotion ──────────────────  on transition
-  ▲                                                 3. hank_plan_declare ◀── agent/harness
+  ▲                                                 3. yupana_plan_declare ◀── agent/harness
 ```
 
-1. **Bundle pull (Quipu → Hank).** On instance bind — and reactively on any
+1. **Bundle pull (Quipu → Yupana).** On instance bind — and reactively on any
    policy change — Quipu compiles the *live-evaluable* subset of the workflow's
-   policies into a **signed bundle**: the catalog leaves Hank can evaluate, their
+   policies into a **signed bundle**: the catalog leaves Yupana can evaluate, their
    gates + effect matrix, the relevant risk-map slice, and the registry entries.
    A re-pushed bundle invalidates the affected cached verdicts.
-2. **Live verdict envelope (Hank → Quipu).** Hank emits signed verdicts —
+2. **Live verdict envelope (Yupana → Quipu).** Yupana emits signed verdicts —
    `{predicate-id, target-ref, outcome, evidence-hash, tier, freshness,
-   confidence, verifier, sig}` — cached live in Hank and **promoted to Quipu only
+   confidence, verifier, sig}` — cached live in Yupana and **promoted to Quipu only
    at milestones** (the live / settled split).
-3. **`hank_plan_declare` (agent / harness → Hank).** `{instance, targets:
-   [symbol-ref], rationale}`; Hank binds targets to symbols, reconciles against
+3. **`yupana_plan_declare` (agent / harness → Yupana).** `{instance, targets:
+   [symbol-ref], rationale}`; Yupana binds targets to symbols, reconciles against
    the inferred plan, and returns the plan + an immediate coverage verdict.
-   Companion `hank_plan_status` returns the plan and per-`PlanStep` verdicts.
-4. **Milestone promotion (Hank / plane → Quipu).** On a transition,
+   Companion `yupana_plan_status` returns the plan and per-`PlanStep` verdicts.
+4. **Milestone promotion (Yupana / plane → Quipu).** On a transition,
    `{instance, step, transition, verdicts[], committed-evidence, actor,
    valid-time}` is written as bitemporal facts, waking the reactive reasoner.
 
-Tool surface: `hank_policy_check`, `hank_plan_declare`, `hank_plan_status` join
-Hank's existing `hank_*` MCP tools (and REST mirror); harness adapters call these
-plus the pre-edit hook. The `quipu` Cargo feature already carries Hank's
+Tool surface: `yupana_policy_check`, `yupana_plan_declare`, `yupana_plan_status` join
+Yupana's existing `yupana_*` MCP tools (and REST mirror); harness adapters call these
+plus the pre-edit hook. The `quipu` Cargo feature already carries Yupana's
 promotion path; policy bundles ride the same channel.
 
 ## Authoring
@@ -284,7 +284,7 @@ Two distinct "creations" — do not conflate:
 - **Definition** — authoring a workflow / policy *template*. Governed,
   human-driven, written to Quipu. This is what "authoring" means below.
 - **Instance** — a definition going live for a run. Automatic, runtime, held in
-  Hank's overlay + Quipu state. Not authored.
+  Yupana's overlay + Quipu state. Not authored.
 
 ### Creation is composition over a catalog
 
@@ -323,7 +323,7 @@ function — reads:
 
 ```text
 ∀ s ∈ changed-public-symbols(run) : has-test(s)
-      └─ selector (Hank)             └─ predicate (Hank)
+      └─ selector (Yupana)             └─ predicate (Yupana)
 targets Step[implement].exit-gate  ·  effect: block
 ```
 
@@ -349,12 +349,12 @@ verification), the same spine one altitude up:
 
 - **Definition-time** — *is this workflow well-formed?* (SHACL, at write, Quipu)
 - **Run-time** — *is this workflow satisfied by reality?* (stored verdicts, at
-  execution, Hank + Quipu)
+  execution, Yupana + Quipu)
 
 ### Catalog growth and sovereignty
 
 - **Catalog + escape hatch.** 90% is composition of named predicates; an expert
-  may author a *raw* predicate (a graph query / Hank capability) and **register
+  may author a *raw* predicate (a graph query / Yupana capability) and **register
   it back** into the catalog as a new named primitive. A newly registered
   predicate is itself an entity that must be verified/reviewed before it enters
   the catalog — creation-is-verified, recursively.
@@ -371,18 +371,18 @@ Instance context.
 
 ### Selectors (evidence → set)
 
-- `changed-files(run)` — files touched — *git / Hank overlay*
-- `changed-symbols(run)` — symbols touched — *Hank*
-- `changed-public-symbols(run)` — exported subset of the above — *Hank*
-- `blast-radius(change)` — dependents / frontier of a change — *Hank*
-- `callers(symbol)` / `callees(symbol)` — *Hank*
-- `sinks-reached(source)` — taint / dataflow reachable sinks — *Hank (cpg)*
-- `referencing-docs(symbol)` / `referenced-symbols(section)` — doc↔code — *Hank*
+- `changed-files(run)` — files touched — *git / Yupana overlay*
+- `changed-symbols(run)` — symbols touched — *Yupana*
+- `changed-public-symbols(run)` — exported subset of the above — *Yupana*
+- `blast-radius(change)` — dependents / frontier of a change — *Yupana*
+- `callers(symbol)` / `callees(symbol)` — *Yupana*
+- `sinks-reached(source)` — taint / dataflow reachable sinks — *Yupana (cpg)*
+- `referencing-docs(symbol)` / `referenced-symbols(section)` — doc↔code — *Yupana*
 - `required-artifacts(step)` / `prior-steps(step)` — *Quipu (definition)*
 
 ### Predicates (element → bool)
 
-Code-grounded, live tier (*Hank*):
+Code-grounded, live tier (*Yupana*):
 
 - `has-test(symbol)` · `symbol-exists(ref)` · `doc-section-exists(ref)`
 - `blast-radius-within(change, scope)` · `in-scope(action, scope)`
@@ -421,14 +421,14 @@ turn
 The injected guide content is **not authored separately** — it is *derived* from
 `definition × current verdicts`. Verdicts are derived facts: when a referent
 changes, the verdict goes `stale` and staleness propagates up the artifact →
-step → workflow chain (Quipu's reactive reasoner + Hank freshness).
+step → workflow chain (Quipu's reactive reasoner + Yupana freshness).
 
 ### State: live vs settled
 
 The state machine obeys the same tier split as the rest of the stack — so the
 answer to *"do we write every step to Quipu?"* is **no**.
 
-- **Live tier (Hank).** The hot loop runs in Hank's session runtime over the
+- **Live tier (Yupana).** The hot loop runs in Yupana's session runtime over the
   overlay: live-tier gates, the current-step pointer, plan progress, propulsion.
   Volatile, per-session, re-derived on demand — *never* written to Quipu
   tick-by-tick. It is ephemeral precisely because it is re-derivable, the same
@@ -436,19 +436,19 @@ answer to *"do we write every step to Quipu?"* is **no**.
 - **Settled tier (Quipu).** Only **transitions and committed verdicts** are
   promoted — step entered/exited, gate passed, run completed — each a sparse,
   audit-worthy bitemporal fact. Quipu's reactive reasoner drives the *settled*
-  transitions (cross-agent handoffs, temporal triggers); Hank drives the *live*
+  transitions (cross-agent handoffs, temporal triggers); Yupana drives the *live*
   ones.
 
 The **Instance** is a Quipu entity (identity, workflow, parameters, last durable
-milestone); Hank holds a live *projection* of it. Agents coordinate through the
+milestone); Yupana holds a live *projection* of it. Agents coordinate through the
 Quipu record, not shared memory — a handoff is: agent A promotes a milestone →
-the reasoner enqueues the next step for agent B's role → agent B's Hank
+the reasoner enqueues the next step for agent B's role → agent B's Yupana
 rehydrates from that milestone.
 
 ### Resumability
 
 Resume is not a context reload — it is `last-promoted-milestone (Quipu) +
-re-derived live verdicts (Hank)`. Durable progress is never lost; the volatile
+re-derived live verdicts (Yupana)`. Durable progress is never lost; the volatile
 delta since the last milestone is cheap to re-derive by re-verifying the current
 working tree. Because verdicts are content-bound, anything the world changed
 while paused surfaces as **stale**, so resume is precise about what shifted —
@@ -457,20 +457,20 @@ window, so a different agent (or harness) can resume the same Instance.
 
 ## Intent map (tactical plan)
 
-Hank maps what the code *is*; the intent map adds what the agent *intends to do
+Yupana maps what the code *is*; the intent map adds what the agent *intends to do
 to it*, and binds the two. It is the middle layer between the strategic workflow
-(Quipu) and the raw code graph (Hank) — and the layer that makes tactical resume
+(Quipu) and the raw code graph (Yupana) — and the layer that makes tactical resume
 and intent-conformance possible.
 
 A **`PlanStep`** entity references a code symbol (`add-sanitizer → parseInput`)
-and belongs to the running Step / Instance. Only Hank can bind intent to
+and belongs to the running Step / Instance. Only Yupana can bind intent to
 structure live, holding both the code graph and the edit overlay at once.
 
 ### Sourcing the plan
 
-Hank **infers** a draft plan from the harness's plan / todo output and the
+Yupana **infers** a draft plan from the harness's plan / todo output and the
 agent's opening edits, binding each item to symbols. The agent may **declare** a
-plan to override or correct the inference (`hank_plan_declare`), and a declared
+plan to override or correct the inference (`yupana_plan_declare`), and a declared
 plan wins. Inference is the low-friction default; declaration is the authority.
 Requiring a plan before edits is itself a policy (`plan-declared-before-edit`).
 
@@ -485,7 +485,7 @@ Requiring a plan before edits is itself a policy (`plan-declared-before-edit`).
   scope-creep. **Soft by default** (`warn` / `require-revision`, since
   re-planning is healthy); **hard only when composed** with a scope policy that
   already matters (drift *into* a protected module → `deny`).
-- **Targeted context** — Hank and Bobbin inject exactly the symbol, its blast
+- **Targeted context** — Yupana and Bobbin inject exactly the symbol, its blast
   radius, and its tests for the next planned edit instead of dumping context.
 
 Plan drift is expected: the plan is a living artifact, re-verified as it changes.
@@ -533,7 +533,7 @@ when present) or async (inbox) by availability.
   verdict content-binding reused.
 - **Approvals are role-restricted signed attestations** under the verifier
   registry. An agent can no more forge or self-issue an approval than forge a
-  Hank verdict; separation-of-duties (`different-actor-than`) prevents
+  Yupana verdict; separation-of-duties (`different-actor-than`) prevents
   self-approval. Sovereignty enforced cryptographically.
 - **Waits are bounded by temporal triggers.** No decision within the SLA →
   escalate to another role / auto-reject / notify.
@@ -557,7 +557,7 @@ One mechanism, different triggers:
 ## Worked example
 
 One `feature-sdlc` run, threading every primitive. Bead `KUE-42` — "add
-rate-limiting to the login handler," repo `hank`, actor `agent-fix-3`. Risk map:
+rate-limiting to the login handler," repo `yupana`, actor `agent-fix-3`. Risk map:
 `auth/**` = high.
 
 **Definitions (Quipu).** `feature-sdlc` = Steps `design → implement → review →
@@ -572,31 +572,31 @@ tests-green(artifact)                                          [CI-attested]
 
 `review` binds `require-approval` + `different-actor-than(implement)`.
 
-**1 — Bind.** Instance created for `(feature-sdlc, bead=KUE-42, repo=hank,
+**1 — Bind.** Instance created for `(feature-sdlc, bead=KUE-42, repo=yupana,
 actor=agent-fix-3)`; `design-doc` pattern resolves to `docs/design/KUE-42.md`.
 Milestone `instance started, step=design` → Quipu. Quipu pushes the `implement`
-bundle to Hank.
+bundle to Yupana.
 
 **2 — Design.** Agent writes the design doc; `design-artifact-approved` is an
 async `require-approval` gate → **suspends**; a human signs a `DecisionRecord`
 bound to the doc's hash → transition fires → `step=implement`.
 
-**3 — Plan (intent map).** On entry, Hank *infers* a plan from the harness todo
+**3 — Plan (intent map).** On entry, Yupana *infers* a plan from the harness todo
 → `targets = {login_handler, RateLimiter}`, satisfying `plan-present`. Agent
 edits both, tries to finish.
 
-**4 — Live gate (Hank PDP).** `blast-radius(change)` at `tier=lsp` (high
+**4 — Live gate (Yupana PDP).** `blast-radius(change)` at `tier=lsp` (high
 confidence) → `{login_handler, RateLimiter, session_store, auth_middleware}`.
 `plan-covers-blast-radius` → **unsatisfied** (two omitted). Risk = high (`auth`).
 `effect(high, high, unsatisfied)` → **deny at the transition** + inject the two
 missing symbols. (A docs change would `warn` — same policy, different effect.)
 
-**5 — Adapt.** Agent declares a plan override (`hank_plan_declare`) covering all
+**5 — Adapt.** Agent declares a plan override (`yupana_plan_declare`) covering all
 four, edits them, adds tests. Re-eval: `plan-covers-blast-radius` ✓,
 `all-public-tested` ✓ (lsp). `tests-green` → **`unknown`** (no CI yet) → still
 cannot complete; propulsion: "CI pending."
 
-**6 — Commit → milestone (Quipu).** Agent commits; Hank promotes committed
+**6 — Commit → milestone (Quipu).** Agent commits; Yupana promotes committed
 structural facts; CI **signs** `tests-green over hash H'`. Quipu's engine
 evaluates the gate over committed evidence → all ✓, high confidence. Milestone
 `step=implement completed` → reactive reasoner fires the `approve`-guarded
@@ -610,7 +610,7 @@ guarded transition branches **back** to `implement` (bounded loop). Second pass:
 approve → `merge`.
 
 **8 — Resume (if `agent-fix-3` had died at step 5).** A fresh agent rehydrates
-from the last milestone (`implement in progress`); Hank re-derives live verdicts;
+from the last milestone (`implement in progress`); Yupana re-derives live verdicts;
 the diff shows `auth_middleware` still untested → precisely the remaining work.
 No context reload.
 
@@ -622,7 +622,7 @@ reproducible after the fact.
 Settled:
 
 - **Home** — the policy / workflow **engine lives in Quipu** (widely applicable,
-  usable by Quipu on its own data); Hank is a co-located decision point; no new
+  usable by Quipu on its own data); Yupana is a co-located decision point; no new
   repo. Working name for the capability: *the loom*.
 - **Enforcement floor** — the default floor is `observed` (never block real work
   because a harness can't gate), but a **high-risk action requires a `prevented`
@@ -655,12 +655,12 @@ produces is tagged `tier` + `freshness` + `confidence`.
   definition-time validation; bitemporal verdict storage; committed-tier
   evaluation over the Datalog reasoner; retain `evidence-hash + predicate-id` for
   reproducibility. Extends the existing `shacl` + reasoner machinery.
-- **Phase 2 — Hank: policy module + live verdicts.** `policy/{model,eval}.rs`
+- **Phase 2 — Yupana: policy module + live verdicts.** `policy/{model,eval}.rs`
   over `serve/{refs,impact,dataflow,callgraph}`; bundle pull + cache; signed live
-  verdict emission; `hank_policy_check` (MCP + REST); wire the pre-edit hook to
-  `deny`. Initial Hank-grounded catalog leaves. Behind a `policy` feature.
-- **Phase 3 — Hank: intent map.** `PlanStep` binding; inference + `hank_plan_declare`
-  / `hank_plan_status`; `plan-present`, `plan-covers-blast-radius`,
+  verdict emission; `yupana_policy_check` (MCP + REST); wire the pre-edit hook to
+  `deny`. Initial Yupana-grounded catalog leaves. Behind a `policy` feature.
+- **Phase 3 — Yupana: intent map.** `PlanStep` binding; inference + `yupana_plan_declare`
+  / `yupana_plan_status`; `plan-present`, `plan-covers-blast-radius`,
   intent-conformance.
 - **Phase 4 — Harness adapters.** Claude Code (`SessionStart` / `UserPromptSubmit`
   inject, `PreToolUse` gate, `PostToolUse` advance, `Stop` gate); the fleet

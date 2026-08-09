@@ -1,7 +1,7 @@
 //! Harness hook adapters — the edit-reactive interface (§5.9/FR-30).
 //!
 //! An agent harness (Claude Code) fires a hook on every edit; the edit tool call
-//! *is* the `didChange` event, so Hank's response is automatic — the agent never
+//! *is* the `didChange` event, so Yupana's response is automatic — the agent never
 //! has to remember to call a tool. Two adapters share the payload types here:
 //!
 //! - [`post_edit`] (`PostToolUse`) — after the edit lands, report the cross-file
@@ -17,7 +17,7 @@
 //!
 //! **A hook must never fail the harness.** The full contract lives in
 //! `docs/book/src/reference/policy-guard.md`; the parts this module enforces:
-//! allow is *silence* (exit 0, empty stdout) and Hank never exits `2`, which is
+//! allow is *silence* (exit 0, empty stdout) and Yupana never exits `2`, which is
 //! Claude Code's fail-*closed* channel. Reserving exit `2` means even a panic
 //! (exit 101, a non-blocking error to the harness) lets the edit through.
 
@@ -39,9 +39,9 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-/// The subset of a harness hook payload Hank needs.
+/// The subset of a harness hook payload Yupana needs.
 ///
-/// Every field is optional: a payload Hank cannot fully parse must degrade to
+/// Every field is optional: a payload Yupana cannot fully parse must degrade to
 /// "nothing to say", never to an error.
 #[derive(Debug, Default, Deserialize)]
 pub struct HookInput {
@@ -59,7 +59,7 @@ pub struct HookInput {
     pub tool_input: ToolInput,
 }
 
-/// The tool arguments Hank reads, across `Edit` / `Write` / `MultiEdit`.
+/// The tool arguments Yupana reads, across `Edit` / `Write` / `MultiEdit`.
 #[derive(Debug, Default, Deserialize)]
 pub struct ToolInput {
     /// Target file (all three tools).
@@ -91,7 +91,7 @@ pub struct EditItem {
 }
 
 impl HookInput {
-    /// Parse a payload, or `None` if it is not JSON Hank understands.
+    /// Parse a payload, or `None` if it is not JSON Yupana understands.
     #[must_use]
     pub fn parse(input_json: &str) -> Option<Self> {
         serde_json::from_str(input_json).ok()
@@ -177,7 +177,7 @@ pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .take(80)
         .collect();
-    let marker = std::env::temp_dir().join(format!("hank-guard-failopen-{safe}-{kind_safe}"));
+    let marker = std::env::temp_dir().join(format!("yupana-guard-failopen-{safe}-{kind_safe}"));
     match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -287,7 +287,7 @@ mod tests {
                 .take(80)
                 .collect();
             let _ = std::fs::remove_file(
-                std::env::temp_dir().join(format!("hank-guard-failopen-{session}-{safe_kind}")),
+                std::env::temp_dir().join(format!("yupana-guard-failopen-{session}-{safe_kind}")),
             );
         }
         // Without a session id we cannot rate-limit, so we always warn.

@@ -30,7 +30,7 @@
 //! should happen quietly. On the hook path this module only signs with a key
 //! that is **already there** — no key means no verdict, and the count of
 //! unsigned decisions is spooled so the gap is visible rather than inferred from
-//! an empty verdict file. `hank verifier` is how an operator creates the key,
+//! an empty verdict file. `yupana verifier` is how an operator creates the key,
 //! deliberately.
 
 use std::path::{Path, PathBuf};
@@ -46,9 +46,9 @@ use crate::types::Freshness;
 /// help diagnose.
 const ROTATE_BYTES: u64 = 64 * 1024 * 1024;
 
-/// Where the verdict spool lives: `$HANK_VERDICT_PATH`, else
-/// `$XDG_STATE_HOME/hank/verdicts.jsonl`, else
-/// `~/.local/state/hank/verdicts.jsonl`.
+/// Where the verdict spool lives: `$YUPANA_VERDICT_PATH`, else
+/// `$XDG_STATE_HOME/yupana/verdicts.jsonl`, else
+/// `~/.local/state/yupana/verdicts.jsonl`.
 ///
 /// Pure, so the precedence is testable without touching the process
 /// environment — parallel tests race on env vars, and this crate denies
@@ -63,20 +63,20 @@ pub fn resolve_path(
         return Some(PathBuf::from(p));
     }
     if let Some(x) = xdg_state {
-        return Some(PathBuf::from(x).join("hank").join("verdicts.jsonl"));
+        return Some(PathBuf::from(x).join("yupana").join("verdicts.jsonl"));
     }
     home.map(|h| {
         PathBuf::from(h)
             .join(".local")
             .join("state")
-            .join("hank")
+            .join("yupana")
             .join("verdicts.jsonl")
     })
 }
 
 fn spool_path() -> Option<PathBuf> {
     resolve_path(
-        std::env::var("HANK_VERDICT_PATH").ok().as_deref(),
+        std::env::var("YUPANA_VERDICT_PATH").ok().as_deref(),
         std::env::var("XDG_STATE_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
     )
@@ -133,9 +133,9 @@ pub fn record_to(
         // fleet in advise mode indistinguishable from a compliant one in the
         // governed record.
         let satisfied = evaluation.outcome == Outcome::Satisfied;
-        // `unknown` has no signed form in the shape's outcome enum that hank can
+        // `unknown` has no signed form in the shape's outcome enum that yupana can
         // honestly produce here — an unknown verdict asserts "there was no
-        // evidence", and a constraint hank evaluated had evidence by
+        // evidence", and a constraint yupana evaluated had evidence by
         // construction. Skip rather than mint a satisfied/unsatisfied claim for
         // something that concluded neither.
         if evaluation.outcome == Outcome::Unknown {
@@ -258,7 +258,7 @@ pub fn drain(path: &Path, endpoint: &str) -> crate::errors::Result<Drained> {
             endpoint,
             &verdict.turtle,
             &format!(
-                "hank verdict: {} on {}",
+                "yupana verdict: {} on {}",
                 verdict.predicate_id, verdict.target_ref
             ),
         ) {

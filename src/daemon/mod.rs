@@ -1,4 +1,4 @@
-//! The resident engine — Phase 3, stage 1 (FR-31, hank #1 / aegis-1qze).
+//! The resident engine — Phase 3, stage 1 (FR-31, yupana #1 / aegis-1qze).
 //!
 //! Today the hook and one-shot commands build the whole `CodeGraph` transiently,
 //! per invocation. FR-31 makes a resident process that holds the base graph in
@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::graph::{Base, CodeGraph, Dir, TenantRegistry};
 use crate::hook::Sizing;
 use crate::policy::PolicyConfig;
@@ -59,11 +59,11 @@ struct Engine {
     graph: CodeGraph,
     /// The config resolved at startup. NOT re-read per request — this is the
     /// single trust point the aegis-hac0 signed cache will guard (see module docs).
-    config: HankConfig,
+    config: YupanaConfig,
     built_at: SystemTime,
     nodes: usize,
     edges: usize,
-    /// The tenant layer (hank #2 wiring): a shared [`Base`] at the startup
+    /// The tenant layer (yupana #2 wiring): a shared [`Base`] at the startup
     /// HEAD plus per-tenant overlays, fed by `POST /edit`. `None` outside a
     /// git repo — a `Base` needs a commit to anchor to; the working-tree
     /// `graph` above keeps serving the un-tenanted surface either way.
@@ -89,7 +89,7 @@ impl ResidentEngine {
     /// `config_override` mirrors the `--config` flag so the daemon honours the
     /// same config resolution as every other entry point.
     pub fn build(root: &Path, config_override: Option<&Path>) -> anyhow::Result<Self> {
-        let config = HankConfig::resolve(config_override, root)?;
+        let config = YupanaConfig::resolve(config_override, root)?;
         let graph = CodeGraph::build(root)?;
         let (nodes, edges) = graph.stats();
         // The tenant layer needs a commit to anchor its shared base to.
@@ -181,7 +181,7 @@ impl ResidentEngine {
     }
 
     /// Definition sites of `symbol`, from the resident node index — the answer
-    /// `hank_references` walks every file to compute, with no re-extraction.
+    /// `yupana_references` walks every file to compute, with no re-extraction.
     #[must_use]
     pub fn references(&self, symbol: &str) -> Definitions {
         let defs = self.graph().definitions(symbol);
@@ -302,7 +302,7 @@ pub async fn serve(
     let engine = ResidentEngine::build(root, config_override)?;
     let status = engine.status();
     eprintln!(
-        "hank daemon: resident graph built — {} nodes, {} edges from {}",
+        "yupana daemon: resident graph built — {} nodes, {} edges from {}",
         status.nodes, status.edges, status.root
     );
     http::serve(engine, bind, port).await
@@ -314,7 +314,7 @@ pub async fn serve(
 // emphasis the prose and comments use throughout this repo, and it is load-
 // bearing in a test name: it says which word the assertion turns on. Allowed
 // explicitly, and scoped to tests, so the lint stays live everywhere else
-// rather than being switched off crate-wide (hank #83).
+// rather than being switched off crate-wide (yupana #83).
 #[allow(non_snake_case)]
 mod tests {
     use super::*;
@@ -408,7 +408,7 @@ mod tests {
     #[test]
     fn a_resident_impact_query_is_far_under_the_SLO() {
         // The daemon's reason for being: the query runs against the RESIDENT graph,
-        // with NO rebuild. hank #1's SLO is blast-radius 5 hops < 300ms p95. Against
+        // with NO rebuild. yupana #1's SLO is blast-radius 5 hops < 300ms p95. Against
         // a resident graph a single query is microseconds; this pins that the query
         // path itself carries no rebuild cost. (Build time is paid once, at startup,
         // and is excluded here on purpose — that is exactly what the daemon moves off

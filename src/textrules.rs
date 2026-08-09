@@ -20,7 +20,7 @@
 //!   "nothing matched" — under-enforcement must be loud.
 //!
 //! Per-rule tier (`aegis:enforcementTier`): `block` or `warn`. The tier is the
-//! RULE's severity, from the graph; the local `[hank.policy] mode` stays the
+//! RULE's severity, from the graph; the local `[yupana.policy] mode` stays the
 //! host's enforcement ceiling (hac0: one tiering vocabulary — Mode — and the
 //! tier is data that maps into it, never a second local knob).
 

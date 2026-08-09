@@ -1,9 +1,9 @@
-# Hank — Product Requirements & Build Specification
+# Yupana — Product Requirements & Build Specification
 
 **Version:** 0.2
 **Status:** Living (Phases 1–2 implemented; Phase 3 next)
 **Last Updated:** 2026-07-18
-**Owning vision:** [`docs/vision.md`](./vision.md) — *Bobbin × Hank × Quipu: A Governed, Multi-Signal, Multi-Tenant Code Intelligence Layer (v0.2)*
+**Owning vision:** [`docs/vision.md`](./vision.md) — *Bobbin × Yupana × Quipu: A Governed, Multi-Signal, Multi-Tenant Code Intelligence Layer (v0.2)*
 
 > **New here / picking this up?** Start with **Appendix D (Implementation
 > Status)** for exactly what is built, **Appendix E (Design Decision Log)** for
@@ -14,7 +14,7 @@
 
 ## 1. Executive Summary
 
-Hank is an **in-memory, multi-tenant code-analysis engine** written in Rust. It
+Yupana is an **in-memory, multi-tenant code-analysis engine** written in Rust. It
 extracts precise structure from a codebase — AST, symbols, call graph, control-
 and data-dependence, and LSP-grade type/reference facts — keeps that structure
 hot in memory, and serves it over MCP (stdio and streamable-HTTP; a parallel REST
@@ -23,26 +23,26 @@ tenant**, so an entire team can edit concurrently without corrupting each
 other's view of the graph, using a **shared-base-plus-copy-on-write-overlay**
 model in which *blast radius doubles as the incremental-update primitive*.
 
-Hank is the third peer in an existing stack:
+Yupana is the third peer in an existing stack:
 
 - **Bobbin** (`scbrown/bobbin`, v0.6.0) — the fusion/serving layer. Retrieval is
   LanceDB hybrid (vector + keyword) search; coupling is FP-Growth co-change
-  mining over git history. Bobbin's mission is unchanged; it gains Hank's
+  mining over git history. Bobbin's mission is unchanged; it gains Yupana's
   structural facts as a new signal to fuse and explain.
 - **Quipu** (`scbrown/quipu`, v0.3.3) — the governed, bitemporal knowledge graph
   (RDF model over a SQLite EAVT fact log, SPARQL 1.1, SHACL via `rudof`). Quipu
   becomes the settled home for *committed* structural facts under a code
   ontology it already partially defines (`shapes/code-entities.ttl`).
-- **Hank** (this spec) — new. Owns the language toolchains, holds the volatile
+- **Yupana** (this spec) — new. Owns the language toolchains, holds the volatile
   per-tenant working graph, and feeds three consumers: Bobbin (fusion), Quipu
   (promotion on commit), and the Gas Town broker/Aegis (per-tenant blast radius
   as a trust boundary).
 
-The north star, restated as an engineering contract: **Hank extracts and serves
+The north star, restated as an engineering contract: **Yupana extracts and serves
 live per-tenant structure; Quipu governs and versions the committed record;
 Bobbin fuses everything and serves it.**
 
-This document specifies what Hank must do (functional requirements), how well
+This document specifies what Yupana must do (functional requirements), how well
 (non-functional requirements), how it is built (architecture and technology
 choices, matched to Bobbin and Quipu), how it integrates (MCP surface, config,
 Quipu promotion), and in what order (phasing). It deliberately reconciles the
@@ -65,19 +65,19 @@ whether the coupling is real or coincidental.
 
 A co-change edge with no structural explanation is a refactoring smell; a
 co-change edge backed by a dataflow path is real coupling. **No single signal
-makes that distinction** — which is exactly the gap Hank fills.
+makes that distinction** — which is exactly the gap Yupana fills.
 
 ### 2.2 Why this belongs in a new tool, not in Bobbin
 
 1. **Toolchain quarantine.** LSP servers, tree-sitter grammars, and any
    CPG/dataflow machinery (potentially JVM-flavored, from Joern) are stateful,
    heavy, and must never link into Bobbin's retrieval path.
-2. **Different lifecycle.** Bobbin's path is interactive and per-query. Hank's is
+2. **Different lifecycle.** Bobbin's path is interactive and per-query. Yupana's is
    incremental, event-driven, and on-edit — a hot resident graph updated by a
    file-watcher, not rebuilt per request.
-3. **Three consumers, not one.** Hank's facts feed Quipu, Bobbin, *and* the
+3. **Three consumers, not one.** Yupana's facts feed Quipu, Bobbin, *and* the
    broker's blast radius. Bury extraction inside Bobbin and the other two must
-   route through Bobbin to get structural facts. As a peer, Hank serves all three
+   route through Bobbin to get structural facts. As a peer, Yupana serves all three
    directly.
 4. **Precedent.** The stack is already decomposed into peers (Quipu, Aegis,
    polecat). The strongest recent project in this space (codebase-memory) chose
@@ -97,19 +97,19 @@ this, and none of the source tools (multilspy, Joern, codebase-memory) do.
 Bobbin is on the request path **only when fusion or ranking adds value.**
 Multi-signal context retrieval goes through Bobbin. Single-signal, analysis-only
 queries — edit verification, blast radius, live structure lookups — go **straight
-to Hank**, and policy consumers like the broker read Hank directly. Verification
+to Yupana**, and policy consumers like the broker read Yupana directly. Verification
 and blast radius skip Bobbin because there is only one signal, so there is
 nothing to fuse.
 
 The boundary is not dogmatic: the lightweight parsing Bobbin already does
-(chunking for embeddings, git-history co-change) **stays in Bobbin**. Hank owns
+(chunking for embeddings, git-history co-change) **stays in Bobbin**. Yupana owns
 the *heavy, precise, toolchain-bound* analysis, not all parsing.
 
 ---
 
 ## 3. Relationship to Bobbin and Quipu
 
-| Concern | Bobbin (v0.6.0) | Quipu (v0.3.3) | Hank (this spec) |
+| Concern | Bobbin (v0.6.0) | Quipu (v0.3.3) | Yupana (this spec) |
 |---|---|---|---|
 | Mission | Fuse + serve context | Govern + version committed facts | Extract + serve live structure |
 | State | Per-query, index on disk | Append-only bitemporal log | Hot in-memory, per-tenant |
@@ -126,7 +126,7 @@ the *heavy, precise, toolchain-bound* analysis, not all parsing.
                  │
                  ▼
    ┌───────────────────────────┐        promote on commit/merge
-   │           HANK            │ ───────────────────────────────► ┌──────────┐
+   │           YUPANA            │ ───────────────────────────────► ┌──────────┐
    │  base graph + overlays    │        (SHACL-validated Turtle)   │  QUIPU   │
    │  tree-sitter + LSP + CPG  │ ◄─────────────────────────────── │ EAVT log │
    └────────────┬──────────────┘        SPARQL over committed code │ SPARQL   │
@@ -145,13 +145,13 @@ Where each stolen idea lives (from the vision, made concrete):
 
 | Idea (source) | Home | Realized as |
 |---|---|---|
-| LSP defs/refs/types (*multilspy*) | Hank | §5.2 reference/definition resolution |
-| CPG + dataflow/taint (*Joern*) | Hank builds → Quipu stores | §5.3 call graph + dataflow |
-| Structural graph, community detection (*codebase-memory*) | Hank → Quipu → Bobbin | §5.3, §9, Bobbin fusion |
-| Token-efficient structural recall | Bobbin over Hank/Quipu | Bobbin serves structure, not files |
-| Convention/decision memory | Quipu | Quipu episodes (out of Hank scope) |
-| Monitor-guided verification (*multilspy*) | Hank (served directly) | §5.7 edit verification |
-| Blast-radius-as-trust-boundary | Broker/Aegis consumes; Hank computes | §5.4 + §5.9 |
+| LSP defs/refs/types (*multilspy*) | Yupana | §5.2 reference/definition resolution |
+| CPG + dataflow/taint (*Joern*) | Yupana builds → Quipu stores | §5.3 call graph + dataflow |
+| Structural graph, community detection (*codebase-memory*) | Yupana → Quipu → Bobbin | §5.3, §9, Bobbin fusion |
+| Token-efficient structural recall | Bobbin over Yupana/Quipu | Bobbin serves structure, not files |
+| Convention/decision memory | Quipu | Quipu episodes (out of Yupana scope) |
+| Monitor-guided verification (*multilspy*) | Yupana (served directly) | §5.7 edit verification |
+| Blast-radius-as-trust-boundary | Broker/Aegis consumes; Yupana computes | §5.4 + §5.9 |
 
 ---
 
@@ -178,7 +178,7 @@ Where each stolen idea lives (from the vision, made concrete):
 - **Needs:** structural facts with confidence/tier tags to fuse with co-change
   and embeddings; a way to flag retrieved code that will not compile in the
   current overlay.
-- **Constraints:** async, per-query; consumes Hank as a signal source, not a
+- **Constraints:** async, per-query; consumes Yupana as a signal source, not a
   dependency it must route others through.
 
 ### Persona 4: The Broker / Aegis (policy consumer)
@@ -231,7 +231,7 @@ a numbered capability from the vision (§"The concrete capability set").
   system that does not exist. `types::Fact`/`types::Freshness` are the defined but
   not-yet-wired carrier.
 
-### 5.2 Ground-truth reference & definition resolution *(multilspy → Hank; cap. 1)*
+### 5.2 Ground-truth reference & definition resolution *(multilspy → Yupana; cap. 1)*
 
 **FR-4:** Given a symbol or a `(file, line, col)` position, return its definition
 site(s) and all reference sites, each with span, tier, and tenant-resolved
@@ -240,7 +240,7 @@ truth (base + overlay, see §5.5).
 **FR-5:** Resolution must be served to Bobbin so it can turn "probably relevant"
 into "provably connected," and to agents directly for navigation.
 
-### 5.3 Call-graph & dataflow extraction *(Joern + codebase-memory → Hank; cap. 2)*
+### 5.3 Call-graph & dataflow extraction *(Joern + codebase-memory → Yupana; cap. 2)*
 
 **FR-6: Call graph.** Build inter-procedural call edges (caller → callee) with
 multi-strategy resolution (direct, method, dynamic/virtual best-effort), matching
@@ -254,27 +254,27 @@ the JVM-vs-Rust build decision this forces (resolve in Phase 2).
 dataflow path can corroborate (or refute) a co-change edge.
 
 **FR-9: Community detection.** Run deterministic Louvain community detection over
-the structural graph (Quipu already exposes this via `quipu_project`; Hank
+the structural graph (Quipu already exposes this via `quipu_project`; Yupana
 computes it live over the in-memory graph for the hot path).
 
-### 5.4 Blast-radius / impact analysis *(Joern reachability + co-change → Hank; cap. 3)*
+### 5.4 Blast-radius / impact analysis *(Joern reachability + co-change → Yupana; cap. 3)*
 
 **FR-10:** Given a symbol/file/change set, compute the structurally-reachable
 impacted set (forward: dependents; backward: dependencies) over the call/dataflow
 graph, bounded by max hops and optional predicate filters — the same shape as
-Quipu's `quipu_impact` but over Hank's live per-tenant graph.
+Quipu's `quipu_impact` but over Yupana's live per-tenant graph.
 
 **FR-11:** Reconcile the structural reachable set with Bobbin's historical
 co-change set; surface edges that appear in one but not the other (structural-
 only = new/unexercised coupling; co-change-only = a refactoring smell).
 
-> **Invariant — Hank borrows co-change, it never derives it.** The co-change set
+> **Invariant — Yupana borrows co-change, it never derives it.** The co-change set
 > is always a *required input* supplied by the caller (Bobbin), never something
-> Hank mines itself. Hank must not walk git history, run FP-Growth, or store a
+> Yupana mines itself. Yupana must not walk git history, run FP-Growth, or store a
 > co-change signal — that is Bobbin's owned signal (statistical, over the settled
 > past) and the routing rule (§2.4) keeps it there. Reconciliation is a
-> *stateless annotation* on Hank's own structural output, not ownership of a
-> second temporal signal. The day Hank derives co-change is the day it becomes a
+> *stateless annotation* on Yupana's own structural output, not ownership of a
+> second temporal signal. The day Yupana derives co-change is the day it becomes a
 > second source of truth (the risk in §9.6). The implementation enforces this:
 > `reconcile()` takes the co-change set as a parameter with no fallback path.
 
@@ -283,7 +283,7 @@ single primitive reused for two purposes: (a) answering *"what does this change
 affect?"* for a consumer, and (b) answering *"what must I recompute?"* for the
 incremental updater (§5.5). **One primitive, two uses — build it once.**
 
-### 5.5 Per-tenant live graph *(the tenancy model → Hank; cap. 4)*
+### 5.5 Per-tenant live graph *(the tenancy model → Yupana; cap. 4)*
 
 **FR-13: Shared base.** Compute the full structural graph once at a baseline
 commit (e.g. `main`), held **read-only** in memory.
@@ -322,51 +322,51 @@ corresponding structural facts into Quipu as a new bitemporal state
 **FR-20:** Promoted facts MUST be emitted as Turtle in the **existing `bobbin:`
 code ontology** (`https://bobbin.dev/ontology#`, namespace constructors in
 Quipu's `src/namespace.rs`) and validated against `shapes/code-entities.ttl`
-(extended per §9.2) before write. Hank never writes to Quipu without passing
+(extended per §9.2) before write. Yupana never writes to Quipu without passing
 SHACL.
 
 **FR-21:** Promotion writes via Quipu's existing surface — `quipu_knot` (MCP) /
 `POST /knot` (REST) / `Store::transact` (in-process) — honoring
 `valid_from`/`valid_to`, `transactions.actor` (= the promoting identity), and
-`source` (= the commit SHA). Hank does **not** stand up its own triple store
+`source` (= the commit SHA). Yupana does **not** stand up its own triple store
 (§14.4).
 
-**FR-22:** Uncommitted overlay churn MUST NOT be promoted. Hank holds the
+**FR-22:** Uncommitted overlay churn MUST NOT be promoted. Yupana holds the
 in-flight reality; Quipu holds only the settled record. Enforced structurally:
-`hank promote --commit <ish>` projects `export::to_turtle_at` over the
+`yupana promote --commit <ish>` projects `export::to_turtle_at` over the
 **committed git tree** at that ref, never the working tree — an in-flight
 overlay edit or unsaved buffer cannot reach a promotion by construction (the
-hank #15 committed-tree slice).
+yupana #15 committed-tree slice).
 
-### 5.7 Monitor-guided edit verification *(multilspy monitors → Hank, served directly; cap. 8)*
+### 5.7 Monitor-guided edit verification *(multilspy monitors → Yupana, served directly; cap. 8)*
 
 **FR-23:** Given a proposed edit (an edited buffer), re-run analysis on that
-buffer against the base graph Hank already holds and return a boolean verdict
+buffer against the base graph Yupana already holds and return a boolean verdict
 plus violations: `identifier-does-not-exist`, `wrong-arity`, `type-violation`,
 `unresolved-import`.
 
-**FR-24:** Verification is single-signal and boolean — agents call Hank directly,
-**not** through Bobbin. Bobbin may still *consume* verdicts like any other Hank
+**FR-24:** Verification is single-signal and boolean — agents call Yupana directly,
+**not** through Bobbin. Bobbin may still *consume* verdicts like any other Yupana
 fact (e.g. to flag retrieved code that will not compile in the current overlay);
-that is the normal Hank→Bobbin flow, not verification living in Bobbin.
+that is the normal Yupana→Bobbin flow, not verification living in Bobbin.
 
-### 5.8 Static-analysis-as-trust-boundary *(Hank blast radius → Broker/Aegis; cap. 9)*
+### 5.8 Static-analysis-as-trust-boundary *(Yupana blast radius → Broker/Aegis; cap. 9)*
 
 **FR-25:** Expose per-tenant blast radius in a form the Gas Town broker/Aegis can
 consume to scope a polecat's provisioned execution environment. Capability
 scoping MUST be computed against the *requesting tenant's* live graph, never a
-stale shared one (this is why the live per-tenant state must live in Hank).
+stale shared one (this is why the live per-tenant state must live in Yupana).
 
 ### 5.9 Interfaces — the interface model
 
-Hank has **two interaction modes**, and they want different shapes. Conflating
+Yupana has **two interaction modes**, and they want different shapes. Conflating
 them is the mistake to avoid:
 
 - **Query mode** (pull) — an agent asks a discrete question ("what's the blast
   radius of this symbol"). Request/response, agent-initiated, structured. **MCP
   is ideal** and it is what agents and Bobbin already speak.
 - **Edit-reactive mode** (push/synchronous) — the agent *changes a file* and
-  Hank responds *at the moment of the edit* (impact, verification). This is
+  Yupana responds *at the moment of the edit* (impact, verification). This is
   LSP-shaped (an edit stream in, a verdict out) and MCP-pull fits it poorly.
 
 The resolution is to serve each mode with the surface that fits, over one
@@ -374,13 +374,13 @@ resident engine:
 
 | Surface | Consumer | Shape | Requirement |
 |---|---|---|---|
-| **Harness hook** (`hank hook …`) | in-harness agents (Claude Code) | synchronous, edit-reactive, automatic | FR-30 |
+| **Harness hook** (`yupana hook …`) | in-harness agents (Claude Code) | synchronous, edit-reactive, automatic | FR-30 |
 | **MCP tools** | agents, Bobbin | pull, on-demand queries | FR-26 |
 | **HTTP API** *(Phase 3)* | broker / daemon backplane | the resident engine all surfaces share | FR-27 |
 | **CLI** | humans, scripts, CI | one-shot | FR-28 |
 | **LSP server** (optional) | human editors | unsaved-buffer precision + push diagnostics | FR-32 |
 
-**FR-26: MCP server.** Expose Hank's capabilities as MCP tools (§12) over both
+**FR-26: MCP server.** Expose Yupana's capabilities as MCP tools (§12) over both
 stdio and streamable-HTTP transports, using `rmcp` exactly as Bobbin does
 (`#[tool_router]` / `#[tool]` / `Parameters<T>` / `schemars`).
 
@@ -390,29 +390,29 @@ mirroring Quipu's REST-parallel-to-MCP pattern. This is the resident engine's
 shared backplane, so it lands **with** that engine (FR-31), not before it: a
 REST facade over a per-request transient graph build would carry the daemon's
 latency without its benefit. Until then every capability is already reachable
-over TCP via the **streamable-HTTP MCP transport** (`hank serve --http`, mounted
+over TCP via the **streamable-HTTP MCP transport** (`yupana serve --http`, mounted
 at `/mcp`); the gap FR-27 closes is protocol ergonomics for non-MCP consumers, not
 reach. Tracked in §12 Phase 3.
 
-**FR-28: CLI.** Provide a `hank` binary (clap, like Bobbin) with subcommands for
+**FR-28: CLI.** Provide a `yupana` binary (clap, like Bobbin) with subcommands for
 serving, one-shot analysis, and inspection (§Appendix A).
 
-**FR-29: Config.** Read from the shared `.bobbin/config.toml` under a new `[hank]`
+**FR-29: Config.** Read from the shared `.bobbin/config.toml` under a new `[yupana]`
 table (§11), with the same resolution order Quipu uses (flags > project toml >
 user toml > defaults).
 
 **FR-30: Harness hook adapter — the edit-reactive interface.** Provide
-`hank hook <event>` adapters that read an agent harness's hook payload on stdin
+`yupana hook <event>` adapters that read an agent harness's hook payload on stdin
 and respond synchronously. The edit tool call *is* the `didChange` event; the
-hook makes Hank's response automatic — the agent never has to remember to call a
+hook makes Yupana's response automatic — the agent never has to remember to call a
 tool. For Claude Code (Bobbin already integrates this way for context injection):
 
-- **`hank hook post-edit`** (`PostToolUse` on `Edit|Write|MultiEdit`) — after the
+- **`yupana hook post-edit`** (`PostToolUse` on `Edit|Write|MultiEdit`) — after the
   edit lands, update the overlay and return the cross-file blast radius as
   injected `additionalContext`. *Advisory by default.* (Implemented; with a
   resident daemon it feeds the tenant overlay via `POST /edit`, FR-30/31, and
   falls back to a transient build otherwise.)
-- **`hank hook pre-edit`** (`PreToolUse`) — before the edit lands, verify the
+- **`yupana hook pre-edit`** (`PreToolUse`) — before the edit lands, verify the
   *proposed* buffer (§5.7 / FR-23) and, for **capability-scoped agents**
   (polecats), optionally `deny` with a reason so the model revises. This is where
   the §5.8 trust boundary becomes concrete: **blocking guard is opt-in**, never
@@ -425,12 +425,12 @@ its facts stay harness-agnostic.
 synchronously in the agent's loop, so a `pre-edit` guard has a sub-100ms budget
 (§6.1). A cold full-graph build per edit blows it. Therefore the hook (and the
 streamable-HTTP MCP surface, and the broker) must be **thin clients of a resident
-`hank serve` engine** holding the base + per-tenant overlays — never rebuilding
+`yupana serve` engine** holding the base + per-tenant overlays — never rebuilding
 per invocation (Bobbin's hooks hit its resident server the same way). **This
 makes the Phase-3 resident overlay a hard prerequisite of the hook interface, not
 a nice-to-have** — the hook use case is the forcing function for the hot overlay.
 
-**FR-32: LSP server surface (optional).** Optionally *expose* an LSP server (Hank
+**FR-32: LSP server surface (optional).** Optionally *expose* an LSP server (Yupana
 already *consumes* LSP internally for the precise tier) so human editors get
 unsaved-buffer precision and pushed diagnostics natively. Justified only if
 human-in-editor is a target consumer; deferred behind the agent/Bobbin/broker
@@ -443,11 +443,11 @@ on disk (picked up by the file-watcher, §5.5) or via the harness hook (FR-30);
 **The synergy:** code and docs are one referential graph, not two. A function
 calls a function; a doc section *references* a symbol; a code comment links to an
 ADR. These are the same *kind* of fact — a typed edge between named entities —
-and Hank's machinery (reference resolution, blast radius, monitor-guided
-verification) applies to all of them. Hank's differentiated job is to be the one
+and Yupana's machinery (reference resolution, blast radius, monitor-guided
+verification) applies to all of them. Yupana's differentiated job is to be the one
 tool that builds the **complete, precise referential graph spanning code and
 docs**. This is explicitly **not chunking**: Bobbin chunks code+docs into
-embedding windows for *retrieval*; Hank emits *precise, typed referential
+embedding windows for *retrieval*; Yupana emits *precise, typed referential
 structure* for *reasoning and governance*. Complementary, not redundant.
 
 **Two clocks — the same graph, two update disciplines:**
@@ -455,7 +455,7 @@ structure* for *reasoning and governance*. Complementary, not redundant.
 | | Real-time (live) | Asynchronous (export) |
 |---|---|---|
 | Trigger | edit hook / MCP query | commit / merge / on-demand |
-| Home | Hank in-memory overlay (the present) | Quipu governed graph (the record) |
+| Home | Yupana in-memory overlay (the present) | Quipu governed graph (the record) |
 | Code | blast radius + guard, in-loop | committed structure, bitemporal |
 | Docs | "your code edit made `docs/x.md#y` stale" | full doc→code reference graph, versioned |
 
@@ -466,7 +466,7 @@ real-time hook still fires the *code→doc* staleness note in the moment. Same
 underlying graph; code leans live, docs lean export.
 
 **It reuses the existing ontology.** `shapes/code-entities.ttl` already defines
-`Document` and `Section` (alongside `CodeModule`/`CodeSymbol`). Hank adds
+`Document` and `Section` (alongside `CodeModule`/`CodeSymbol`). Yupana adds
 `Section → references → CodeSymbol` edges into that model — additive, no new
 entity design.
 
@@ -475,10 +475,10 @@ answers "every `Document` that references a `CodeSymbol` which no longer exists,
 auditable over time. That is capability 7 (SPARQL-over-code) extended to docs for
 free.
 
-**Boundary discipline** (so this stays Hank's job and not everyone's): Hank owns
+**Boundary discipline** (so this stays Yupana's job and not everyone's): Yupana owns
 *building the structural referential graph*. It does **not** do chunking or
 embeddings (Bobbin), prose/style linting (Vale), doc semantic retrieval (Bobbin),
-or governed-intent storage (Quipu owns the record). Hank only cares about
+or governed-intent storage (Quipu owns the record). Yupana only cares about
 *structural references between docs and code*.
 
 **FR-33: Doc→code reference extraction.** Parse markdown (tree-sitter / the
@@ -487,14 +487,14 @@ code fences, and `src/…#L..` links — resolved against the code graph and
 tier-tagged. Emits `Section → references → CodeSymbol` edges. Feeds both the
 live hook (code→doc staleness) and the export (FR-34).
 
-**FR-34: Export the referential structure.** Provide `hank export` — the governed
+**FR-34: Export the referential structure.** Provide `yupana export` — the governed
 projection of the live graph.
 
-- `hank export --format turtle` emits the referential structure (modules,
+- `yupana export --format turtle` emits the referential structure (modules,
   symbols, `definedIn`/`calls`, and — as FR-33 lands — `Document`/`Section` +
   `references`) as Turtle in the `bobbin:` ontology, validating against
   `shapes/code-entities.ttl`. *(Implemented for the code side.)*
-- `hank export --to quipu` promotes it (SHACL-validate → `quipu_knot`,
+- `yupana export --to quipu` promotes it (SHACL-validate → `quipu_knot`,
   bitemporal). This **is** Phase-4 promotion (§9); the Turtle dump is the
   substrate under it. Decoupling "produce the governed projection" from "serve
   live" keeps the present (overlay) and the record (Quipu) cleanly separated.
@@ -525,7 +525,7 @@ projection of the live graph.
 | Memory | base + Σ overlays within a configurable budget; content-hash sharing (FR-15) is the primary lever |
 
 Overlay memory and hot-symbol churn are the top scaling risk (§14.2): the spec
-requires an eviction policy and a high-fan-in special case, and requires Hank to
+requires an eviction policy and a high-fan-in special case, and requires Yupana to
 `log` when it bounds or truncates coverage rather than silently degrading.
 
 ### 6.3 Correctness & staleness semantics
@@ -597,7 +597,7 @@ thin `main.rs` that inits tracing + parses the CLI):
 src/
   main.rs            # tracing init, CLI parse+dispatch (#[tokio::main])
   cli/               # one module per subcommand (serve, analyze, refs, impact, verify, promote, status)
-  config.rs          # [hank] table, load_merged (defaults < user < project < flags)
+  config.rs          # [yupana] table, load_merged (defaults < user < project < flags)
   errors.rs          # thiserror error type + Result alias
   extract/
     treesitter.rs    # grammar registry, symbol tree, intra-file calls
@@ -675,14 +675,14 @@ commit time, source = SHA → advance the base to the new commit.
 
 ## 8. Technology Choices
 
-Hank most resembles **Bobbin** on the serving side (async, MCP, tree-sitter,
+Yupana most resembles **Bobbin** on the serving side (async, MCP, tree-sitter,
 file-watch) and borrows **Quipu's** graph and RDF crates for the analysis and
 promotion sides. Versions below are pinned to what the two peers already use, so
 the three build against a coherent dependency set.
 
 | Concern | Choice | Version | Matches |
 |---|---|---|---|
-| Language / edition | Rust, **edition 2021** | — | Bobbin (Hank is closest to Bobbin's rmcp serving core; see note) |
+| Language / edition | Rust, **edition 2021** | — | Bobbin (Yupana is closest to Bobbin's rmcp serving core; see note) |
 | Async runtime | `tokio` (full) | `1` | Bobbin |
 | MCP SDK | `rmcp` (server, transport-io, streamable-http, axum) | `0.12` | Bobbin |
 | JSON schema | `schemars` | `1.0` | Bobbin |
@@ -691,7 +691,7 @@ the three build against a coherent dependency set.
 | Graph algorithms | `petgraph` | `0.7` | Quipu |
 | Datalog (optional, for derived edges) | `datafrog` | `2` | Quipu |
 | RDF model / Turtle | `oxrdf` / `oxttl` / `oxrdfio` | `0.3` / `0.2` / `0.2` | Quipu |
-| SPARQL (if Hank ever parses queries) | `spargebra` | `0.4` | Quipu |
+| SPARQL (if Yupana ever parses queries) | `spargebra` | `0.4` | Quipu |
 | SHACL (validate before promotion) | `rudof_lib` (behind `shacl`/`quipu` feature) | `0.2.8` | Quipu |
 | Overlay spill / cache (optional) | `rusqlite` (bundled) | `0.33` | Both |
 | HTTP server | `axum` + `tower-http` (cors, trace) | `0.8` / `0.6` | Both |
@@ -703,7 +703,7 @@ the three build against a coherent dependency set.
 | Hashing | `sha2` / `hex` | `0.10` / `0.4` | Bobbin (content-hash sharing) |
 | Quipu integration | `quipu` git dep, pinned by rev, `default-features = false`, optional | rev-pinned | Bobbin's exact pattern |
 
-**Edition note.** Bobbin is edition 2021; Quipu is edition 2024. Hank sits on
+**Edition note.** Bobbin is edition 2021; Quipu is edition 2024. Yupana sits on
 Bobbin's serving stack (`rmcp`, async, `notify`, `tracing`) and shares Bobbin's
 request-path role, so **edition 2021** is the default choice for compatibility
 with that surface. This is a reversible decision; revisit if a 2024-only
@@ -712,33 +712,33 @@ dependency becomes compelling (§16, open question 1).
 **Feature flags** (mirroring both peers' feature discipline):
 
 - `quipu` — gates the entire promotion path (`dep:quipu`, `oxttl`, `rudof_lib`).
-  Off by default so Hank compiles and serves without the promotion toolchain, and
+  Off by default so Yupana compiles and serves without the promotion toolchain, and
   — critically — **CI builds and tests both with and without it**, the single
   most-emphasized convention in Bobbin (the "don't let a feature ship dark" rule).
 - `cpg` / `lsp` — **planned, NOT yet Cargo features** (aegis-qe5z). They will gate
   the Phase-2 CPG/dataflow extractor and the LSP tier respectively. They were
   briefly present as `cpg = []` / `lsp = []` — empty features gating no code — and
   were removed: an empty feature can be enabled without the implementation
-  existing, which made `hank status` advertise a precision tier the binary did not
+  existing, which made `yupana status` advertise a precision tier the binary did not
   have. Re-introduce each ONLY alongside the extractor it gates, and add the tier
   to `Tier::served()` in the same change, so the flag and the capability move
   together.
 
 **Lints.** Adopt Quipu's in-manifest `[lints.rust]` / `[lints.clippy]` block
 verbatim (`unsafe_code = "deny"`, `unused_must_use = "deny"`, `missing_docs =
-"warn"`, plus the ~25 clippy warns) so Hank matches house style from commit one.
+"warn"`, plus the ~25 clippy warns) so Yupana matches house style from commit one.
 
 **The `quipu` dependency**, following Bobbin's Cargo.toml comment discipline
 exactly: pin by `rev` (not `branch`, because `Cargo.lock` is gitignored and a
 branch dep would float to tip on a fresh CI checkout), use `default-features =
-false` to keep Quipu's `onnx`/`shacl` off unless Hank explicitly needs them, and
+false` to keep Quipu's `onnx`/`shacl` off unless Yupana explicitly needs them, and
 document the chosen rev and why bumping it is a migration, not a version bump.
 
 ---
 
 ## 9. The Code Ontology & Quipu Promotion
 
-This is where Hank meets Quipu, and where the vision needs the most reconciliation
+This is where Yupana meets Quipu, and where the vision needs the most reconciliation
 with reality.
 
 ### 9.1 What already exists (build on it, don't reinvent)
@@ -756,13 +756,13 @@ Quipu already ships a code ontology and SHACL contract:
   `aegis:SoftwareComponent`, `CodeModule` → `aegis:CodeRepository`, etc., surfaced
   predicates `aegis:dependsOn`, `aegis:ownedBy`, `aegis:runsOn`.
 
-Hank promotes into **this** model. It mints the **same** IRIs so Bobbin's and
-Hank's facts about the same symbol reconcile on a shared identifier.
+Yupana promotes into **this** model. It mints the **same** IRIs so Bobbin's and
+Yupana's facts about the same symbol reconcile on a shared identifier.
 
-### 9.2 What Hank adds (ontology extension)
+### 9.2 What Yupana adds (ontology extension)
 
 The existing shapes cover *entities* (modules, symbols) but not the *structural
-edges* Hank exists to produce. Hank contributes new predicates and their SHACL
+edges* Yupana exists to produce. Yupana contributes new predicates and their SHACL
 shapes (to be added to `code-entities.ttl`, or a sibling `code-edges.ttl`):
 
 | Predicate | Domain → Range | Meaning | Source tier |
@@ -799,7 +799,7 @@ bobbin:CallsShape a sh:NodeShape ;
 Promotion uses Quipu's bitemporal model directly (Quipu `concepts/temporal-model`):
 
 - **valid-time** (`--timestamp` / `valid_from`) = the commit's author/commit time.
-- **transaction-time** (`transactions.timestamp`, monotonic tx id) = when Hank
+- **transaction-time** (`transactions.timestamp`, monotonic tx id) = when Yupana
   learned/promoted the fact.
 - A signature change that removes an edge is a **retraction** (close `valid_to`),
   not a delete — Quipu's log is append-only, so code archaeology ("what called
@@ -813,7 +813,7 @@ in the graph. **Sample SPARQL over promoted code:**
 # Who called authenticate() as of 2026-03-01?  (valid-time travel)
 SELECT ?caller WHERE {
   ?caller <http://aegis.gastown.local/ontology/calls>
-          <http://aegis.gastown.local/ontology/code/hank/src%2Fauth.rs::authenticate> .
+          <http://aegis.gastown.local/ontology/code/yupana/src%2Fauth.rs::authenticate> .
 }
 # executed with valid_at = 2026-03-01
 ```
@@ -838,14 +838,14 @@ store, so the change is *additive* and can be made non-breaking:
 - Bobbin (pinned to an old Quipu rev, `default-features = false`) is insulated
   during the transition.
 
-**Why it's worth a Quipu-core change, not just a Hank convenience:** named graphs
+**Why it's worth a Quipu-core change, not just a Yupana convenience:** named graphs
 pay off well beyond branches. Quipu already has a `docs/design/group-
 isolation.md`, per-source provenance (`transactions.source`, episode
 `prov:wasGeneratedBy`), and a `FederatedProvider` — all of which want the same
 primitive: a first-class way to partition the graph. Branches are simply the
 first customer. One quad column serves branch scoping, group isolation, and
 provenance/federation at once, which is *less* total complexity than solving each
-separately (a branch-qualifier hack in Hank *plus* group isolation *plus* source
+separately (a branch-qualifier hack in Yupana *plus* group isolation *plus* source
 scoping).
 
 **Where the design care goes:** the interaction of three axes — `graph ×
@@ -858,12 +858,12 @@ hard; together they are the surface to design deliberately. **Decide
 default-graph-is-union vs. default-graph-is-distinct early** — it is the dataset
 semantics choice that is painful to reverse later.
 
-**Sequencing (does not block Hank).** Hank Phases 1–3 (extraction, dataflow,
+**Sequencing (does not block Yupana).** Yupana Phases 1–3 (extraction, dataflow,
 tenancy) never touch Quipu. Only Phase 4 (promotion) cares. So the quad work is a
 **Phase 4 enabler tracked on the Quipu side** (see §9.5 for the RFC sketch), not a
-Hank dependency. If quads land first, Hank promotes each branch's committed facts
+Yupana dependency. If quads land first, Yupana promotes each branch's committed facts
 directly into a named graph named for the branch (bitemporally versioned within).
-If they are not ready when Phase 4 starts, Hank falls back to **branch-as-
+If they are not ready when Phase 4 starts, Yupana falls back to **branch-as-
 qualifier** (a reified `bobbin:onBranch` term on each edge, queries adding a
 `?fact bobbin:onBranch "main"` constraint) — heavier queries, no Quipu change —
 and migrates to named graphs when they arrive. The config `branch_model` key
@@ -896,15 +896,15 @@ A short design note to raise in `scbrown/quipu` (natural home:
 
 ### 9.6 Two graph engines — keep the split honest
 
-Hank's in-memory graph serves interactive dataflow/reachability queries that are
+Yupana's in-memory graph serves interactive dataflow/reachability queries that are
 genuinely painful over RDF/SPARQL. Quipu serves governed/temporal/cross-domain
-queries. The rule (from the vision's risks): **Hank's transient store must never
+queries. The rule (from the vision's risks): **Yupana's transient store must never
 become a second source of truth for committed facts.** Committed truth lives in
-Quipu; Hank holds only what is in flight plus a read-only projection of the base.
+Quipu; Yupana holds only what is in flight plus a read-only projection of the base.
 
 ### 9.7 Downstream: promotion feeds work-item co-occurrence in Quipu
 
-Hank's promotion emits more than entity facts — at commit time it can write the
+Yupana's promotion emits more than entity facts — at commit time it can write the
 **provenance edge `commit → touched entities`** (valid-time = commit time,
 `source` = SHA, `actor` = committer). That provenance is the substrate for a
 Quipu-side capability distinct from Bobbin's statistical co-change:
@@ -916,24 +916,24 @@ problem:
 
 | Signal | Owner | Mechanism | Question |
 |---|---|---|---|
-| Structural coupling | **Hank** | call/dataflow reachability | "what is wired to this" |
+| Structural coupling | **Yupana** | call/dataflow reachability | "what is wired to this" |
 | Statistical co-change | **Bobbin** | FP-Growth over git history | "what *tends to* change together" |
 | Work-item co-occurrence | **Quipu** | deterministic SPARQL over provenance edges | "what work *did* touch this, and what else did it touch" |
 
-The loop closes cleanly: **Hank promotes the `commit → entity` provenance →
+The loop closes cleanly: **Yupana promotes the `commit → entity` provenance →
 Quipu aggregates it (with `bead → commit`) into ticket/epic co-occurrence →
 Bobbin fuses all three signals.** This generalizes FR-11's structural-vs-co-change
 reconciliation into multi-signal corroboration: coupling backed by structure
 *and* co-change *and* a shared work item is strong; coupling in only one is weak.
 The same borrow-don't-derive invariant applies to Quipu (no statistical mining
 there — that stays Bobbin's). Tracked Quipu-side as
-[scbrown/quipu#37](https://github.com/scbrown/quipu/issues/37); Hank's obligation
+[scbrown/quipu#37](https://github.com/scbrown/quipu/issues/37); Yupana's obligation
 is only to promote the provenance edge in Phase 4.
 
 ### 9.8 Bounded transitive paths over the promoted graph (Quipu-side follow-up)
 
 > **Sketched Quipu-side in `quipu/docs/design/statement-identity.md`.** Nothing
-> is required of Hank; this records what the promoted graph cannot answer yet, so
+> is required of Yupana; this records what the promoted graph cannot answer yet, so
 > §9.3's capability claims stay honest.
 
 §9.3 claims bitemporal code archaeology comes "for free once the facts are in the
@@ -948,15 +948,15 @@ cannot express a depth cap, so we walk the store directly."*
 What the promoted graph needs is therefore a depth bound on path expressions plus
 the traversed path returned, not just the endpoint pair.
 
-**This does not relitigate §9.6.** Hank's interactive dataflow and reachability
-stay in Hank's in-memory graph; that split is deliberate and unchanged. The gap
+**This does not relitigate §9.6.** Yupana's interactive dataflow and reachability
+stay in Yupana's in-memory graph; that split is deliberate and unchanged. The gap
 here is confined to the *governed, committed* projection — the queries Quipu owns
-because they are temporal and cross-domain, which is exactly where Hank's
+because they are temporal and cross-domain, which is exactly where Yupana's
 transient store must not answer. Concretely: transitive `calls` archaeology at a
 `--valid-at`, and cross-repo reachability spanning promotions that no single
 tenant view holds.
 
-Nothing blocks Hank's Phase 4 promotion, and the ontology needs no change — the
+Nothing blocks Yupana's Phase 4 promotion, and the ontology needs no change — the
 edges are already the right ones. The recommendation is only that a transitive
 archaeology query be written against real promoted data before §9.3's wording is
 treated as satisfied.
@@ -964,20 +964,20 @@ treated as satisfied.
 ## 10. MCP & HTTP Tool Surface
 
 Tool naming mirrors the peers: Bobbin uses bare snake_case function names that
-clients namespace as `bobbin_*`; Quipu uses explicit `quipu_*`. Hank uses
-**`hank_*`** for clarity alongside both on the same agent.
+clients namespace as `bobbin_*`; Quipu uses explicit `quipu_*`. Yupana uses
+**`yupana_*`** for clarity alongside both on the same agent.
 
 | Tool | Purpose | Routes to |
 |---|---|---|
-| `hank_definition` | Definition site(s) of a symbol/position | §5.2 |
-| `hank_references` | All reference sites of a symbol | §5.2 |
-| `hank_callers` / `hank_callees` | Call-graph neighbors | §5.3 |
-| `hank_dataflow` | Source→sink dataflow paths | §5.3 |
-| `hank_impact` | Blast radius (forward/backward, N hops) | §5.4 |
-| `hank_symbols` | Symbol tree for a file/module | §5.1 |
-| `hank_verify` | Verdict on a proposed edit buffer | §5.7 |
-| `hank_status` | Base commit, tenant overlays, tiers, freshness | §5.5 |
-| `hank_promote` | Trigger promotion of a commit to Quipu (write-guarded) | §5.6 |
+| `yupana_definition` | Definition site(s) of a symbol/position | §5.2 |
+| `yupana_references` | All reference sites of a symbol | §5.2 |
+| `yupana_callers` / `yupana_callees` | Call-graph neighbors | §5.3 |
+| `yupana_dataflow` | Source→sink dataflow paths | §5.3 |
+| `yupana_impact` | Blast radius (forward/backward, N hops) | §5.4 |
+| `yupana_symbols` | Symbol tree for a file/module | §5.1 |
+| `yupana_verify` | Verdict on a proposed edit buffer | §5.7 |
+| `yupana_status` | Base commit, tenant overlays, tiers, freshness | §5.5 |
+| `yupana_promote` | Trigger promotion of a commit to Quipu (write-guarded) | §5.6 |
 
 Every tool response carries `tier` per FR-3 (the `freshness` half is Phase 3 —
 see FR-3), and every request that reads structure accepts a `tenant` parameter
@@ -992,7 +992,7 @@ Today the broker reaches these same tools over the streamable-HTTP MCP transport
 > **Refinement — name-based today, position-based for the LSP tier.** The
 > current tools resolve by symbol *name* (the tree-sitter tier). The precise
 > LSP tier (FR-2/FR-4) wants **position-based** variants — `(file, line, col)` —
-> so `hank_definition` can disambiguate overloads and shadowing the way a
+> so `yupana_definition` can disambiguate overloads and shadowing the way a
 > language server does. MCP carries positions fine; the tools were simply
 > designed name-first. Add position variants when the `lsp` tier lands.
 
@@ -1000,13 +1000,13 @@ Today the broker reaches these same tools over the streamable-HTTP MCP transport
 
 ## 11. Configuration
 
-Hank shares Bobbin/Quipu's `.bobbin/config.toml` under a new `[hank]` table, with
+Yupana shares Bobbin/Quipu's `.bobbin/config.toml` under a new `[yupana]` table, with
 the same resolution order (compiled defaults < `~/.config/bobbin/config.toml` <
 `.bobbin/config.toml` < CLI flags). No new environment variables beyond what
 Bobbin defines (e.g. `BOBBIN_ROLE` for tenant identity, reused).
 
 ```toml
-[hank]
+[yupana]
 # Baseline the shared read-only graph is built at.
 base_ref = "main"
 
@@ -1014,26 +1014,26 @@ base_ref = "main"
 enable_lsp = true          # (Phase 2/3 — not yet read) LSP precision where a build resolves
 enable_cpg = false         # (Phase 2 — not yet read) CPG/dataflow
 
-# Languages (default = Bobbin's grammar set). RESTRICTS `hank analyze`.
+# Languages (default = Bobbin's grammar set). RESTRICTS `yupana analyze`.
 languages = ["rust", "typescript", "python", "go", "java", "cpp"]
 
-[hank.freshness]
+[yupana.freshness]
 # Debounce keystroke-driven tree-sitter updates (ms); LSP/CPG on save/on-demand.
 debounce_ms = 300
 lsp_on = "save"            # (LSP tier — not yet read) "save" | "on_demand"
 
-[hank.tenancy]                          # (Phase 3 — none of these keys are read yet)
+[yupana.tenancy]                          # (Phase 3 — none of these keys are read yet)
 max_overlays = 32
 # Symbols with fan-in above this get special frontier handling (§14.2).
 high_fanin_threshold = 200
 overlay_eviction = "on_session_close"   # "on_session_close" | "lru"
 
-[hank.serve]
+[yupana.serve]
 bind_address = "127.0.0.1"
 mcp_http_port = 3040       # distinct from Bobbin's server and Quipu's 3030
-read_only = false          # write guard: when true, hank REFUSES mutating operations (promotion)
+read_only = false          # write guard: when true, yupana REFUSES mutating operations (promotion)
 
-[hank.quipu]               # (Phase 4) promotion target (feature = "quipu")
+[yupana.quipu]               # (Phase 4) promotion target (feature = "quipu")
 enabled = false
 promote_on = "merge"       # (Phase 4 — not yet read) "commit" | "merge" | "manual"
 branch_model = "named_graph" # §9.4: "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback)
@@ -1048,49 +1048,49 @@ Phasing follows the vision's five phases. Each is a checklist with an exit
 criterion; every phase must keep the `quipu` feature compiling both on and off
 (Bobbin's dark-feature rule) and must land docs + tests per §13.
 
-### Phase 1 — Hank, single-tenant *(explained retrieval, no new store)*
+### Phase 1 — Yupana, single-tenant *(explained retrieval, no new store)*
 
 - [ ] Project scaffold: Cargo (edition 2021), `[lints]` block, `just` + pre-commit + CI (both feature arms), mdBook skeleton.
 - [ ] Tree-sitter extraction (Bobbin's grammar set): symbol tree + intra-file calls.
 - [ ] LSP client (multilspy-style) for ≥ Rust + one more language: defs/refs/types.
 - [ ] Tier tagging (FR-3) on every served response from day one. (Freshness
       tagging is Phase 3 — it needs the resident graph + watcher, FR-16/17.)
-- [ ] Single-tenant in-memory graph; `hank_definition` / `hank_references` / `hank_symbols` / `hank_callers` over MCP (stdio + HTTP).
+- [ ] Single-tenant in-memory graph; `yupana_definition` / `yupana_references` / `yupana_symbols` / `yupana_callers` over MCP (stdio + HTTP).
 - [ ] CLI: `serve`, `analyze`, `refs`, `status`.
-- **Exit:** Bobbin fuses Hank's precise references with its co-change/embeddings; "probably relevant" becomes "provably connected."
+- **Exit:** Bobbin fuses Yupana's precise references with its co-change/embeddings; "probably relevant" becomes "provably connected."
 
 ### Phase 2 — Dataflow & blast radius
 
 - [x] Call graph (FR-6): tree-sitter call-site extraction, by-name resolution, in-memory `CodeGraph`.
 - [x] Blast-radius primitive (FR-10, FR-12) with forward/backward reachability (`reachable()`, one primitive).
-- [x] `hank_impact`, `hank_callers`, `hank_callees` (MCP) and `hank callers` / `hank impact` (CLI).
+- [x] `yupana_impact`, `yupana_callers`, `yupana_callees` (MCP) and `yupana callers` / `yupana impact` (CLI).
 - [x] Resolve the JVM/Rust CPG decision (§14.1): **Rust-native traversals** (Joern not adopted).
-- [x] Intra-procedural data dependence (FR-8, first slice): `src/dataflow.rs`, `hank dataflow` (CLI) and `hank_dataflow` (MCP).
-- [x] Reconcile structural reachable set with Bobbin co-change (FR-11): `src/reconcile.rs`, `hank impact --cochange` (CLI) and the `cochange` param on `hank_impact` (MCP), partitioning into corroborated / structural-only / co-change-only.
-- [x] Edit-reactive harness hook (FR-30, prototype): `hank hook post-edit` emits a synchronous cross-file blast-radius advisory as Claude Code `PostToolUse` context (builds transiently until the Phase-3 resident daemon lands).
-- [x] Referential-structure export (FR-34, code side): `hank export --format turtle` emits `CodeModule`/`CodeSymbol` + `definedIn`/`calls`/`imports` as Turtle in the `bobbin:` ontology (the substrate under Phase-4 promotion; doc→code references and `--to quipu` fold in later).
+- [x] Intra-procedural data dependence (FR-8, first slice): `src/dataflow.rs`, `yupana dataflow` (CLI) and `yupana_dataflow` (MCP).
+- [x] Reconcile structural reachable set with Bobbin co-change (FR-11): `src/reconcile.rs`, `yupana impact --cochange` (CLI) and the `cochange` param on `yupana_impact` (MCP), partitioning into corroborated / structural-only / co-change-only.
+- [x] Edit-reactive harness hook (FR-30, prototype): `yupana hook post-edit` emits a synchronous cross-file blast-radius advisory as Claude Code `PostToolUse` context (builds transiently until the Phase-3 resident daemon lands).
+- [x] Referential-structure export (FR-34, code side): `yupana export --format turtle` emits `CodeModule`/`CodeSymbol` + `definedIn`/`calls`/`imports` as Turtle in the `bobbin:` ontology (the substrate under Phase-4 promotion; doc→code references and `--to quipu` fold in later).
 - [ ] *Deferred to the `cpg` feature (post-exit):* deeper CPG — control dependence + inter-procedural taint (FR-7, remainder of FR-8).
-- **Exit (met):** structural blast radius, reconciled with history, served to agents and Bobbin. Co-change mining stays in Bobbin; Hank reconciles a supplied co-change set (the routing rule).
+- **Exit (met):** structural blast radius, reconciled with history, served to agents and Bobbin. Co-change mining stays in Bobbin; Yupana reconciles a supplied co-change set (the routing rule).
 
 ### Phase 3 — Multi-tenancy *(the hard phase)*
 
-- [x] Shared base + copy-on-write overlays (FR-13, FR-14): `graph::{Base, Overlay, TenantRegistry, TenantView}`, wired into the resident daemon (hank #2).
+- [x] Shared base + copy-on-write overlays (FR-13, FR-14): `graph::{Base, Overlay, TenantRegistry, TenantView}`, wired into the resident daemon (yupana #2).
 - [x] Content-hash structural sharing (FR-15): per-file content hashes on the base + the registry's parse-intern cache (identical bytes across tenants share one `ParsedFile`).
-- [x] Frontier-bounded incremental update reusing the Phase-2 blast primitive (FR-16): `graph::update_frontier` walks the composed view via the one `reachable()` BFS; the base's `callers_of_name` index closes the overlay-new-name case (hank #3).
-- [x] File-watch (`notify`) + debounce + tiered scheduling (FR-17): `src/watch/` — `.gitignore`-filtered `notify` watcher, debounced tiers; `OverlayRefresh` touches the tenant overlay (fast) then runs `update_frontier` (heavy), with per-file freshness (hank #5).
-- [x] Overlay lifecycle + high-fan-in handling + eviction (FR-18, §14.2): `TenantRegistry` open/close/reset, `max_overlays` cap with `overlay_eviction` (lru / on_session_close backstop) — logged, never silent — and a `high_fanin_threshold` guard that clips a hot signature's cascade to one hop (hank #6).
-- [x] `tenant` parameter across the MCP/HTTP surface; `hank_status` shows overlays (hank #2 daemon wiring).
-- [x] Parallel REST HTTP API beside the MCP mount (FR-27): the resident daemon (`hank daemon`) serves `/status`, `/callers`, `/impact`, `/references`, `/symbols`, `/dataflow`, `/measure`, `/edit`, each mirroring the `hank_*` tool payloads, for the broker and non-MCP consumers (hank #1).
+- [x] Frontier-bounded incremental update reusing the Phase-2 blast primitive (FR-16): `graph::update_frontier` walks the composed view via the one `reachable()` BFS; the base's `callers_of_name` index closes the overlay-new-name case (yupana #3).
+- [x] File-watch (`notify`) + debounce + tiered scheduling (FR-17): `src/watch/` — `.gitignore`-filtered `notify` watcher, debounced tiers; `OverlayRefresh` touches the tenant overlay (fast) then runs `update_frontier` (heavy), with per-file freshness (yupana #5).
+- [x] Overlay lifecycle + high-fan-in handling + eviction (FR-18, §14.2): `TenantRegistry` open/close/reset, `max_overlays` cap with `overlay_eviction` (lru / on_session_close backstop) — logged, never silent — and a `high_fanin_threshold` guard that clips a hot signature's cascade to one hop (yupana #6).
+- [x] `tenant` parameter across the MCP/HTTP surface; `yupana_status` shows overlays (yupana #2 daemon wiring).
+- [x] Parallel REST HTTP API beside the MCP mount (FR-27): the resident daemon (`yupana daemon`) serves `/status`, `/callers`, `/impact`, `/references`, `/symbols`, `/dataflow`, `/measure`, `/edit`, each mirroring the `yupana_*` tool payloads, for the broker and non-MCP consumers (yupana #1).
 - **Exit (met):** N developers edit concurrently; each sees a correct, isolated `base + overlay`; overlays cost O(touched + frontier), capped and evicted under a logged policy.
 
 ### Phase 4 — Promote to Quipu
 
-- [x] Extend the code ontology with edge shapes (§9.2) and `Section → references → CodeSymbol` (§5.10); start permissive: `shapes/code-edges.ttl` covers `calls`/`references`/`imports`/`dataDependsOn`/`controlDependsOn`/`hasTier` + `Section→references`, permissive (nodeKind IRI, `sh:class` deferred), with node shapes synced from Quipu's `code-entities.ttl` (hank #13).
-- [x] Turtle emission of the referential structure (`hank export --format turtle`, FR-34, code side) — extend to docs (FR-33) and wire `--to quipu`.
+- [x] Extend the code ontology with edge shapes (§9.2) and `Section → references → CodeSymbol` (§5.10); start permissive: `shapes/code-edges.ttl` covers `calls`/`references`/`imports`/`dataDependsOn`/`controlDependsOn`/`hasTier` + `Section→references`, permissive (nodeKind IRI, `sh:class` deferred), with node shapes synced from Quipu's `code-entities.ttl` (yupana #13).
+- [x] Turtle emission of the referential structure (`yupana export --format turtle`, FR-34, code side) — extend to docs (FR-33) and wire `--to quipu`.
 - [x] Doc→code reference extraction (FR-33) folded into the **export**: `src/docref.rs`
       scans markdown for code-symbol mentions and `src/export.rs` emits
       `Section → references → CodeSymbol`. Not yet wired into the live edit hook.
-- [x] SHACL-validate (`rudof`) before every write (FR-20): `promote::validate` runs `rudof_lib` in-process against `code-edges.ttl` and refuses the whole promotion on any violation (all-or-nothing); a real `export` projection is round-trip-validated in the test suite so the emitter cannot drift from the gate (hank #14).
+- [x] SHACL-validate (`rudof`) before every write (FR-20): `promote::validate` runs `rudof_lib` in-process against `code-edges.ttl` and refuses the whole promotion on any violation (all-or-nothing); a real `export` projection is round-trip-validated in the test suite so the emitter cannot drift from the gate (yupana #14).
 - [ ] Promote on commit/merge via `quipu_knot` / `Store::transact`, bitemporal (FR-19, FR-21, FR-22).
 - [ ] Branch modeling per §9.4: promote each branch into a named graph if Quipu
       quad support (§9.5) has landed; else branch-as-qualifier fallback. SPARQL-
@@ -1099,9 +1099,9 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
 
 ### Phase 5 — Consumption & guardrails
 
-- [x] Per-tenant blast radius wired into the broker/Aegis capability-scoping path (FR-25): `[hank.policy.scopes.<tenant>]` gives each tenant writable-path globs and blast-radius ceilings, evaluated against that tenant's graph.
-- [x] `hank_verify` monitor-guided edit verification as a direct surface (FR-23, FR-24): `hank verify` + the `hank_verify` MCP tool. Tree-sitter tier decides `identifier-does-not-exist`, `wrong-arity`, and `unresolved-import`; `type-violation` is reported as unchecked until the LSP tier lands.
-- [x] `hank hook pre-edit` guard (FR-30): blocking `deny` opt-in for capability-scoped polecats, off by default, always fail-open. Contract pinned in `docs/book/src/reference/policy-guard.md`. (Proposed-buffer *verification* joins it when FR-23 lands.)
+- [x] Per-tenant blast radius wired into the broker/Aegis capability-scoping path (FR-25): `[yupana.policy.scopes.<tenant>]` gives each tenant writable-path globs and blast-radius ceilings, evaluated against that tenant's graph.
+- [x] `yupana_verify` monitor-guided edit verification as a direct surface (FR-23, FR-24): `yupana verify` + the `yupana_verify` MCP tool. Tree-sitter tier decides `identifier-does-not-exist`, `wrong-arity`, and `unresolved-import`; `type-violation` is reported as unchecked until the LSP tier lands.
+- [x] `yupana hook pre-edit` guard (FR-30): blocking `deny` opt-in for capability-scoped polecats, off by default, always fail-open. Contract pinned in `docs/book/src/reference/policy-guard.md`. (Proposed-buffer *verification* joins it when FR-23 lands.)
 - [ ] Bobbin consumes verdicts to flag won't-compile retrieved code.
 - **Exit:** structure defines the polecat sandbox, per tenant; agents get a boolean guard on their own edits.
 
@@ -1109,7 +1109,7 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
 
 ## 13. Testing & Dev Tooling
 
-Adopt both peers' conventions so Hank is a first-class citizen of the stack from
+Adopt both peers' conventions so Yupana is a first-class citizen of the stack from
 commit one:
 
 - **`just` is the only entrypoint** (never raw `cargo`); justfile quiet by
@@ -1123,7 +1123,7 @@ commit one:
   re-creates the dark-feature bug.
 - **Tests:** inline `#[cfg(test)]` unit tests colocated with modules (Quipu
   style) + `tests/` integration tests via `assert_cmd`/`predicates`/`tempfile`
-  driving the `hank` binary (Bobbin style). New functionality ships with tests;
+  driving the `yupana` binary (Bobbin style). New functionality ships with tests;
   tests are part of `just check`. Integration tests must **skip gracefully** when
   a language server or optional toolchain is unavailable (Bobbin's
   `try_indexed_project` pattern).
@@ -1141,15 +1141,15 @@ commit one:
 
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| 14.1 | **JVM/Rust fork for CPG.** Joern is JVM/Scala; the stack is Rust. | High | **Decided (Phase 2): Rust-native traversals.** Rather than embed Joern (a heavy JVM dep + serialization seam), Hank reimplements the traversals it needs, keeping the stack coherent. Started with intra-procedural data dependence (`src/dataflow.rs`, tree-sitter tier); a deeper CPG with inter-procedural taint can grow behind the `cpg` feature. Joern is not adopted. |
+| 14.1 | **JVM/Rust fork for CPG.** Joern is JVM/Scala; the stack is Rust. | High | **Decided (Phase 2): Rust-native traversals.** Rather than embed Joern (a heavy JVM dep + serialization seam), Yupana reimplements the traversals it needs, keeping the stack coherent. Started with intra-procedural data dependence (`src/dataflow.rs`, tree-sitter tier); a deeper CPG with inter-procedural taint can grow behind the `cpg` feature. Joern is not adopted. |
 | 14.2 | **Overlay memory & churn.** Per-tenant overlays + a large base must stay in budget; frontier recompute on hot (high-fan-in) symbols can cascade. | High | Content-hash sharing (FR-15) as the primary lever; `high_fanin_threshold` special-casing; explicit overlay eviction policy (`on_session_close`/`lru`); `log` any bounded/truncated coverage — never degrade silently. |
 | 14.3 | **When to promote to Quipu.** Every commit? Only merges to tracked branches? Promotion cost vs. history completeness. | Medium | `promote_on = commit\|merge\|manual` config; default `merge`. Bitemporality lets promotion be lazy but not free. |
-| 14.4 | **Two graph engines drift.** Hank's transient store could become a second source of truth for committed facts. | Medium | Hard rule (§9.6): committed truth lives in Quipu; Hank holds in-flight + a read-only base projection only. Promotion is the one-way boundary. |
+| 14.4 | **Two graph engines drift.** Yupana's transient store could become a second source of truth for committed facts. | Medium | Hard rule (§9.6): committed truth lives in Quipu; Yupana holds in-flight + a read-only base projection only. Promotion is the one-way boundary. |
 | 14.5 | **Freshness/staleness semantics.** Agents must know if a fact is tree-sitter-approximate or LSP-precise. | Medium | Mandatory `tier` + `freshness` tag on every fact (FR-3), surfaced in every MCP/HTTP response. |
 | 14.6 | **Build-free vs build-required.** Joern's fuzzy parser needs no build; LSP needs a resolvable build for precise types. | Medium | Serve both: tree-sitter always-on breadth, LSP precision where a build exists; degrade tier, never fail; the ontology carries facts of differing confidence. |
 | 14.7 | **Ontology design cost.** Over-constrained SHACL rejects legitimate facts from messy real code. | Medium | Start permissive (§9.2), tighten deliberately once real promoted data validates cleanly. |
-| 14.8 | **Named-graph gap → Quipu quad-store work.** Quipu is a triple store; branches want named graphs. The fix is a Quipu-core change (add a graph column, graph-aware SPARQL), whose real cost is the `graph × valid-time × tx-time` interaction. | Medium | §9.4/§9.5: add quads *additively* (default-graph-preserving, non-breaking); sequence as a Phase-4 enabler tracked on the Quipu side, **not** on Hank's critical path; `branch_model = "qualifier"` is the zero-Quipu-change fallback if quads aren't ready. Decide default-graph union-vs-distinct early. |
-| 14.9 | **Query-surface sprawl.** Resist standing up CPGQL *and* SPARQL *and* many MCP tools as permanent interfaces. | Low | Consolidate on SPARQL-over-Quipu for committed queries + Hank's `hank_*` MCP surface for live analysis. No second query language. |
+| 14.8 | **Named-graph gap → Quipu quad-store work.** Quipu is a triple store; branches want named graphs. The fix is a Quipu-core change (add a graph column, graph-aware SPARQL), whose real cost is the `graph × valid-time × tx-time` interaction. | Medium | §9.4/§9.5: add quads *additively* (default-graph-preserving, non-breaking); sequence as a Phase-4 enabler tracked on the Quipu side, **not** on Yupana's critical path; `branch_model = "qualifier"` is the zero-Quipu-change fallback if quads aren't ready. Decide default-graph union-vs-distinct early. |
+| 14.9 | **Query-surface sprawl.** Resist standing up CPGQL *and* SPARQL *and* many MCP tools as permanent interfaces. | Low | Consolidate on SPARQL-over-Quipu for committed queries + Yupana's `yupana_*` MCP surface for live analysis. No second query language. |
 | 14.10 | **`quipu` dep instability.** Quipu is pre-1.0; API drifts (Bobbin is pinned to a rev a full minor behind tip). | Medium | Pin `quipu` by `rev`, `default-features = false`, document the rev and why bumping it is a migration; CI compiles the `quipu` feature so drift can't ship dark. |
 
 ---
@@ -1171,13 +1171,13 @@ commit one:
    the single biggest architectural fork; resolve early in Phase 2.
 4. **Branch model.** Named graphs (via Quipu quad support, §9.4/§9.5) are the
    preferred path; branch-as-qualifier is the fallback. The open item is
-   *sequencing*: does the Quipu quad work land before Hank Phase 4, and what are
+   *sequencing*: does the Quipu quad work land before Yupana Phase 4, and what are
    the default-graph dataset semantics (union vs. distinct)? Freeze before the
    promotion schema is.
 5. **Promotion trigger.** On every commit vs only merges to tracked branches
    (§14.3) — trades promotion cost against history completeness.
 6. **Tenant identity.** Reuse `BOBBIN_ROLE`/Gas Town crew identity as the tenant
-   key, or mint a Hank-native session id? Affects broker capability scoping.
+   key, or mint a Yupana-native session id? Affects broker capability scoping.
 7. **Overlay persistence.** Pure in-memory vs `rusqlite` spill for large overlays
    / crash recovery — do we need durability for in-flight state at all?
 8. **LSP server management.** Bundle/vendor language servers, or discover
@@ -1196,7 +1196,7 @@ commit one:
 | **Tier** | Provenance/precision of a fact: `treesitter` (fast, approximate), `lsp` (precise, build-required), `cpg` (dataflow). |
 | **Freshness** | Whether a served fact is `fresh`, `stale`, or `recomputing`. |
 | **CPG** | Code Property Graph — AST + control-flow + data/program-dependence merged into one queryable graph (Joern's idea). |
-| **Promotion** | Writing committed structural facts from Hank into Quipu as a new bitemporal state, SHACL-validated. |
+| **Promotion** | Writing committed structural facts from Yupana into Quipu as a new bitemporal state, SHACL-validated. |
 | **Tenant** | A developer/agent session sitting at the base commit plus its own uncommitted working delta. |
 | **Bitemporal** | Two time axes: valid-time (when true in the world = commit time) and transaction-time (when Quipu learned it). |
 | **Named graph** | An RDF quad's graph component; the preferred branch axis. Not supported by Quipu today — §9.4/§9.5 propose adding quad support additively. |
@@ -1209,7 +1209,7 @@ commit one:
 
 ```text
 USAGE:
-    hank <COMMAND>
+    yupana <COMMAND>
 
 COMMANDS:
     serve       Run the MCP server (stdio, or streamable-HTTP with --http)
@@ -1234,32 +1234,32 @@ GLOBAL FLAGS:
     --config    Path to config file
 
 EXAMPLES:
-    hank serve
-    hank analyze
-    hank refs authenticate src
-    hank impact authenticate src --hops 5
-    hank verify --file src/auth.rs --buffer /tmp/edited.rs
-    hank promote --commit HEAD
+    yupana serve
+    yupana analyze
+    yupana refs authenticate src
+    yupana impact authenticate src --hops 5
+    yupana verify --file src/auth.rs --buffer /tmp/edited.rs
+    yupana promote --commit HEAD
 ```
 
-## Appendix B: Sample promoted Turtle (facts Hank emits into Quipu)
+## Appendix B: Sample promoted Turtle (facts Yupana emits into Quipu)
 
 ```turtle
 @prefix bobbin: <http://aegis.gastown.local/ontology/> .
 @prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
 
-bobbin:code/hank/src%2Fauth.rs::authenticate
+bobbin:code/yupana/src%2Fauth.rs::authenticate
     a bobbin:CodeSymbol ;
     bobbin:name "authenticate" ;
     bobbin:symbolKind "function" ;
-    bobbin:definedIn bobbin:code/hank/src%2Fauth.rs ;
-    bobbin:calls bobbin:code/hank/src%2Fdb.rs::lookup_user ;
-    bobbin:dataDependsOn bobbin:code/hank/src%2Ftoken.rs::verify .
+    bobbin:definedIn bobbin:code/yupana/src%2Fauth.rs ;
+    bobbin:calls bobbin:code/yupana/src%2Fdb.rs::lookup_user ;
+    bobbin:dataDependsOn bobbin:code/yupana/src%2Ftoken.rs::verify .
 
-bobbin:code/hank/src%2Fauth.rs
+bobbin:code/yupana/src%2Fauth.rs
     a bobbin:CodeModule ;
     bobbin:filePath "src/auth.rs" ;
-    bobbin:repo "hank" ;
+    bobbin:repo "yupana" ;
     bobbin:language "rust" .
 ```
 
@@ -1270,7 +1270,7 @@ written into the branch's named graph — e.g. `GRAPH bobbin:branch/main { … }
 once Quipu quad support (§9.5) has landed; under the `qualifier` fallback each
 edge instead carries a `bobbin:onBranch "main"` term.)
 
-## Appendix C: Sample `hank_impact` response (MCP)
+## Appendix C: Sample `yupana_impact` response (MCP)
 
 ```json
 {
@@ -1317,7 +1317,7 @@ have grown from single files into modules.
 | `policy.rs` | capability scopes + blast-radius ceilings (§5.8/FR-25) | done |
 | `verify/` | proposed-buffer verdicts (FR-23/FR-24) | tree-sitter tier done |
 | `mcp/` | `rmcp` server (`server`/`tools`/`transport`) | done (`mcp` feature) |
-| `config.rs` | `[hank]` config table | done |
+| `config.rs` | `[yupana]` config table | done |
 | `cli.rs` / `cli_cmds.rs` / `render.rs` | CLI surface | done |
 | `types.rs` / `errors.rs` | fact model (Tier/Freshness/…) + errors | done |
 
@@ -1326,11 +1326,11 @@ have grown from single files into modules.
 `serve` (`mcp` feature), `completions` — all live. `promote` — live behind
 the `quipu` feature (SHACL-validate, then write); a phase notice without it.
 
-**MCP tools (14, `mcp` feature):** `hank_status`, `hank_symbols`,
-`hank_references`, `hank_analyze`, `hank_callers`, `hank_callees`, `hank_impact`
-(with `cochange`), `hank_communities`, `hank_dataflow`, `hank_verify`,
-`hank_promote` (writes to Quipu; needs the `quipu` feature), `hank_ingest`,
-`hank_guard`, `hank_whatif` (the game-state harness; need the `game-state`
+**MCP tools (14, `mcp` feature):** `yupana_status`, `yupana_symbols`,
+`yupana_references`, `yupana_analyze`, `yupana_callers`, `yupana_callees`, `yupana_impact`
+(with `cochange`), `yupana_communities`, `yupana_dataflow`, `yupana_verify`,
+`yupana_promote` (writes to Quipu; needs the `quipu` feature), `yupana_ingest`,
+`yupana_guard`, `yupana_whatif` (the game-state harness; need the `game-state`
 feature). Over stdio + streamable-HTTP.
 
 **Cargo features:** `default = []`; `mcp`, `langs-extra`, `quipu`, `game-state`
@@ -1338,7 +1338,7 @@ feature). Over stdio + streamable-HTTP.
 `langs-extra` gates REAL extractors — TypeScript, TSX, Python, Go, Java and C++
 all produce modules, symbols and call edges (measured 2026-08-04 against a
 7-language probe repo, 3–4 symbols each). A build WITHOUT it is Rust-only and
-says so in `hank status` (`languages`); it does not error on the other five, it
+says so in `yupana status` (`languages`); it does not error on the other five, it
 silently extracts nothing from them, which is why the deployed binary was
 Rust-only for an undated period without anyone noticing. This paragraph
 previously read "deps are declared but extractors are Rust-only so far" — that
@@ -1364,9 +1364,9 @@ mechanism against `src/`, cross-refs the open GitHub issues):**
 
 | Section | Status | Evidence |
 |---|---|---|
-| FR-34 `hank export` (Turtle) | ✅ Implemented | `src/export.rs::to_turtle` (`:32`), tested |
-| FR-19/21/22 `hank promote` / `export --to quipu` | ✅ Implemented (behind `quipu` feature) | `src/promote.rs::promote` (`:229`) — SHACL-validate → `quipu_knot`/`POST /knot`, all-or-nothing, reads the committed tree only (FR-22); tested (`:335`). GH #15. *(Supersedes the earlier "Quipu promotion wiring — not built" line above: it is built, and behind the feature — a separate refinery/rig copy still stubs `promote`, which is not this crate.)* |
-| §9.7 commit→touched-entities provenance edge | 🟡 Partial | Hank emits only code structure — grep finds no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of hank (an hourly commit-ingest job), so §9.7's *hank-placement* is unmet; module-granularity only. GH #18. |
+| FR-34 `yupana export` (Turtle) | ✅ Implemented | `src/export.rs::to_turtle` (`:32`), tested |
+| FR-19/21/22 `yupana promote` / `export --to quipu` | ✅ Implemented (behind `quipu` feature) | `src/promote.rs::promote` (`:229`) — SHACL-validate → `quipu_knot`/`POST /knot`, all-or-nothing, reads the committed tree only (FR-22); tested (`:335`). GH #15. *(Supersedes the earlier "Quipu promotion wiring — not built" line above: it is built, and behind the feature — a separate refinery/rig copy still stubs `promote`, which is not this crate.)* |
+| §9.7 commit→touched-entities provenance edge | 🟡 Partial | Yupana emits only code structure — grep finds no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of yupana (an hourly commit-ingest job), so §9.7's *yupana-placement* is unmet; module-granularity only. GH #18. |
 | §9.4 branch modeling (named-graph vs qualifier) | ⬜ Planned | Config scaffold only — `config.rs::branch_model` (`:147`, default `"named_graph"`); no code attaches `bobbin:onBranch` or a `GRAPH bobbin:branch/<b>` to any promoted edge. Lands with the Phase-4 promote emit point; qualifier fallback first. GH #17. |
 
 Pre-existing Phase 1/2 spec-gaps also remain open (out of the graph-export
@@ -1387,20 +1387,20 @@ The load-bearing decisions and *why*, so they are not re-litigated blind.
    no JVM dependency or serialization seam. Started with intra-procedural data
    dependence.
 4. **MCP is the query interface; the harness hook is the edit-reactive
-   interface** (§5.9). Hank has two modes — pull (MCP) and push/synchronous
+   interface** (§5.9). Yupana has two modes — pull (MCP) and push/synchronous
    (LSP-shaped) — and forcing edit-streaming over MCP is the mistake. The
    filesystem watcher / harness hook is the edit source, not a protocol the agent
    speaks. Exposing LSP is an optional, deferred surface for human editors.
 5. **The hook makes Phase 3 a hard prerequisite** (FR-31). A synchronous guard
    has a sub-100ms budget; a cold build per edit blows it → the resident overlay
    is required, not optional.
-6. **Co-change stays Bobbin's; Hank borrows it, never derives it** (§5.4
+6. **Co-change stays Bobbin's; Yupana borrows it, never derives it** (§5.4
    invariant). `reconcile()` takes co-change as a required input with no fallback.
    Prevents a second source of truth.
-7. **Reconciliation lives in Hank** (not Bobbin) because the broker reads Hank
+7. **Reconciliation lives in Yupana** (not Bobbin) because the broker reads Yupana
    directly for a reconciled blast radius (§5.8); it is a stateless annotation,
    not fusion.
-8. **Export is decoupled from serving** (§5.10). `hank export` produces the
+8. **Export is decoupled from serving** (§5.10). `yupana export` produces the
    governed projection (Turtle); `--to quipu` = Phase-4 promotion. The present
    (overlay) and the record (Quipu) stay cleanly separated.
 9. **Code and docs are one referential graph** (§5.10) — *not* chunking (that is
@@ -1417,17 +1417,17 @@ The load-bearing decisions and *why*, so they are not re-litigated blind.
 
 **Tracked Quipu-side follow-ups:** [quipu#36](https://github.com/scbrown/quipu/issues/36)
 (quad store / named graphs) · [quipu#37](https://github.com/scbrown/quipu/issues/37)
-(provenance-based work-item co-occurrence — fed by Hank's promotion, §9.7).
+(provenance-based work-item co-occurrence — fed by Yupana's promotion, §9.7).
 
 ## Appendix F: Handoff & Next Steps
 
 **Repo state.** `main` is current; the working branch
-`claude/hank-project-spec-qyw6qg` mirrors it. Every push runs CI (green) and
+`claude/yupana-project-spec-qyw6qg` mirrors it. Every push runs CI (green) and
 redeploys the mdBook to `gh-pages`.
 
 **One owner-only action outstanding.** GitHub Pages is not yet enabled. Toggle:
 **Settings → Pages → Deploy from a branch → `gh-pages` / `(root)`** → the book
-goes live at `https://scbrown.github.io/hank/`. No token available to the agent
+goes live at `https://scbrown.github.io/yupana/`. No token available to the agent
 can do this (the Pages REST endpoint is blocked and the integration lacks
 `pages: write`).
 
@@ -1435,7 +1435,7 @@ can do this (the Pages REST endpoint is blocked and the integration lacks
 now has a concrete forcing function (the hook's latency budget, decision E-5).
 Recommended order:
 
-1. **Resident engine + local API.** Turn `hank serve` into a daemon holding the
+1. **Resident engine + local API.** Turn `yupana serve` into a daemon holding the
    base graph, reachable over a local socket/HTTP (FR-27/FR-31). Make the hook
    and the streamable-HTTP MCP surface *thin clients* of it (today they build
    transiently). This alone is the biggest latency win and unblocks the guard.
@@ -1449,13 +1449,13 @@ Recommended order:
 5. **File-watcher** (`notify`, already a dep) as the on-disk edit source for
    agents (§5.5).
 
-**Then:** `pre-edit` guard (FR-30, needs #1); `hank export --to quipu` + doc→code
+**Then:** `pre-edit` guard (FR-30, needs #1); `yupana export --to quipu` + doc→code
 references (FR-33/34, Phase 4); and the `lsp`/`cpg` precision tiers. (The
 `langs-extra` extractors are DONE — see Appendix E's Cargo-features note.)
 
 **Beyond code (Phase 4+):** a general in-memory fact graph + policy harness for
 the NeuralAmplifier project — generic non-code ingestion, a game-state policy
-model, `hank_guard`/`hank_whatif`, and per-game tenancy (FR-35..FR-39). Scoped in
+model, `yupana_guard`/`yupana_whatif`, and per-game tenancy (FR-35..FR-39). Scoped in
 [neuralamplifier-harness.md](neuralamplifier-harness.md).
 
 **Known imprecision to keep in mind.** Call/reference resolution is *by name*
@@ -1470,5 +1470,5 @@ join the CI matrix in the same change (the "don't ship dark" rule). See
 
 ---
 
-*Hank: live per-tenant code structure — the missing structural signal for the
+*Yupana: live per-tenant code structure — the missing structural signal for the
 Bobbin × Quipu stack.*

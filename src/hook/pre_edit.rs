@@ -6,7 +6,7 @@
 //!
 //! Everything here is arranged around one invariant: **fail open**. The harness
 //! launches every crew agent through this hook, so a guard that fails closed
-//! bricks the fleet the moment Hank is unavailable. Only a policy decision
+//! bricks the fleet the moment Yupana is unavailable. Only a policy decision
 //! blocks an edit; every error, timeout, and unknown degrades to "allow". See
 //! `docs/book/src/reference/policy-guard.md` for the pinned contract.
 
@@ -25,7 +25,7 @@ use decision::Decision;
 
 use super::measure::{measure_within, relative};
 use super::{deny_envelope, first_notice_for_session, system_message, HookInput};
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::extract::language_for_extension;
 use crate::policy::{BlastRadius, Mode};
 use crate::types::Freshness;
@@ -58,7 +58,7 @@ pub fn run_pre_edit(tenant: Option<&str>, config_override: Option<&Path>) -> any
 }
 
 /// Decide an edit, and SPOOL the decision (aegis-0nng): one `guard` metrics
-/// line per invocation — result, duration, extension, and (hank #77) the target
+/// line per invocation — result, duration, extension, and (yupana #77) the target
 /// path and the rule that fired — through the fail-silent spool, after the
 /// outcome is already fixed. Measurement rides behind the decision; it can
 /// never lean on it.
@@ -77,7 +77,7 @@ pub fn guard(
 /// The guard, returning its outcome AND the record it would spool.
 ///
 /// Split from [`guard`] so the record is testable. The alternative — driving the
-/// real spool from a test — needs `$HANK_METRICS_PATH` set at runtime, and this
+/// real spool from a test — needs `$YUPANA_METRICS_PATH` set at runtime, and this
 /// crate denies `unsafe_code`, which `std::env::set_var` now requires. Splitting
 /// here leaves exactly one untested line in [`guard`] (the `emit` call itself,
 /// which `crate::metrics` covers directly) and puts the whole of the record
@@ -118,7 +118,7 @@ fn guard_recorded(
     let root = input
         .as_ref()
         .map_or_else(|| default_root.to_path_buf(), |i| i.root(default_root));
-    let config = HankConfig::resolve(config_override, &root).ok();
+    let config = YupanaConfig::resolve(config_override, &root).ok();
     // The MODE rides every guard line (soak hygiene): the enforce-flip gate is
     // "zero false positives measured over ambient ADVISE traffic", and the
     // first live window was unusable because operator test bursts under an
@@ -138,7 +138,7 @@ fn guard_recorded(
         ("ext", ext.into()),
     ];
 
-    // The SUBJECT of the decision (hank #77). Recorded for allow as well as
+    // The SUBJECT of the decision (yupana #77). Recorded for allow as well as
     // deny, deliberately and under the same knob: scope that can only be
     // inferred from the absence of denies cannot be verified at all, and an
     // operator confirming a rule is scoped correctly needs to see what it let
@@ -232,7 +232,7 @@ fn guard_inner(
     // Honour `--config` if the operator scoped the guard at a specific file. A
     // bad override path errors here and lands in `fail_open` — a loud allow,
     // never a silent revert to the ambient config the operator meant to bypass.
-    let config = match HankConfig::resolve(config_override, &root) {
+    let config = match YupanaConfig::resolve(config_override, &root) {
         Ok(config) => config,
         Err(e) => return fail_open(&input, "config", &format!("unreadable config ({e})")).into(),
     };
@@ -326,12 +326,12 @@ fn guard_inner(
             .reason
             .clone()
             .unwrap_or_else(|| "unmeasured".to_string());
-        eprintln!("hank: blast radius UNMEASURED for `{rel}`: {reason}");
+        eprintln!("yupana: blast radius UNMEASURED for `{rel}`: {reason}");
         let kind = format!("unmeasured-{}-{rel}", reply.kind);
         if first_notice_for_session(input.session_id.as_deref(), &kind) {
             return Decision::ruled(
                 Outcome::Notify(format!(
-                    "hank: blast-radius rules were NOT EVALUATED for `{rel}` — \
+                    "yupana: blast-radius rules were NOT EVALUATED for `{rel}` — \
                      {reason}. The edit is allowed (the guard fails open), but \
                      tenant `{tenant}`'s ceilings did not apply to it. Treat this \
                      file as UNGUARDED by blast radius, not as within limits."
@@ -358,12 +358,12 @@ fn guard_inner(
     // UNMEASURED Notify already returned above. The fail-open is intact: the edit was
     // still guarded, by the transient rebuild.
     if let Some(reason) = daemon_absent {
-        eprintln!("hank: resident guard daemon EXPECTED but unusable: {reason}");
+        eprintln!("yupana: resident guard daemon EXPECTED but unusable: {reason}");
         if matches!(verdict.outcome, Outcome::Allow)
             && first_notice_for_session(input.session_id.as_deref(), "daemon-absent")
         {
             return Outcome::Notify(format!(
-                "hank: the resident guard daemon is DOWN ({reason}). This edit was guarded by a \
+                "yupana: the resident guard daemon is DOWN ({reason}). This edit was guarded by a \
                  transient rebuild and ALLOWED — but the daemon a caller could kill to bypass \
                  the guard on every edit is not running. Restart it."
             ))
@@ -387,7 +387,7 @@ fn guard_inner(
 ///   `/measure` 400s): FALL BACK to the transient build, and return the reason so
 ///   the caller warns. The guard still runs — fail-open is preserved.
 fn blast_reply(
-    config: &HankConfig,
+    config: &YupanaConfig,
     root: &Path,
     file: &Path,
     rel: &str,
@@ -466,7 +466,7 @@ fn decide(mode: Mode, message: String) -> Outcome {
     match mode {
         Mode::Enforce => Outcome::Deny(message),
         // Advise: report what would have been denied, but never block.
-        Mode::Advise => Outcome::Notify(format!("hank (advise, not blocking): {message}")),
+        Mode::Advise => Outcome::Notify(format!("yupana (advise, not blocking): {message}")),
         Mode::Off => Outcome::Allow,
     }
 }
@@ -475,13 +475,13 @@ fn decide(mode: Mode, message: String) -> Outcome {
 /// once per session, a user-visible notice — because a hook's stderr is
 /// surfaced only on exit `2`, so stderr alone would be silent in practice.
 fn fail_open(input: &HookInput, kind: &str, reason: &str) -> Outcome {
-    eprintln!("hank: policy guard failed open: {reason}");
+    eprintln!("yupana: policy guard failed open: {reason}");
     // The metric that separates "allowed clean" from "allowed because the
     // check could not run" — the two must never share a label (aegis-0nng).
     crate::metrics::emit("fail_open", &[("fail_kind", kind.into())]);
     if first_notice_for_session(input.session_id.as_deref(), kind) {
         return Outcome::Notify(format!(
-            "hank: policy guard failed open ({reason}) — edits are UNGUARDED this session."
+            "yupana: policy guard failed open ({reason}) — edits are UNGUARDED this session."
         ));
     }
     Outcome::Allow

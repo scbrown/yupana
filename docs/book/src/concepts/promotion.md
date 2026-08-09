@@ -1,14 +1,14 @@
 # Promotion to Quipu
 
-Hank holds the volatile, per-tenant, in-flight reality. When changes land on a
+Yupana holds the volatile, per-tenant, in-flight reality. When changes land on a
 shared branch (commit/merge), the corresponding facts are **promoted** into
 Quipu as a new bitemporal state — valid-time = commit time, transaction-time =
-when learned. Quipu holds the settled, governed, versioned record; Hank holds
+when learned. Quipu holds the settled, governed, versioned record; Yupana holds
 what's in flight. Uncommitted churn never pollutes the governed graph.
 
 ## Export — the governed projection
 
-`hank export` is the projection Hank promotes: the **precise, typed referential
+`yupana export` is the projection Yupana promotes: the **precise, typed referential
 structure** (modules, symbols, `definedIn`/`calls`/`imports`, and — as the
 markdown extractor lands — `Document`/`Section` + `references`), emitted as RDF
 Turtle in the `bobbin:` ontology. This is **not** Bobbin's chunking; it is
@@ -20,11 +20,11 @@ stem, so they over-connect on shared names like any tree-sitter-tier fact; the
 `lsp` tier refines them.
 
 ```bash
-hank export src --repo myrepo --format turtle    # dump the referential graph
-hank promote --commit HEAD --to "$QUIPU_URL" .   # SHACL-validate + write it
+yupana export src --repo myrepo --format turtle    # dump the referential graph
+yupana promote --commit HEAD --to "$QUIPU_URL" .   # SHACL-validate + write it
 ```
 
-`hank promote` needs `--features quipu`; without it the binary says so rather
+`yupana promote` needs `--features quipu`; without it the binary says so rather
 than pretending. It emits the Turtle, SHACL-validates in-process against
 `shapes/`, and writes to `/knot` **only if it conforms** — a rejected promotion
 exits non-zero so a script can't read it as landed.
@@ -43,12 +43,12 @@ doc rot becomes a SPARQL query — "every `Document` referencing a `CodeSymbol`
 that no longer exists."
 
 - Facts are emitted as Turtle in the existing `bobbin:` code ontology and
-  **SHACL-validated before write** (in-process via `rudof_lib`, FR-20) — Hank
+  **SHACL-validated before write** (in-process via `rudof_lib`, FR-20) — Yupana
   never writes to Quipu without passing `shapes/code-edges.ttl`, the compiled-in
   shape set. It gates the structural edges (`calls`, `references`, `imports`,
   `dataDependsOn`, `controlDependsOn`, `hasTier`) and the `Section → references`
   edge (§5.10), and carries the node-shape constraints synced byte-for-byte
-  from Quipu's `code-entities.ttl` so a shape drift is caught at Hank rather
+  from Quipu's `code-entities.ttl` so a shape drift is caught at Yupana rather
   than discovered as a Quipu refusal. A real `export` projection is
   round-trip-validated against these shapes in the test suite, so the emitter
   cannot drift from the gate unnoticed.
@@ -82,7 +82,7 @@ SELECT ?affected WHERE { ?t bobbin:name "hbiw_beta" . ?affected bobbin:calls+ ?t
 
 Code entities do **not** suffer the alias-fragmentation that afflicts the
 human-named infrastructure graph (a blast-radius query over fragmented nodes
-returns a confident *subset*, worse than nothing): Hank mints one deterministic
+returns a confident *subset*, worse than nothing): Yupana mints one deterministic
 IRI per symbol (`…/code/<repo>/<file>::<scope…>::<symbol>`), so re-promotion
 updates the same node rather than minting a synonym, and the `calls+` closure
 is complete. The scope chain — enclosing module/impl/trait/class/function
@@ -98,6 +98,6 @@ Each branch's committed facts belong in an RDF **named graph**, bitemporally
 versioned within. Quipu is a triple store today, so this is tracked as an
 additive, default-graph-preserving quad-store extension —
 [scbrown/quipu#36](https://github.com/scbrown/quipu/issues/36). Until it lands,
-Hank can fall back to a branch qualifier. See the
+Yupana can fall back to a branch qualifier. See the
 [Specification](../design/specification.md) §9 for the ontology extension and
 the quad-store RFC sketch.

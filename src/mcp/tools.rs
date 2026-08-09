@@ -1,4 +1,4 @@
-//! Request/response DTOs for Hank's MCP tools.
+//! Request/response DTOs for Yupana's MCP tools.
 //!
 //! Requests derive `Deserialize + schemars::JsonSchema` (the schema is served to
 //! clients); responses derive `Serialize + schemars::JsonSchema`. Every response
@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Request for `hank_symbols` — the symbol tree of one file.
+/// Request for `yupana_symbols` — the symbol tree of one file.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct SymbolsRequest {
     /// File path (relative to the analysis root) to list symbols for.
@@ -14,11 +14,11 @@ pub struct SymbolsRequest {
     pub file: String,
 }
 
-/// Request for `hank_references` — definition sites of a symbol by name.
+/// Request for `yupana_references` — definition sites of a symbol by name.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ReferencesRequest {
     /// The symbol name to locate. Optional so a caller can name the symbol by
-    /// POSITION instead (`at_file` + `at_line`, FR-4 / hank #8).
+    /// POSITION instead (`at_file` + `at_line`, FR-4 / yupana #8).
     #[schemars(
         description = "Symbol name to locate, e.g. 'authenticate'. Give this OR at_file+at_line."
     )]
@@ -49,7 +49,7 @@ pub struct ReferencesRequest {
     pub at_line: Option<usize>,
 }
 
-/// Request for `hank_analyze` — a structural summary of a subtree.
+/// Request for `yupana_analyze` — a structural summary of a subtree.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AnalyzeRequest {
     /// Directory to analyze (relative to the root; defaults to the whole root).
@@ -74,7 +74,7 @@ pub struct SymbolItem {
     pub tier: String,
 }
 
-/// Response for `hank_symbols`.
+/// Response for `yupana_symbols`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct SymbolsResponse {
     /// The file that was analyzed.
@@ -85,7 +85,7 @@ pub struct SymbolsResponse {
     pub symbols: Vec<SymbolItem>,
 }
 
-/// One definition site in a `hank_references` response.
+/// One definition site in a `yupana_references` response.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct RefItem {
     /// File the definition is in (relative to the root).
@@ -100,7 +100,7 @@ pub struct RefItem {
     pub tier: String,
 }
 
-/// Response for `hank_references`.
+/// Response for `yupana_references`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ReferencesResponse {
     /// The symbol that was searched for.
@@ -113,7 +113,7 @@ pub struct ReferencesResponse {
     /// `count` of 0 over `searched_symbols: 0` means NOTHING under the queried
     /// path was parseable — which is not the same fact as "the name is absent
     /// from a populated graph", and a caller must be able to tell them apart
-    /// before reporting "this symbol does not exist" (hank #76).
+    /// before reporting "this symbol does not exist" (yupana #76).
     ///
     /// OMITTED, not zeroed, when the answer came from the resident daemon: the
     /// `/references` reply carries `found` but no graph size, and a fabricated
@@ -128,7 +128,7 @@ pub struct ReferencesResponse {
     pub tier: String,
 }
 
-/// Response for `hank_analyze`.
+/// Response for `yupana_analyze`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct AnalyzeResponse {
     /// Number of files analyzed.
@@ -139,7 +139,7 @@ pub struct AnalyzeResponse {
     pub tier: String,
 }
 
-/// Request for `hank_callers` / `hank_callees` — call-graph neighbors.
+/// Request for `yupana_callers` / `yupana_callees` — call-graph neighbors.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct NeighborsRequest {
     /// The symbol name.
@@ -151,7 +151,7 @@ pub struct NeighborsRequest {
     pub path: Option<String>,
 }
 
-/// Request for `hank_impact` — the blast radius of changing a symbol.
+/// Request for `yupana_impact` — the blast radius of changing a symbol.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ImpactRequest {
     /// The seed symbol.
@@ -192,7 +192,7 @@ pub struct ReachItem {
     pub tier: String,
 }
 
-/// Response for `hank_callers` / `hank_callees`.
+/// Response for `yupana_callers` / `yupana_callees`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct NeighborsResponse {
     /// The seed symbol.
@@ -220,7 +220,7 @@ pub struct ReconciliationItem {
     pub cochange_only: Vec<String>,
 }
 
-/// Response for `hank_impact`.
+/// Response for `yupana_impact`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ImpactResponse {
     /// The seed symbol.
@@ -244,7 +244,7 @@ pub struct ImpactResponse {
     pub tier: String,
 }
 
-/// Request for `hank_communities` — detected symbol clusters over a subtree.
+/// Request for `yupana_communities` — detected symbol clusters over a subtree.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct CommunitiesRequest {
     /// Directory to build the call graph over (relative to the root).
@@ -252,7 +252,7 @@ pub struct CommunitiesRequest {
     pub path: Option<String>,
 }
 
-/// One member symbol of a community in a `hank_communities` response.
+/// One member symbol of a community in a `yupana_communities` response.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CommunityMemberItem {
     /// Symbol name.
@@ -278,7 +278,7 @@ pub struct CommunityItem {
     pub members: Vec<CommunityMemberItem>,
 }
 
-/// Response for `hank_communities`.
+/// Response for `yupana_communities`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CommunitiesResponse {
     /// Number of communities detected.
@@ -289,7 +289,7 @@ pub struct CommunitiesResponse {
     pub tier: String,
 }
 
-/// Request for `hank_dataflow` — intra-procedural data dependence.
+/// Request for `yupana_dataflow` — intra-procedural data dependence.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct DataflowRequest {
     /// The function to analyze.
@@ -335,7 +335,7 @@ pub struct DepEdgeItem {
     pub line: usize,
 }
 
-/// Response for `hank_dataflow`.
+/// Response for `yupana_dataflow`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct DataflowResponse {
     /// The analyzed function.
@@ -356,7 +356,7 @@ pub struct DataflowResponse {
     pub tier: String,
 }
 
-/// Response for `hank_status`.
+/// Response for `yupana_status`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct StatusResponse {
     /// Baseline ref the graph is built at.
@@ -366,7 +366,7 @@ pub struct StatusResponse {
     /// Extraction tiers this build can serve.
     pub tiers: Vec<String>,
     /// The languages this build can actually PARSE (aegis-ah0q1). An agent
-    /// asking `hank_impact` about a Python symbol on a Rust-only build gets a
+    /// asking `yupana_impact` about a Python symbol on a Rust-only build gets a
     /// confident empty answer, not an error — so the served set has to be
     /// visible here, next to the tiers, or "no callers" cannot be told apart
     /// from "this build cannot read that language".
@@ -376,13 +376,13 @@ pub struct StatusResponse {
     /// The configured branch model.
     pub branch_model: String,
     /// The resident daemon's tenant layer (base commit + active overlays,
-    /// hank #2), when a usable daemon holds one. `None` when no daemon is
+    /// yupana #2), when a usable daemon holds one. `None` when no daemon is
     /// expected/usable OR its tenant layer is absent — the daemon's own
     /// `/status` distinguishes those.
     pub tenant_layer: Option<serde_json::Value>,
 }
 
-/// Request for `hank_verify` — a verdict on a proposed edit buffer (FR-23).
+/// Request for `yupana_verify` — a verdict on a proposed edit buffer (FR-23).
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct VerifyRequest {
     /// The file the buffer is proposed as.
@@ -394,7 +394,7 @@ pub struct VerifyRequest {
     pub buffer: String,
 }
 
-/// One violation in a `hank_verify` verdict.
+/// One violation in a `yupana_verify` verdict.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ViolationItem {
     /// `identifier-does-not-exist`, `wrong-arity`, `unresolved-import`, ...
@@ -407,7 +407,7 @@ pub struct ViolationItem {
     pub message: String,
 }
 
-/// Response for `hank_verify`.
+/// Response for `yupana_verify`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct VerifyResponse {
     /// The file that was verified.
@@ -422,7 +422,7 @@ pub struct VerifyResponse {
     pub tier: String,
 }
 
-/// Request for `hank_promote` — promote a tree's structural facts into Quipu.
+/// Request for `yupana_promote` — promote a tree's structural facts into Quipu.
 /// Fields are read only by the `quipu`-gated tool body; the type itself is always
 /// present because the tool method (and thus its signature) always is.
 #[cfg_attr(not(feature = "quipu"), allow(dead_code))]
@@ -435,7 +435,7 @@ pub struct PromoteRequest {
     pub path: Option<String>,
 
     /// Quipu base URL override (e.g. `http://localhost:8080`). Omit to use the
-    /// deployment's configured `[hank.quipu] endpoint`.
+    /// deployment's configured `[yupana.quipu] endpoint`.
     #[schemars(description = "Quipu base URL override; omit to use the configured endpoint")]
     pub endpoint: Option<String>,
 
@@ -448,7 +448,7 @@ pub struct PromoteRequest {
     pub repo: Option<String>,
 }
 
-/// Response for `hank_promote`. Constructed only by the `quipu`-gated tool body.
+/// Response for `yupana_promote`. Constructed only by the `quipu`-gated tool body.
 #[cfg_attr(not(feature = "quipu"), allow(dead_code))]
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct PromoteResponse {

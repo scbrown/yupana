@@ -1,4 +1,4 @@
-//! hank #77 — a guard record must be auditable IN PARTICULAR, not just in
+//! yupana #77 — a guard record must be auditable IN PARTICULAR, not just in
 //! aggregate.
 //!
 //! The reported failure: a host logged 18 denies in a few minutes, and the spool
@@ -8,7 +8,7 @@
 //! guard earning its keep and a guard being noise.
 //!
 //! These tests drive the real binary, so each case gets its OWN process and its
-//! own `HANK_METRICS_PATH`. That is deliberate: the spool location is resolved
+//! own `YUPANA_METRICS_PATH`. That is deliberate: the spool location is resolved
 //! from the environment, and asserting it in-process would make these tests race
 //! each other over a shared env var.
 
@@ -35,10 +35,10 @@ fn guarded_project(policy: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     // silently depended on a shared service answering within 2s. When it did
     // not, the guard failed open and `result` was `notify` instead of the
     // `deny` under test, in five tests at once.
-    let policy = if policy.contains("[hank.quipu]") {
+    let policy = if policy.contains("[yupana.quipu]") {
         policy.to_string()
     } else {
-        format!("{policy}\n\n[hank.quipu]\nenabled = false\n")
+        format!("{policy}\n\n[yupana.quipu]\nenabled = false\n")
     };
     std::fs::write(bobbin.join("config.toml"), policy).unwrap();
     let spool = dir.path().join("metrics.jsonl");
@@ -80,10 +80,10 @@ fn pre_edit_payload(dir: &std::path::Path, file: &str) -> String {
 
 /// Run the guard against `file` and return the `guard` line it spooled.
 fn guard_record(dir: &std::path::Path, spool: &std::path::Path, file: &str) -> serde_json::Value {
-    Command::cargo_bin("hank")
+    Command::cargo_bin("yupana")
         .unwrap()
         .args(["hook", "pre-edit", "--tenant", "polecat"])
-        .env("HANK_METRICS_PATH", spool)
+        .env("YUPANA_METRICS_PATH", spool)
         .write_stdin(pre_edit_payload(dir, file))
         .assert()
         .success();
@@ -96,15 +96,15 @@ fn guard_record(dir: &std::path::Path, spool: &std::path::Path, file: &str) -> s
         .expect("a guard line was spooled")
 }
 
-const DENY_PATH_POLICY: &str = "[hank.policy]\nmode = \"enforce\"\n\
-     [hank.policy.scopes.polecat]\nallow_paths = [\"caller*.rs\"]\n";
+const DENY_PATH_POLICY: &str = "[yupana.policy]\nmode = \"enforce\"\n\
+     [yupana.policy.scopes.polecat]\nallow_paths = [\"caller*.rs\"]\n";
 
 #[test]
 fn a_deny_records_the_target_path_when_recording_is_enabled() {
     // The whole issue in one assertion: the operator asked "what was denied?",
     // and this is the field that answers.
     let (dir, spool) = guarded_project(&format!(
-        "{DENY_PATH_POLICY}[hank.metrics]\nrecord_paths = \"relative\"\n"
+        "{DENY_PATH_POLICY}[yupana.metrics]\nrecord_paths = \"relative\"\n"
     ));
     let record = guard_record(dir.path(), &spool, "leaf.rs");
 
@@ -121,7 +121,7 @@ fn a_deny_records_which_rule_fired() {
     // wrongly-scoped rule and a correctly-scoped one produce identical records,
     // so the log cannot show that a rule is mis-scoped — only that it fired.
     let (dir, spool) = guarded_project(&format!(
-        "{DENY_PATH_POLICY}[hank.metrics]\nrecord_paths = \"relative\"\n"
+        "{DENY_PATH_POLICY}[yupana.metrics]\nrecord_paths = \"relative\"\n"
     ));
     let record = guard_record(dir.path(), &spool, "leaf.rs");
 
@@ -137,9 +137,9 @@ fn the_matching_deny_glob_is_named_not_just_the_rule_class() {
     // the log can tell which of several globs is over-broad — the actionable
     // half of "which rule fired".
     let (dir, spool) = guarded_project(
-        "[hank.policy]\nmode = \"enforce\"\n\
-         [hank.policy.scopes.polecat]\ndeny_paths = [\"leaf*.rs\"]\n\
-         [hank.metrics]\nrecord_paths = \"relative\"\n",
+        "[yupana.policy]\nmode = \"enforce\"\n\
+         [yupana.policy.scopes.polecat]\ndeny_paths = [\"leaf*.rs\"]\n\
+         [yupana.metrics]\nrecord_paths = \"relative\"\n",
     );
     let record = guard_record(dir.path(), &spool, "leaf.rs");
 
@@ -170,7 +170,7 @@ fn recording_is_off_by_default_and_the_record_is_unchanged() {
 #[test]
 fn absolute_recording_yields_a_path_that_locates_the_file_on_the_host() {
     let (dir, spool) = guarded_project(&format!(
-        "{DENY_PATH_POLICY}[hank.metrics]\nrecord_paths = \"absolute\"\n"
+        "{DENY_PATH_POLICY}[yupana.metrics]\nrecord_paths = \"absolute\"\n"
     ));
     let record = guard_record(dir.path(), &spool, "leaf.rs");
 
@@ -187,9 +187,9 @@ fn an_allow_records_its_path_too_so_scope_can_be_verified_not_inferred() {
     // inferred from the ABSENCE of denies cannot be verified at all: an operator
     // confirming a rule is scoped correctly needs to see what it let through.
     let (dir, spool) = guarded_project(
-        "[hank.policy]\nmode = \"enforce\"\ndeadline_ms = 30000\n\
-         [hank.policy.scopes.polecat]\nmax_impacted_files = 10\n\
-         [hank.metrics]\nrecord_paths = \"relative\"\n",
+        "[yupana.policy]\nmode = \"enforce\"\ndeadline_ms = 30000\n\
+         [yupana.policy.scopes.polecat]\nmax_impacted_files = 10\n\
+         [yupana.metrics]\nrecord_paths = \"relative\"\n",
     );
     let record = guard_record(dir.path(), &spool, "leaf.rs");
 
@@ -205,9 +205,9 @@ fn an_allow_records_its_path_too_so_scope_can_be_verified_not_inferred() {
 #[test]
 fn a_blast_radius_deny_names_the_ceiling_it_exceeded() {
     let (dir, spool) = guarded_project(
-        "[hank.policy]\nmode = \"enforce\"\ndeadline_ms = 30000\n\
-         [hank.policy.scopes.polecat]\nmax_impacted_files = 1\n\
-         [hank.metrics]\nrecord_paths = \"relative\"\n",
+        "[yupana.policy]\nmode = \"enforce\"\ndeadline_ms = 30000\n\
+         [yupana.policy.scopes.polecat]\nmax_impacted_files = 1\n\
+         [yupana.metrics]\nrecord_paths = \"relative\"\n",
     );
     let record = guard_record(dir.path(), &spool, "leaf.rs");
 

@@ -1,7 +1,7 @@
-# Contributing to Hank
+# Contributing to Yupana
 
-Thanks for helping build Hank. This guide covers the essentials; the full design
-lives in [`docs/hank-spec.md`](docs/hank-spec.md).
+Thanks for helping build Yupana. This guide covers the essentials; the full design
+lives in [`docs/yupana-spec.md`](docs/yupana-spec.md).
 
 ## Workflow
 
@@ -27,7 +27,7 @@ lives in [`docs/hank-spec.md`](docs/hank-spec.md).
   resolve every lint before merge.
 - **Small files.** Pre-commit warns at 400 lines and fails at 500 (tests
   exempt). One responsibility per module — follow the layout in
-  [`docs/hank-spec.md` §7.2](docs/hank-spec.md).
+  [`docs/yupana-spec.md` §7.2](docs/yupana-spec.md).
 - **Tag every fact** with a `tier` and `freshness` (FR-3).
 - **No feature ships dark.** When you wire a Cargo feature (`mcp`, `quipu`,
   `cpg`, `lsp`), add it to the CI matrix in the same PR.

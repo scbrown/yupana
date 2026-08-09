@@ -1,15 +1,15 @@
-//! FR-3 enforcement: every `hank_*` MCP response carries its provenance tier
+//! FR-3 enforcement: every `yupana_*` MCP response carries its provenance tier
 //! (aegis-8yrn). Child module of `server`, so it can drive the private tool
 //! handlers directly; size-exempt (`_test.rs`).
 //!
-//! The bug this pins: `hank_impact`, `hank_callers`, `hank_callees` and
-//! `hank_dataflow` served an unlabelled tree-sitter approximation — no `tier`
-//! anywhere — which FR-3 exists to forbid, and which is worse on `hank_impact`
+//! The bug this pins: `yupana_impact`, `yupana_callers`, `yupana_callees` and
+//! `yupana_dataflow` served an unlabelled tree-sitter approximation — no `tier`
+//! anywhere — which FR-3 exists to forbid, and which is worse on `yupana_impact`
 //! precisely because it is the trust-boundary/capability-scoping surface. This
 //! walk asserts the served WIRE JSON, so a future response type that omits the
 //! tag fails here rather than shipping silent.
 
-use super::HankMcpServer;
+use super::YupanaMcpServer;
 use crate::mcp::tools::{
     AnalyzeRequest, CommunitiesRequest, DataflowRequest, ImpactRequest, NeighborsRequest,
     ReferencesRequest, SymbolsRequest, VerifyRequest,
@@ -27,8 +27,8 @@ fn fixture() -> tempfile::TempDir {
     dir
 }
 
-fn server(dir: &tempfile::TempDir) -> HankMcpServer {
-    HankMcpServer::new(dir.path().to_path_buf(), None, None)
+fn server(dir: &tempfile::TempDir) -> YupanaMcpServer {
+    YupanaMcpServer::new(dir.path().to_path_buf(), None, None)
 }
 
 /// The served JSON payload, parsed out of the MCP `CallToolResult` wire form
@@ -74,7 +74,7 @@ async fn impact_carries_a_top_level_tier() {
     let dir = fixture();
     let payload = served(
         server(&dir)
-            .hank_impact(Parameters(ImpactRequest {
+            .yupana_impact(Parameters(ImpactRequest {
                 symbol: "b".into(),
                 path: None,
                 hops: None,
@@ -83,7 +83,7 @@ async fn impact_carries_a_top_level_tier() {
             .await,
     );
     // The bug was that this — the trust-boundary surface — served no tier at all.
-    assert_top_level_tier(&payload, "hank_impact");
+    assert_top_level_tier(&payload, "yupana_impact");
     // And the per-item reach facts carry it too.
     let first = &payload["reachable"][0];
     assert_eq!(
@@ -99,7 +99,7 @@ async fn impact_on_a_missing_symbol_still_declares_its_tier() {
     let dir = fixture();
     let payload = served(
         server(&dir)
-            .hank_impact(Parameters(ImpactRequest {
+            .yupana_impact(Parameters(ImpactRequest {
                 symbol: "does_not_exist".into(),
                 path: None,
                 hops: None,
@@ -108,7 +108,7 @@ async fn impact_on_a_missing_symbol_still_declares_its_tier() {
             .await,
     );
     assert_eq!(payload["found"], false);
-    assert_top_level_tier(&payload, "hank_impact(not-found)");
+    assert_top_level_tier(&payload, "yupana_impact(not-found)");
 }
 
 #[tokio::test]
@@ -116,23 +116,23 @@ async fn callers_and_callees_carry_a_top_level_tier() {
     let dir = fixture();
     let callers = served(
         server(&dir)
-            .hank_callers(Parameters(NeighborsRequest {
+            .yupana_callers(Parameters(NeighborsRequest {
                 symbol: "b".into(),
                 path: None,
             }))
             .await,
     );
-    assert_top_level_tier(&callers, "hank_callers");
+    assert_top_level_tier(&callers, "yupana_callers");
 
     let callees = served(
         server(&dir)
-            .hank_callees(Parameters(NeighborsRequest {
+            .yupana_callees(Parameters(NeighborsRequest {
                 symbol: "a".into(),
                 path: None,
             }))
             .await,
     );
-    assert_top_level_tier(&callees, "hank_callees");
+    assert_top_level_tier(&callees, "yupana_callees");
 }
 
 // --- Stage 3c wiring (aegis-1qze): resident daemon vs. transient fallback ----
@@ -157,12 +157,12 @@ async fn an_unscoped_query_uses_the_daemon_and_a_path_scoped_one_never_does() {
     std::fs::write(
         &config,
         format!(
-            "[hank.serve]\nuse_daemon = true\nbind_address = \"127.0.0.1\"\n\
+            "[yupana.serve]\nuse_daemon = true\nbind_address = \"127.0.0.1\"\n\
              mcp_http_port = {port}\n"
         ),
     )
     .unwrap();
-    let server = HankMcpServer::new(dir.path().to_path_buf(), None, Some(config));
+    let server = YupanaMcpServer::new(dir.path().to_path_buf(), None, Some(config));
 
     // Grow the tree AFTER the resident graph was built: a transient build sees
     // `late`, the daemon cannot. Which graph answered is therefore observable.
@@ -171,7 +171,7 @@ async fn an_unscoped_query_uses_the_daemon_and_a_path_scoped_one_never_does() {
     // Unscoped -> the RESIDENT graph answers (no `late`).
     let resident = served(
         server
-            .hank_callers(Parameters(NeighborsRequest {
+            .yupana_callers(Parameters(NeighborsRequest {
                 symbol: "b".into(),
                 path: None,
             }))
@@ -189,13 +189,13 @@ async fn an_unscoped_query_uses_the_daemon_and_a_path_scoped_one_never_does() {
         "`late` postdates the resident graph; its presence means the transient \
          path answered an unscoped query despite a usable daemon: {names:?}"
     );
-    assert_top_level_tier(&resident, "hank_callers(resident)");
+    assert_top_level_tier(&resident, "yupana_callers(resident)");
 
     // Path-scoped -> NEVER the daemon (whole-root graph ≠ subtree graph): the
     // transient build answers and sees `late`.
     let scoped = served(
         server
-            .hank_callers(Parameters(NeighborsRequest {
+            .yupana_callers(Parameters(NeighborsRequest {
                 symbol: "b".into(),
                 path: Some(".".into()),
             }))
@@ -218,7 +218,7 @@ async fn dataflow_carries_a_top_level_tier() {
     let dir = fixture();
     let payload = served(
         server(&dir)
-            .hank_dataflow(Parameters(DataflowRequest {
+            .yupana_dataflow(Parameters(DataflowRequest {
                 function: "a".into(),
                 path: None,
                 var: None,
@@ -227,7 +227,7 @@ async fn dataflow_carries_a_top_level_tier() {
             }))
             .await,
     );
-    assert_top_level_tier(&payload, "hank_dataflow");
+    assert_top_level_tier(&payload, "yupana_dataflow");
 }
 
 #[tokio::test]
@@ -240,18 +240,18 @@ async fn every_fact_serving_response_carries_a_tier() {
 
     let cases: Vec<(&str, serde_json::Value)> = vec![
         (
-            "hank_symbols",
+            "yupana_symbols",
             served(
-                s.hank_symbols(Parameters(SymbolsRequest {
+                s.yupana_symbols(Parameters(SymbolsRequest {
                     file: "x.rs".into(),
                 }))
                 .await,
             ),
         ),
         (
-            "hank_references",
+            "yupana_references",
             served(
-                s.hank_references(Parameters(ReferencesRequest {
+                s.yupana_references(Parameters(ReferencesRequest {
                     symbol: Some("a".into()),
                     path: None,
                     at_file: None,
@@ -261,23 +261,23 @@ async fn every_fact_serving_response_carries_a_tier() {
             ),
         ),
         (
-            "hank_analyze",
+            "yupana_analyze",
             served(
-                s.hank_analyze(Parameters(AnalyzeRequest { path: None }))
+                s.yupana_analyze(Parameters(AnalyzeRequest { path: None }))
                     .await,
             ),
         ),
         (
-            "hank_communities",
+            "yupana_communities",
             served(
-                s.hank_communities(Parameters(CommunitiesRequest { path: None }))
+                s.yupana_communities(Parameters(CommunitiesRequest { path: None }))
                     .await,
             ),
         ),
         (
-            "hank_verify",
+            "yupana_verify",
             served(
-                s.hank_verify(Parameters(VerifyRequest {
+                s.yupana_verify(Parameters(VerifyRequest {
                     file: "x.rs".into(),
                     buffer: "fn a() { b(); }\nfn b() {}\n".into(),
                 }))
@@ -285,9 +285,9 @@ async fn every_fact_serving_response_carries_a_tier() {
             ),
         ),
         (
-            "hank_callers",
+            "yupana_callers",
             served(
-                s.hank_callers(Parameters(NeighborsRequest {
+                s.yupana_callers(Parameters(NeighborsRequest {
                     symbol: "b".into(),
                     path: None,
                 }))
@@ -295,9 +295,9 @@ async fn every_fact_serving_response_carries_a_tier() {
             ),
         ),
         (
-            "hank_impact",
+            "yupana_impact",
             served(
-                s.hank_impact(Parameters(ImpactRequest {
+                s.yupana_impact(Parameters(ImpactRequest {
                     symbol: "b".into(),
                     path: None,
                     hops: None,
@@ -307,9 +307,9 @@ async fn every_fact_serving_response_carries_a_tier() {
             ),
         ),
         (
-            "hank_dataflow",
+            "yupana_dataflow",
             served(
-                s.hank_dataflow(Parameters(DataflowRequest {
+                s.yupana_dataflow(Parameters(DataflowRequest {
                     function: "a".into(),
                     path: None,
                     var: None,
@@ -331,7 +331,7 @@ async fn every_fact_serving_response_carries_a_tier() {
 
 #[tokio::test]
 async fn status_advertises_only_implemented_tiers() {
-    // hank_status must claim a tier only when it is real. The extractor
+    // yupana_status must claim a tier only when it is real. The extractor
     // assigns TreeSitter, so that is always advertised — never lsp/cpg, which have
     // no implementation and are no longer even Cargo features.
     //
@@ -342,7 +342,7 @@ async fn status_advertises_only_implemented_tiers() {
     // pass — the first is the empty-feature lie this test was written for, the
     // second sends a consumer looking for a tier the build really serves.
     let dir = fixture();
-    let payload = served(server(&dir).hank_status().await);
+    let payload = served(server(&dir).yupana_status().await);
     let tiers = payload["tiers"].as_array().unwrap().clone();
     assert!(tiers.contains(&serde_json::json!("treesitter")));
     assert!(!tiers.contains(&serde_json::json!("lsp")));
@@ -359,7 +359,7 @@ async fn status_advertises_only_implemented_tiers() {
 ///
 /// This is the tier test's sibling and it exists for the mirror-image reason.
 /// The tier lie was advertising a capability that was absent; this one is
-/// STAYING SILENT about an absence — an agent that asks `hank_impact` about a
+/// STAYING SILENT about an absence — an agent that asks `yupana_impact` about a
 /// Python symbol on a Rust-only build is told "no callers", which reads as
 /// "safe to change" rather than "this build cannot see Python at all". Asserted
 /// in both directions so a Rust-only build cannot claim the extra languages and
@@ -367,7 +367,7 @@ async fn status_advertises_only_implemented_tiers() {
 #[tokio::test]
 async fn status_advertises_the_languages_it_can_parse() {
     let dir = fixture();
-    let payload = served(server(&dir).hank_status().await);
+    let payload = served(server(&dir).yupana_status().await);
     let languages = payload["languages"]
         .as_array()
         .expect("status must report a language set")
@@ -395,7 +395,7 @@ async fn references_declares_its_tier_at_the_top_level() {
     let dir = fixture();
     let payload = served(
         server(&dir)
-            .hank_references(Parameters(ReferencesRequest {
+            .yupana_references(Parameters(ReferencesRequest {
                 symbol: Some("definitely_not_here".into()),
                 path: None,
                 at_file: None,
@@ -404,13 +404,13 @@ async fn references_declares_its_tier_at_the_top_level() {
             .await,
     );
     assert_eq!(payload["count"], 0, "fixture has no such symbol: {payload}");
-    assert_top_level_tier(&payload, "hank_references");
+    assert_top_level_tier(&payload, "yupana_references");
 }
 
 #[tokio::test]
 #[cfg(feature = "langs-extra")] // needs the python grammar compiled in
 async fn references_resolves_a_non_rust_definition_on_the_transient_path() {
-    // hank #76 on the MCP surface. The transient fallback walked `rust_files()`
+    // yupana #76 on the MCP surface. The transient fallback walked `rust_files()`
     // and parsed every hit as "rust" — so this path answered "no definitions" for
     // every Python/Go/TypeScript symbol in the tree. A `path`-scoped request ALWAYS
     // lands here (it never consults the daemon, by design), so this was not merely
@@ -421,10 +421,10 @@ async fn references_resolves_a_non_rust_definition_on_the_transient_path() {
         "def derive_agents(cfg):\n    return cfg\n",
     )
     .unwrap();
-    let s = HankMcpServer::new(dir.path().to_path_buf(), None, None);
+    let s = YupanaMcpServer::new(dir.path().to_path_buf(), None, None);
 
     let payload = served(
-        s.hank_references(Parameters(ReferencesRequest {
+        s.yupana_references(Parameters(ReferencesRequest {
             symbol: Some("derive_agents".into()),
             // Scoped on purpose: pins the TRANSIENT path, not the resident one.
             at_file: None,
@@ -444,7 +444,7 @@ async fn references_resolves_a_non_rust_definition_on_the_transient_path() {
 
 #[tokio::test]
 async fn references_by_position_answers_with_the_one_symbol_pointed_at() {
-    // hank #8 / FR-4 on the agent-facing surface. `x.rs` in `fixture()` defines
+    // yupana #8 / FR-4 on the agent-facing surface. `x.rs` in `fixture()` defines
     // `a` and `b`; a real tree has twelve `build`s, and an agent reading code
     // knows WHERE it is, not which one. Position must answer with that symbol —
     // resolving it to a name and looking the name up would hand back the whole
@@ -455,11 +455,11 @@ async fn references_by_position_answers_with_the_one_symbol_pointed_at() {
         "struct Alpha;\nimpl Alpha {\n    fn build() {}\n}\nstruct Beta;\nimpl Beta {\n    fn build() {}\n}\n",
     )
     .unwrap();
-    let s = HankMcpServer::new(dir.path().to_path_buf(), None, None);
+    let s = YupanaMcpServer::new(dir.path().to_path_buf(), None, None);
 
     // By name: ambiguous, both sites.
     let by_name = served(
-        s.hank_references(Parameters(ReferencesRequest {
+        s.yupana_references(Parameters(ReferencesRequest {
             symbol: Some("build".into()),
             path: Some(".".into()),
             at_file: None,
@@ -471,7 +471,7 @@ async fn references_by_position_answers_with_the_one_symbol_pointed_at() {
 
     // By position: exactly the one enclosing that line.
     let by_pos = served(
-        s.hank_references(Parameters(ReferencesRequest {
+        s.yupana_references(Parameters(ReferencesRequest {
             symbol: None,
             path: Some(".".into()),
             at_file: Some("x.rs".into()),
@@ -481,7 +481,7 @@ async fn references_by_position_answers_with_the_one_symbol_pointed_at() {
     );
     assert_eq!(by_pos["count"], 1, "position must disambiguate: {by_pos}");
     assert_eq!(by_pos["definitions"][0]["start_line"], 7, "{by_pos}");
-    assert_top_level_tier(&by_pos, "hank_references");
+    assert_top_level_tier(&by_pos, "yupana_references");
 }
 
 #[tokio::test]
@@ -491,7 +491,7 @@ async fn references_refuses_half_a_position_rather_than_downgrading_to_a_name() 
     // downgrade to the very over-connection the parameter exists to cut.
     let dir = fixture();
     let err = server(&dir)
-        .hank_references(Parameters(ReferencesRequest {
+        .yupana_references(Parameters(ReferencesRequest {
             symbol: Some("a".into()),
             path: Some(".".into()),
             at_file: Some("x.rs".into()),

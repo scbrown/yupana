@@ -2,7 +2,7 @@
 # check-code-shapes.sh — prove shapes/code-edges.ttl can ACCEPT and REFUSE (#13/#14).
 #
 # A SHACL shape that has never been observed rejecting anything is indistinguishable
-# from no shape at all, and FR-20's whole promise ("Hank never writes to Quipu
+# from no shape at all, and FR-20's whole promise ("Yupana never writes to Quipu
 # without passing SHACL") rests on these firing. So this runs BOTH directions:
 #   fixtures/conforming.ttl  MUST validate clean
 #   fixtures/violating.ttl   MUST be refused, naming the violated constraints
@@ -14,10 +14,10 @@
 # shapes registered server-side and still answer /validate correctly for shapes
 # you hand it. Do not read a green run here as "shapes are enforced on every
 # write"; it means "these shapes accept and reject what we expect", which is
-# exactly the property hank needs before promoting.
+# exactly the property yupana needs before promoting.
 #
 # Once the `quipu` feature lands, rudof_lib does this in-process and this script
-# becomes the cross-check that hank and Quipu agree about the same shapes.
+# becomes the cross-check that yupana and Quipu agree about the same shapes.
 set -uo pipefail
 Q="${QUIPU_URL:?set QUIPU_URL to your Quipu endpoint, e.g. http://localhost:8080}"
 D="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo.svg" width="200" alt="Hank logo — a coiled skein of yarn with graph nodes"/>
+  <img src="assets/logo.svg" width="200" alt="Yupana logo — a coiled skein of yarn with graph nodes"/>
 </p>
 
-<h1 align="center">hank</h1>
+<h1 align="center">yupana</h1>
 
 <p align="center">
   <em>🧵 Live, per-tenant code structure — the missing structural signal for the Bobbin × Quipu stack</em>
@@ -12,13 +12,13 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust 2021"/></a>
   <a href="docs/book/src/SUMMARY.md"><img src="https://img.shields.io/badge/docs-mdbook-green.svg" alt="Documentation"/></a>
-  <a href="docs/hank-spec.md"><img src="https://img.shields.io/badge/spec-v0.1-blueviolet.svg" alt="Specification"/></a>
+  <a href="docs/yupana-spec.md"><img src="https://img.shields.io/badge/spec-v0.1-blueviolet.svg" alt="Specification"/></a>
 </p>
 
-> *Bobbin holds the thread. Quipu ties the knots. **Hank** keeps the working coil — live, per-tenant, ready.* 🧶
+> *Bobbin holds the thread. Quipu ties the knots. **Yupana** keeps the working coil — live, per-tenant, ready.* 🧶
 
-A [hank](https://en.wikipedia.org/wiki/Hank_(textile)) is a coiled skein of yarn
-kept ready while you work. **Hank** keeps a codebase's live structural graph the
+A [yupana](https://en.wikipedia.org/wiki/Yupana_(textile)) is a coiled skein of yarn
+kept ready while you work. **Yupana** keeps a codebase's live structural graph the
 same way: extracted once at a baseline, then layered with a lightweight
 per-developer overlay so a whole team of humans and agents can edit at the same
 time without corrupting each other's view. It answers the questions embeddings
@@ -29,14 +29,14 @@ code is still in flight.
 ## 🧶 See It In Action
 
 ```text
-$ hank analyze src
+$ yupana analyze src
 analyzed 7 file(s), 47 symbol(s) [tree-sitter]
 
-$ hank refs authenticate src
+$ yupana refs authenticate src
 src/auth.rs:18 authenticate (Function) [TreeSitter]
 
-$ hank status
-hank status
+$ yupana status
+yupana status
   base ref  : main
   tenant    : (single-tenant)
   tiers     : treesitter
@@ -46,15 +46,15 @@ hank status
 > **Status:** Phases 1 and 2 complete. `analyze`, `refs`, `status`, the
 > call-graph commands `callers`/`impact` (with `--cochange` reconciliation),
 > intra-procedural `dataflow`, and `verify` (the FR-23/FR-24 edit-buffer verdict)
-> do real work, and an MCP server (`hank serve`, `--features mcp`) exposes fourteen
-> `hank_*` tools (`hank_promote` writes to Quipu with the `quipu` feature). Promotion lands per the
-> [phasing](docs/hank-spec.md#12-milestones--phasing); Phase 3 (multi-tenancy)
+> do real work, and an MCP server (`yupana serve`, `--features mcp`) exposes fourteen
+> `yupana_*` tools (`yupana_promote` writes to Quipu with the `quipu` feature). Promotion lands per the
+> [phasing](docs/yupana-spec.md#12-milestones--phasing); Phase 3 (multi-tenancy)
 > is next.
 
-## 🤔 Why Hank? — and how it's different
+## 🤔 Why Yupana? — and how it's different
 
 Structural code intelligence isn't new; the strongest tools each prove out **one**
-signal class. Hank deliberately takes the best idea from each — then adds the axes
+signal class. Yupana deliberately takes the best idea from each — then adds the axes
 none of them have: **a whole team editing at once, governance, and time.**
 
 ### Key selling points
@@ -78,7 +78,7 @@ none of them have: **a whole team editing at once, governance, and time.**
 
 ### How it compares
 
-| | **codebase-memory** | **Joern (CPG)** | **LSP / multilspy** | **Embeddings / co-change** | **Hank** |
+| | **codebase-memory** | **Joern (CPG)** | **LSP / multilspy** | **Embeddings / co-change** | **Yupana** |
 |---|:--:|:--:|:--:|:--:|:--:|
 | Fast structural graph, low token cost | ✅ | ⚠️ | ❌ | ✅ | ✅ |
 | Call graph + **dataflow / taint** | ⚠️ | ✅ | ⚠️ | ❌ | ✅ |
@@ -91,7 +91,7 @@ none of them have: **a whole team editing at once, governance, and time.**
 Each proves one piece — **[multilspy](https://github.com/microsoft/multilspy)** that
 LSP facts can also be *generation guardrails*, **[Joern](https://joern.io)** the Code
 Property Graph and dataflow, **codebase-memory** a lean standalone analyzer with
-content-hash incremental freshness. Hank is spiritually closest to codebase-memory,
+content-hash incremental freshness. Yupana is spiritually closest to codebase-memory,
 extended with Joern-style dataflow, LSP precision, **tenancy**, and a governed
 projection into Quipu.
 
@@ -105,7 +105,7 @@ projection into Quipu.
                  │
                  ▼
    ┌──────────────────────────┐   promote on commit/merge   ┌──────────┐
-   │           HANK           │ ───────────────────────────► │  QUIPU   │
+   │           YUPANA           │ ───────────────────────────► │  QUIPU   │
    │  base graph + overlays   │   (SHACL-validated Turtle)   │ EAVT log │
    │  tree-sitter + LSP + CPG │ ◄─────────────────────────── │ SPARQL   │
    └────────────┬─────────────┘   SPARQL over committed code └──────────┘
@@ -117,7 +117,7 @@ projection into Quipu.
         └───────────────┘   explained context   └──────────┘
 ```
 
-- **[Hank](https://github.com/scbrown/hank)** (this repo) — extracts and serves
+- **[Yupana](https://github.com/scbrown/yupana)** (this repo) — extracts and serves
   live per-tenant structure.
 - **[Quipu](https://github.com/scbrown/quipu)** — governs and versions the
   committed record (bitemporal RDF / SPARQL / SHACL).
@@ -125,11 +125,11 @@ projection into Quipu.
   statistical and embedding signals and serves explained context over MCP.
 
 See [`docs/vision.md`](docs/vision.md) for the north star and
-[`docs/hank-spec.md`](docs/hank-spec.md) for the full build spec.
+[`docs/yupana-spec.md`](docs/yupana-spec.md) for the full build spec.
 
-## 🪢 Hank + Quipu — what the pair unlocks
+## 🪢 Yupana + Quipu — what the pair unlocks
 
-Hank holds the *live* structure; [Quipu](https://github.com/scbrown/quipu) governs
+Yupana holds the *live* structure; [Quipu](https://github.com/scbrown/quipu) governs
 the *committed* record (bitemporal RDF, SHACL-validated, SPARQL-queryable). Together
 they do things neither does alone:
 
@@ -140,11 +140,11 @@ they do things neither does alone:
   when did that coupling first appear* — blast radius that accounts for how the code
   got here, replayable at any point in time.
 - **Ontology rules that block or influence changes.** Author architectural
-  constraints as ontology rules in Quipu (SHACL over the code graph); Hank evaluates
+  constraints as ontology rules in Quipu (SHACL over the code graph); Yupana evaluates
   a proposed edit against them **live and per tenant**, and warns or blocks a
   violation *before it lands*. Policy-as-ontology — a new rule is a graph assertion,
   not a new bespoke linter.
-- **Per-tenant parallel worlds.** A shared base plus copy-on-write overlays (Hank)
+- **Per-tenant parallel worlds.** A shared base plus copy-on-write overlays (Yupana)
   map onto Quipu named graphs, so a whole team edits concurrently without corrupting
   each other's view — over a single **source-of-truth root** that's always queryable.
 - **Agent trust boundaries.** Per-tenant blast radius scopes what an autonomous agent
@@ -165,7 +165,7 @@ they do things neither does alone:
 ### Install
 
 ```bash
-# From source — puts the `hank` binary on your PATH
+# From source — puts the `yupana` binary on your PATH
 cargo install --path .                              # or: just install
 # with the MCP server and the extra language grammars:
 cargo install --path . --features "mcp langs-extra"
@@ -175,36 +175,36 @@ cargo install --path . --features "mcp langs-extra"
 
 ```bash
 # Analyze a tree and list its structure
-hank analyze src
-hank refs <symbol> src
-hank status
+yupana analyze src
+yupana refs <symbol> src
+yupana status
 
 # Call graph: callers/callees and blast radius
-hank callers <symbol> src
-hank impact <symbol> src --hops 5
+yupana callers <symbol> src
+yupana impact <symbol> src --hops 5
 
 # Data dependence within a function
-hank dataflow <function> src --var <variable>
+yupana dataflow <function> src --var <variable>
 
 # Export the referential structure (code + docs) as governed RDF Turtle
-hank export src --repo myrepo --format turtle
+yupana export src --repo myrepo --format turtle
 
 # Serve over MCP (stdio) for an agent
-hank serve
+yupana serve
 
-# Edit-reactive: wire `hank hook post-edit` into a Claude Code PostToolUse hook
-# for synchronous blast-radius advisories on every edit, and `hank hook pre-edit`
+# Edit-reactive: wire `yupana hook post-edit` into a Claude Code PostToolUse hook
+# for synchronous blast-radius advisories on every edit, and `yupana hook pre-edit`
 # into PreToolUse to check an edit against the tenant's scope before it lands.
 
 # Governance (quipu feature): the verdict-signing identity, and the spool drain
-hank verifier --key-path hank-signing.pk8   # public key to register in quipu
-hank verdicts --to http://localhost:7878    # promote signed verdicts
+yupana verifier --key-path yupana-signing.pk8   # public key to register in quipu
+yupana verdicts --to http://localhost:7878    # promote signed verdicts
 
 # Shell completions
-hank completions bash > hank.bash
+yupana completions bash > yupana.bash
 ```
 
-Hank shares the stack's `.bobbin/config.toml` under a `[hank]` table — see the
+Yupana shares the stack's `.bobbin/config.toml` under a `[yupana]` table — see the
 [configuration reference](docs/book/src/reference/config.md).
 
 ## 🌳 Supported Languages
@@ -227,7 +227,7 @@ references — all tagged `TreeSitter`) is wired for Bobbin's full grammar set.
 Each grammar contributes a per-language `GrammarSpec` (grammar + node-kind →
 `SymbolKind` mapping + call/import extraction) to a shared, language-agnostic
 walker in `src/extract/`; `language_for_extension` selects the grammar by file
-extension. See [FR-1](docs/hank-spec.md) for the extraction-tier contract.
+extension. See [FR-1](docs/yupana-spec.md) for the extraction-tier contract.
 
 ## 🛠️ Development
 
@@ -245,11 +245,11 @@ Conventions live in [`AGENTS.md`](AGENTS.md); contribution guidance in
 
 ## 📚 Documentation
 
-- [Specification](docs/hank-spec.md) — the full PRD-style build spec.
-- [Vision](docs/vision.md) — Bobbin × Hank × Quipu.
+- [Specification](docs/yupana-spec.md) — the full PRD-style build spec.
+- [Vision](docs/vision.md) — Bobbin × Yupana × Quipu.
 - [mdBook](docs/book/src/SUMMARY.md) — guides, concepts, and reference.
 - [SARC Conformance](docs/book/src/design/sarc-conformance.md) — the governance
-  map across hank × quipu: what each phase built, and what it did *not* close.
+  map across yupana × quipu: what each phase built, and what it did *not* close.
 - [The Enforcement Trace](docs/book/src/reference/enforcement-trace.md) — the
   record schema, the attribution tuple and its environment, and the verdict spool.
 

@@ -33,7 +33,7 @@ fn the_addendums_example_policy_compiles() {
 fn a_SPARQL_policy_is_REFUSED_not_skipped() {
     // The distinction that matters: a skipped policy is indistinguishable from a
     // satisfied one, so `errors` must list it rather than filter it out as "not
-    // ours". Hank is not an RDF store, and approximating SPARQL with the
+    // ours". Yupana is not an RDF store, and approximating SPARQL with the
     // graph-pattern engine would silently answer a different question.
     let mut policy = garrison_policy();
     policy.predicate.selector_lang = SelectorLang::Sparql;

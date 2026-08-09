@@ -23,8 +23,8 @@ that fired identically at different points produced byte-identical records.
 
 ## Where the spool lives
 
-`$HANK_METRICS_PATH`, else `$XDG_STATE_HOME/hank/metrics.jsonl`, else
-`~/.local/state/hank/metrics.jsonl`. One JSON object per line, appended, rotated
+`$YUPANA_METRICS_PATH`, else `$XDG_STATE_HOME/yupana/metrics.jsonl`, else
+`~/.local/state/yupana/metrics.jsonl`. One JSON object per line, appended, rotated
 to `.jsonl.old` at 64 MiB.
 
 Writes are **absolutely fail-silent** — stricter than the guard's own fail-open.
@@ -36,8 +36,8 @@ negative value.
 
 | `kind` | emitted by | meaning |
 |---|---|---|
-| `guard` | `hank hook pre-edit` | a Pre-Action Gate decision, one per edit |
-| `audit` | `hank hook post-edit` | a Post-Action Auditor crossing, with `point: "PAA"` |
+| `guard` | `yupana hook pre-edit` | a Pre-Action Gate decision, one per edit |
+| `audit` | `yupana hook post-edit` | a Post-Action Auditor crossing, with `point: "PAA"` |
 | `governed` | the pre-edit guard | which governed rules spoke, by name |
 | `fail_open` | anywhere on the guard path | the guard degraded, and why-kind |
 | `hosting_overclaim` | the projection refresh | policies claiming a stronger layer than the one evaluating them |
@@ -106,8 +106,8 @@ is the question it exists for.
 
 | field | source | notes |
 |---|---|---|
-| `principal_chain` | `$HANK_PRINCIPAL_CHAIN` | comma-separated, caller-first |
-| `planner` | `$HANK_PLANNER` | declared, never derived from the chain's head |
+| `principal_chain` | `$YUPANA_PRINCIPAL_CHAIN` | comma-separated, caller-first |
+| `planner` | `$YUPANA_PLANNER` | declared, never derived from the chain's head |
 | `executor` | `$SHANTY_AGENT` | the identity of the process that actually ran |
 | `tool` | the hook payload | `Edit`, `Write`, `MultiEdit` |
 | `attribution_conflict` | computed | emitted **only when true** — see below |
@@ -117,8 +117,8 @@ chain; the sub-agent's hook then records the real chain rather than its own leaf
 identity:
 
 ```bash
-HANK_PRINCIPAL_CHAIN="orchestrator,worker" \
-HANK_PLANNER="orchestrator" \
+YUPANA_PRINCIPAL_CHAIN="orchestrator,worker" \
+YUPANA_PLANNER="orchestrator" \
 SHANTY_AGENT="worker" \
   claude --agent worker
 ```
@@ -133,14 +133,14 @@ which executed is a fact about the dispatch; reading it off list position would
 be an inference wearing a record's clothes.
 
 **`auth` is deliberately absent.** The effective authority is the intersection of
-every link's grant, those grants live in quipu, and hank cannot read them inside
+every link's grant, those grants live in quipu, and yupana cannot read them inside
 a 100 ms pre-edit budget. Recording `principal_chain` is what lets quipu's
 checker *derive* `auth` from the authoritative source; a locally-guessed value
 would put a number in the field the grant store never agreed to.
 
 ### `attribution_conflict`
 
-`HANK_PRINCIPAL_CHAIN` is a declaration; `$SHANTY_AGENT` is what is running. When
+`YUPANA_PRINCIPAL_CHAIN` is a declaration; `$SHANTY_AGENT` is what is running. When
 a chain is declared and its last link disagrees with the executor, the record
 says so rather than silently preferring one. That disagreement is the observable
 signature of a **laundered chain** — an agent acting under a dispatch record that
@@ -150,7 +150,7 @@ the only evidence of it.
 It is emitted only when true. A `false` on every line trains a reader to skip the
 field, which is the opposite of what it is for.
 
-## Verdicts — `hank verifier` and `hank verdicts`
+## Verdicts — `yupana verifier` and `yupana verdicts`
 
 Both need the `quipu` feature.
 
@@ -161,10 +161,10 @@ that a human authored.
 ```bash
 # Show the public key to register in quipu as this verifier's aegis:publicKey.
 # This is the DELIBERATE key-creation act — it mints the key if absent.
-hank verifier --key-path hank-signing.pk8
+yupana verifier --key-path yupana-signing.pk8
 
 # Drain the local spool into quipu.
-hank verdicts --to http://localhost:7878
+yupana verdicts --to http://localhost:7878
 ```
 
 The guard **signs at the moment a constraint fires and appends locally**; it
@@ -175,14 +175,14 @@ a guard for the full two minutes a caller was willing to wait.
 
 The hook path uses an **existing key only** and never mints one. A signing
 identity materialising from an agent's edit is not something that should happen
-quietly; `hank verifier` is where that decision is made.
+quietly; `yupana verifier` is where that decision is made.
 
 The spool is truncated only when **every** verdict was accepted. A partial drain
 leaves the file intact rather than losing the remainder.
 
 ## The Post-Action Auditor and `throttle`
 
-`hank hook post-edit` evaluates constraints declaring `verificationPoint "PAA"`
+`yupana hook post-edit` evaluates constraints declaring `verificationPoint "PAA"`
 against the file *as it now stands* — the completed-action state, which is the
 whole reason the point exists. The gate saw only the fragment an edit proposed.
 
@@ -203,10 +203,10 @@ applied.
 ## Reading a trace with quipu
 
 ```bash
-quipu audit ~/.local/state/hank/metrics.jsonl --db ops.db   # T ⊨ Σ
-quipu audit replay ~/.local/state/hank/metrics.jsonl --db ops.db
-quipu audit tree ~/.local/state/hank/metrics.jsonl
-quipu audit inheritance ~/.local/state/hank/metrics.jsonl --db ops.db
+quipu audit ~/.local/state/yupana/metrics.jsonl --db ops.db   # T ⊨ Σ
+quipu audit replay ~/.local/state/yupana/metrics.jsonl --db ops.db
+quipu audit tree ~/.local/state/yupana/metrics.jsonl
+quipu audit inheritance ~/.local/state/yupana/metrics.jsonl --db ops.db
 ```
 
 `quipu audit` exits non-zero when the trace **contradicts** the specification; an

@@ -1,4 +1,4 @@
-# hank
+# yupana
 # Run `just --list` to see available recipes
 
 # Quiet by default to save context; use verbose=true for full output
@@ -34,7 +34,7 @@ test *args="":
 # Run the linter (matches CI: deny warnings, allow missing-docs)
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every
 # test target, and the lints hiding there were real: a spawned daemon never
-# reaped on the timeout path, and bool `assert_eq!`s (hank #83).
+# reaped on the timeout path, and bool `assert_eq!`s (yupana #83).
 lint:
     cargo clippy --all-targets -- -D warnings -A missing-docs
 
@@ -42,11 +42,11 @@ lint:
 fmt:
     cargo fmt
 
-# Run the hank binary (e.g. `just run status`)
+# Run the yupana binary (e.g. `just run status`)
 run *args="":
     cargo run -- {{args}}
 
-# Install `hank` onto PATH; pass features e.g. `just install "mcp langs-extra"`
+# Install `yupana` onto PATH; pass features e.g. `just install "mcp langs-extra"`
 install features="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -55,7 +55,7 @@ install features="":
     else
         cargo install --path . --locked
     fi
-    echo "Installed: $(command -v hank)"
+    echo "Installed: $(command -v yupana)"
 
 # === Documentation ===
 

@@ -1,11 +1,11 @@
 //! Git baseline access — resolving the `base_ref` to a commit and diffing
 //! commits for promotion.
 //!
-//! Hank's shared base graph is built at a **baseline commit** (`base_ref`,
+//! Yupana's shared base graph is built at a **baseline commit** (`base_ref`,
 //! default `main`, §5.5/FR-13), and promotion (§7.5) diffs a committed change
 //! against that base. This module is the single boundary to git.
 //!
-//! **Access decision (open question 2).** Hank *shells out* to the system `git`,
+//! **Access decision (open question 2).** Yupana *shells out* to the system `git`,
 //! matching Bobbin's own `index/git.rs` precedent (stack coherence,
 //! `CLAUDE.md`), adding no dependency and keeping the single-binary portability
 //! story (§6.4). The choice is deliberately reversible: everything git-shaped
@@ -112,7 +112,7 @@ pub fn read_blob_at(root: &Path, reference: &str, path: &Path) -> Option<String>
 /// WHY THIS EXISTS: repo identity is part of every promoted IRI
 /// (`…/code/<repo>/<file>::<symbol>`), and it used to be derived from the
 /// checkout's DIRECTORY name. A worktree named after an agent
-/// (`hank-wt/gennaro`) then mints `code/gennaro/…`, a CI workspace mints
+/// (`yupana-wt/gennaro`) then mints `code/gennaro/…`, a CI workspace mints
 /// `code/workspace/…`, and the same repository fragments into parallel islands
 /// that no entity resolution can rejoin — the IRIs are structurally different,
 /// not fuzzily similar. The origin URL names the repository itself and is the
@@ -343,13 +343,13 @@ mod tests {
         // The four shapes git remotes actually take, plus the traps: trailing
         // slash, no `.git` suffix, and an scp-like URL with no '/' at all.
         for (url, want) in [
-            ("https://github.com/scbrown/hank.git", "hank"),
+            ("https://github.com/scbrown/yupana.git", "yupana"),
             ("https://example.com/group/sub/proj", "proj"),
-            ("git@github.com:scbrown/hank.git", "hank"),
+            ("git@github.com:scbrown/yupana.git", "yupana"),
             ("ssh://git.example/owner/thing.git", "thing"),
             ("ssh://git.example/owner/thing/", "thing"),
             ("host:solo.git", "solo"),
-            ("/home/someone/checkouts/hank", "hank"),
+            ("/home/someone/checkouts/yupana", "yupana"),
         ] {
             assert_eq!(repo_name_from_url(url).as_deref(), Some(want), "url: {url}");
         }

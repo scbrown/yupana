@@ -1,4 +1,4 @@
-//! The shared read-only base graph (FR-13) — slice 1 of hank #2.
+//! The shared read-only base graph (FR-13) — slice 1 of yupana #2.
 //!
 //! One `Base` is built ONCE at a resolved commit and then never mutated: an
 //! overlay (FR-14, `overlay.rs`) masks files on top of it, it never writes
@@ -28,7 +28,7 @@ pub struct FileFacts {
     pub hash: String,
     /// Names of the symbols the file defines, in definition order. Empty means
     /// the file parsed to no symbols — distinct from the file being absent
-    /// from [`Base::file`] entirely (not in the tree, or not a language hank
+    /// from [`Base::file`] entirely (not in the tree, or not a language yupana
     /// extracts).
     pub symbols: Vec<String>,
 }
@@ -117,7 +117,7 @@ impl Base {
     }
 
     /// The per-file facts for `rel`, or `None` when the file is not in the
-    /// base tree (or not a language hank extracts).
+    /// base tree (or not a language yupana extracts).
     #[must_use]
     pub fn file(&self, rel: &str) -> Option<&FileFacts> {
         self.files.get(rel)

@@ -6,7 +6,7 @@
 //! over records, and without the work item the records cannot express the
 //! question anyone actually asks.
 //!
-//! hank does not resolve the work item itself, and deliberately so. The tracker
+//! yupana does not resolve the work item itself, and deliberately so. The tracker
 //! owns that resolution and has more than one backend behind a single
 //! interface; reimplementing it here would create a SECOND implementation that
 //! can disagree with the first — a rule with two implementations, landing in
@@ -46,7 +46,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// A plate older than this is UNKNOWN. Overridable with `HANK_PLATE_MAX_AGE_SECS`.
+/// A plate older than this is UNKNOWN. Overridable with `YUPANA_PLATE_MAX_AGE_SECS`.
 ///
 /// Four hours is chosen to be longer than any plausible gap between tracker
 /// touches within one working session, and far shorter than the lifetime of a
@@ -103,7 +103,7 @@ pub fn current() -> Option<String> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
-    let max_age = std::env::var("HANK_PLATE_MAX_AGE_SECS")
+    let max_age = std::env::var("YUPANA_PLATE_MAX_AGE_SECS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(DEFAULT_MAX_AGE_SECS);

@@ -98,9 +98,9 @@ fn the_planner_is_declared_never_derived_from_position() {
 }
 
 #[test]
-fn authority_is_not_recorded_by_hank() {
+fn authority_is_not_recorded_by_yupana() {
     // The effective authority is the INTERSECTION of every link's grant, the
-    // grants live in quipu, and hank cannot read them inside the pre-edit
+    // grants live in quipu, and yupana cannot read them inside the pre-edit
     // budget. Recording `P` is what lets the checker derive `auth` from the
     // authoritative source; a locally-guessed `auth` would put a number in the
     // field the grant store never agreed to.
@@ -112,7 +112,7 @@ fn authority_is_not_recorded_by_hank() {
     );
     assert!(
         field(&a.fields(), "auth").is_none(),
-        "hank must not assert an authority it did not compute"
+        "yupana must not assert an authority it did not compute"
     );
 }
 

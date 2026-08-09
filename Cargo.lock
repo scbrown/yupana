@@ -1217,56 +1217,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hank"
-version = "0.6.0"
-dependencies = [
- "anyhow",
- "assert_cmd",
- "axum",
- "chrono",
- "clap",
- "clap_complete",
- "colored",
- "glob",
- "hex",
- "ignore",
- "indicatif",
- "notify",
- "oxrdf",
- "oxrdfio",
- "oxttl",
- "petgraph 0.7.1",
- "predicates",
- "regex",
- "ring",
- "rmcp",
- "rudof_lib",
- "schemars",
- "serde",
- "serde_json",
- "sha2",
- "streaming-iterator",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "toml 0.8.23",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "tree-sitter",
- "tree-sitter-cpp",
- "tree-sitter-go",
- "tree-sitter-java",
- "tree-sitter-python",
- "tree-sitter-rust",
- "tree-sitter-typescript",
- "ureq",
- "walkdir",
-]
-
-[[package]]
 name = "hashbag"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4987,6 +4937,56 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "synstructure",
+]
+
+[[package]]
+name = "yupana"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "axum",
+ "chrono",
+ "clap",
+ "clap_complete",
+ "colored",
+ "glob",
+ "hex",
+ "ignore",
+ "indicatif",
+ "notify",
+ "oxrdf",
+ "oxrdfio",
+ "oxttl",
+ "petgraph 0.7.1",
+ "predicates",
+ "regex",
+ "ring",
+ "rmcp",
+ "rudof_lib",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "streaming-iterator",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "toml 0.8.23",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "tree-sitter",
+ "tree-sitter-cpp",
+ "tree-sitter-go",
+ "tree-sitter-java",
+ "tree-sitter-python",
+ "tree-sitter-rust",
+ "tree-sitter-typescript",
+ "ureq",
+ "walkdir",
 ]
 
 [[package]]

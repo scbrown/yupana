@@ -1,9 +1,9 @@
 //! rudof <-> quipu shape-verdict AGREEMENT (promotion tail, item 2).
 //!
-//! hank validates promotions in-process (rudof); quipu validates the same
+//! yupana validates promotions in-process (rudof); quipu validates the same
 //! shapes server-side. The engines agreeing on ACCEPTANCE was proven early;
 //! nothing asserted they agree on REJECTION — and that exact gap shipped a
-//! live drift: a symbol-IRI collision that hank's compiled shapes passed and
+//! live drift: a symbol-IRI collision that yupana's compiled shapes passed and
 //! quipu's stored registry refused (the promote lane failed hourly until the
 //! shapes were synced). These tests are the mechanism that catches the next
 //! drift in CI instead of production.
@@ -21,7 +21,7 @@
 
 #![cfg(feature = "quipu")]
 
-use hank::promote::{validate, CODE_EDGE_SHAPES};
+use yupana::promote::{validate, CODE_EDGE_SHAPES};
 
 /// Minimal JSON string encoder (no serde in integration-test scope).
 fn json_string(s: &str) -> String {

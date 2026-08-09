@@ -1,7 +1,7 @@
-# code-edges.ttl — SHACL shapes for the structural EDGES Hank promotes (§9.2, #13).
+# code-edges.ttl — SHACL shapes for the structural EDGES Yupana promotes (§9.2, #13).
 #
 # `code-entities.ttl` covers the nodes (modules, symbols, Document, Section).
-# These are the edges — the facts Hank exists to produce — and FR-20 requires
+# These are the edges — the facts Yupana exists to produce — and FR-20 requires
 # every promotion write to validate against them BEFORE it reaches Quipu.
 #
 # ── THE NAMESPACE IS DATA IDENTITY, NOT COSMETICS ───────────────────────────
@@ -24,7 +24,7 @@
 # object at all) and NOT CLASS. §9.2's sample shows `sh:class bobbin:CodeSymbol`
 # — that is the TIGHTENING step, kept below as commented intent, to be enabled
 # per-predicate once real promoted data validates cleanly against it. Enabling
-# it before then would reject facts about symbols Hank has typed but not yet
+# it before then would reject facts about symbols Yupana has typed but not yet
 # classified, which is most of a first promotion.
 
 @prefix sh:     <http://www.w3.org/ns/shacl#> .
@@ -125,11 +125,11 @@ bobbin:SectionReferencesShape a sh:NodeShape ;
 #
 # WHY THESE ARE HERE: quipu's persistent registry loads code-entities.ttl and
 # REFUSES promotions that violate it (first live case: a symbol IRI collision
-# put two symbolKind values on one node; quipu refused, hank's in-process pass
-# had accepted — the first live rudof<->quipu shape drift). hank must refuse
+# put two symbolKind values on one node; quipu refused, yupana's in-process pass
+# had accepted — the first live rudof<->quipu shape drift). yupana must refuse
 # BEFORE the network, so the node constraints ride in the same compiled set the
 # promoter validates against. Keep byte-parity of the CONSTRAINTS with quipu's
-# copy; an automated hank<->quipu shapes-agreement test is the planned follow-up.
+# copy; an automated yupana<->quipu shapes-agreement test is the planned follow-up.
 
 bobbin:CodeModuleShape a sh:NodeShape ;
     sh:targetClass bobbin:CodeModule ;

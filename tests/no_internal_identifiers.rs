@@ -1,10 +1,10 @@
-//! hank's own tree must not carry internal identifiers (aegis-wvuhj).
+//! yupana's own tree must not carry internal identifiers (aegis-wvuhj).
 //!
-//! WHY THIS FILE EXISTS, AND WHY ITS ABSENCE WAS THE ACTUAL BUG. hank IS the
+//! WHY THIS FILE EXISTS, AND WHY ITS ABSENCE WAS THE ACTUAL BUG. yupana IS the
 //! enforcement point for "internal identifiers must not enter public-remote
 //! repos" — the rule is `crate::textrules`, the guard is the pre-edit hook, and
 //! `src/hook/pre_edit_test.rs` asserts the guard fires on a `.lan` hostname. And
-//! `scbrown/hank` is PUBLIC and its default branch carried **60 lines of them
+//! `scbrown/yupana` is PUBLIC and its default branch carried **60 lines of them
 //! across 15 files** (measured 2026-08-04; gennaro measured 58/14 two days
 //! earlier, so it was still GROWING while the bead sat open).
 //!
@@ -155,7 +155,7 @@ fn no_internal_identifiers_in_any_tracked_file() {
 
     assert!(
         offenders.is_empty(),
-        "internal identifier(s) in a PUBLIC repo (scbrown/hank):\n  {}\n\n\
+        "internal identifier(s) in a PUBLIC repo (scbrown/yupana):\n  {}\n\n\
          Use a synthetic name. If the token does NOT need to match a rule \
          pattern, put it outside them entirely (`web.example`, `$QUIPU_URL`). \
          If a test must prove the guard FIRES, invent one that matches \
@@ -222,7 +222,7 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
 
     let expected: BTreeSet<String> = [
         "docs/book/src/concepts/promotion.md",
-        "docs/hank-spec.md",
+        "docs/yupana-spec.md",
         "scripts/delegate-boundary-guard.py",
         "shapes/code-edges.ttl",
         "shapes/fixtures/conforming.ttl",

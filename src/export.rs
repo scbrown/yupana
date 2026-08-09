@@ -1,6 +1,6 @@
 //! Export the referential structure as RDF Turtle in the `bobbin:` code ontology.
 //!
-//! This is the governed projection of Hank's live graph — the substrate under
+//! This is the governed projection of Yupana's live graph — the substrate under
 //! Phase-4 promotion (`--to quipu`). It emits *precise, typed referential
 //! structure* (modules, symbols, `definedIn` / `calls` / `imports` edges),
 //! **not** the embedding-oriented chunking Bobbin produces. Facts validate
@@ -234,8 +234,8 @@ fn to_turtle_from(
 /// the extractor — tree-sitter parses, it does not evaluate `cfg` — so they
 /// mint a single IRI carrying two `symbolKind` values. `code-entities.ttl` puts
 /// `sh:maxCount 1` on `symbolKind`, so SHACL refuses the ENTIRE promotion and
-/// the repo's structure freezes at its last good commit. hank's own
-/// `src/mcp/state_tools.rs` did exactly this and froze hank's own code graph
+/// the repo's structure freezes at its last good commit. yupana's own
+/// `src/mcp/state_tools.rs` did exactly this and froze yupana's own code graph
 /// for a day (aegis-4ba2e).
 ///
 /// FIRST DECLARATION WINS, in file order. Without evaluating `cfg` there is no
@@ -246,7 +246,7 @@ fn to_turtle_from(
 ///
 /// Only a CROSS-KIND collision is recorded. Two sites with the same kind emit
 /// byte-identical `symbolKind` triples, and RDF is a set — they were never a
-/// maxCount violation. (`hank collisions` reports those separately; they are
+/// maxCount violation. (`yupana collisions` reports those separately; they are
 /// the aegis-1q14 class, and this function is not the place to relitigate it.)
 ///
 /// **The drop is not silent.** Dropping a declaration quietly would trade a
@@ -282,7 +282,7 @@ fn dedupe_by_iri(symbols: Vec<SymbolTriple>) -> (Vec<SymbolTriple>, Vec<String>)
         .into_iter()
         .map(|(iri, (winner, dropped))| {
             format!(
-                "# hank: <{iri}> was declared with more than one symbolKind — kept \
+                "# yupana: <{iri}> was declared with more than one symbolKind — kept \
                  \"{winner}\" (first in file order), dropped {}. Mutually-exclusive \
                  #[cfg] declarations of one name look like this; so does a genuine \
                  IRI collision. See aegis-4ba2e.",
@@ -516,7 +516,7 @@ fn module_iri(repo: &str, rel: &str) -> String {
 
 /// Mint a `CodeSymbol` IRI: `{module}::{scope1}::{scope2}::{name}` — the scope
 /// chain is what keeps two same-named symbols in one file on distinct IRIs
-/// (aegis-1q14: without it, 42 same-kind collisions across bobbin/hank/quipu
+/// (aegis-1q14: without it, 42 same-kind collisions across bobbin/yupana/quipu
 /// silently merged, unioning different symbols' call edges). Scope segments are
 /// raw source text (impl types can be `Foo<T>` or `dyn Trait`), so IRI-hostile
 /// characters are percent-encoded; `::` between segments is the one separator.
@@ -557,7 +557,7 @@ fn iri_segment(raw: &str) -> String {
             // MEASURED (aegis-r5xta): the hourly quipu code-promote failed on
             // 55 runs over 12 days with `Invalid IRI code point '['`, leaving
             // CodeSymbol/CodeModule frozen at their 2026-07-23 state for quipu and
-            // hank. Every offender was a JavaScript computed method name —
+            // yupana. Every offender was a JavaScript computed method name —
             // `[Symbol.iterator]` in vendored three.module.min.js and
             // mermaid.min.js — not the Rust slice types one would guess.
             '[' => out.push_str("%5B"),

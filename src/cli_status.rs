@@ -1,5 +1,5 @@
-//! `hank status` and its policy rendering, split out of `cli` for size
-//! (hank #83). See `cli_analyze` for why this is a child module.
+//! `yupana status` and its policy rendering, split out of `cli` for size
+//! (yupana #83). See `cli_analyze` for why this is a child module.
 
 use super::*;
 use crate::types::Tier;
@@ -9,7 +9,7 @@ impl Cli {
     pub(super) fn status(&self) -> anyhow::Result<()> {
         let root = std::env::current_dir()?;
         let config = self.load_config(&root)?;
-        let mode_provenance = HankConfig::policy_mode_provenance(&root, config.policy.mode)?;
+        let mode_provenance = YupanaConfig::policy_mode_provenance(&root, config.policy.mode)?;
         let tenant = self.tenant.as_deref().unwrap_or("(single-tenant)");
         // Resolve the configured base ref to a concrete commit (None outside a
         // repo / unresolved ref — degrade, never fail).
@@ -34,7 +34,7 @@ impl Cli {
                 "quipu": { "enabled": config.quipu.enabled, "branch_model": config.quipu.branch_model },
                 "policy": policy,
                 "policy_mode_provenance": mode_provenance,
-                // Whether guard records will carry their subject (hank #77). An
+                // Whether guard records will carry their subject (yupana #77). An
                 // operator has to be able to confirm this from OUTSIDE the
                 // process: "recording is on" believed but untrue looks exactly
                 // like "nothing was denied" in the spool.
@@ -81,7 +81,7 @@ impl Cli {
                 || "(unresolved — not a git repo or ref absent)".to_string(),
                 |c| c[..c.len().min(12)].to_string(),
             );
-            println!("{}", "hank status".bold());
+            println!("{}", "yupana status".bold());
             println!("  base ref    : {}", config.base_ref);
             println!("  base commit : {commit}");
             println!("  tenant      : {tenant}");
@@ -125,7 +125,7 @@ impl Cli {
         // therefore FAILS OPEN on every edit until the graph answers again. That
         // is precisely the state the ruling refuses to let anyone learn from
         // silence — "you write to quipu, believe the rule is live, and cannot
-        // tell". Before this, `hank status` printed COULD NOT TELL in red and
+        // tell". Before this, `yupana status` printed COULD NOT TELL in red and
         // exited 0, so no script could gate on it and no human had to notice.
         //
         // Only `degraded` exits non-zero. `empty` does not: an empty graph is a
@@ -142,18 +142,18 @@ impl Cli {
     }
 }
 
-/// `hank status` exit code for a rule plane that could not be loaded.
+/// `yupana status` exit code for a rule plane that could not be loaded.
 ///
 /// A dedicated code, not `1`: `1` is "the command itself failed" and `2` is
 /// clap's argument error (and Claude Code's hook-deny), so a caller that gates
-/// on this can tell "hank could not tell me about the rules" apart from "hank
+/// on this can tell "yupana could not tell me about the rules" apart from "yupana
 /// did not run". The whole point is that the two stop looking alike.
 pub(super) const EXIT_RULE_SET_DEGRADED: i32 = 3;
 
-/// `hank status` exit code when a workspace lowers the user's policy mode.
+/// `yupana status` exit code when a workspace lowers the user's policy mode.
 pub(super) const EXIT_POLICY_MODE_LOWERED: i32 = 4;
 
-/// Render the policy section of `hank status`.
+/// Render the policy section of `yupana status`.
 ///
 /// Shows the enforcement mode, whether a scope applies to this tenant and its
 /// ceilings, and — loudly — two states an operator must never learn from
@@ -198,7 +198,7 @@ fn print_policy_status(
     }
 }
 
-/// What `hank status` says about the RULE SET — measured, not asserted.
+/// What `yupana status` says about the RULE SET — measured, not asserted.
 ///
 /// THIS LINE USED TO BE A STRING LITERAL. It printed
 /// `rule set : none — never loaded (local config only)` unconditionally, on
@@ -206,7 +206,7 @@ fn print_policy_status(
 /// the *signed resident cache*, which genuinely does not exist yet — but the
 /// words it chose describe the RULE SET, and they were read the way they read.
 ///
-/// The cost was not hypothetical. An operator ran `hank status`, saw
+/// The cost was not hypothetical. An operator ran `yupana status`, saw
 /// "none — never loaded", and concluded the governed rule plane was empty and
 /// that every claim of change-time enforcement in this deployment was false. A
 /// P1 was filed to build what already existed. Measured at that moment: seven
@@ -233,7 +233,7 @@ pub(super) struct RuleSetStatus {
     pub error: Option<String>,
     pub graph_enabled: bool,
     /// WHICH rule set is live, as a content digest over the projected rules
-    /// (aegis-hac0 acceptance: "hank status reports rule-set version").
+    /// (aegis-hac0 acceptance: "yupana status reports rule-set version").
     ///
     /// There is no signed cache yet, so there is no authoritative VERSION to
     /// report — and inventing a version number for an unauthenticated fetch
@@ -256,7 +256,7 @@ pub(super) struct RuleSetStatus {
 }
 
 /// What state the rule plane is in — the field an operator and `st doctor` gate
-/// on, and the reason `hank status` can exit non-zero (aegis-hac0).
+/// on, and the reason `yupana status` can exit non-zero (aegis-hac0).
 ///
 /// These are kept DISTINCT for the reason the whole bead exists: "the graph
 /// projected no rules" and "I could not reach the graph" produce the same
@@ -326,7 +326,7 @@ impl RuleSetStatus {
 
 /// MEASURE the rule set. Split from rendering so the JSON and human surfaces
 /// cannot disagree — two renderers of one measurement, never two measurements.
-pub(super) fn measure_rule_set(config: &HankConfig) -> RuleSetStatus {
+pub(super) fn measure_rule_set(config: &YupanaConfig) -> RuleSetStatus {
     let local = config.policy.rules.len();
     // `mut` is used only under the quipu feature; without it the graph plane
     // does not exist and the struct is returned as built.
@@ -397,13 +397,13 @@ pub(super) fn measure_rule_set(config: &HankConfig) -> RuleSetStatus {
     st
 }
 
-/// How many times `hank status` retries the projection before calling the plane
+/// How many times `yupana status` retries the projection before calling the plane
 /// DEGRADED — and why `status` retries when the hook deliberately does not.
 ///
 /// MEASURED 2026-08-01 on this deployment: the governed text-rule query returns
 /// in 0.19s median (15 samples, max 0.35s), but quipu intermittently stalls past
 /// the guard's 2s ceiling — two spikes of 2.7s and 2.8s were caught inside one
-/// short session, and the first `hank status` run of that session reported
+/// short session, and the first `yupana status` run of that session reported
 /// COULD NOT TELL purely because it landed on one.
 ///
 /// The hook must NOT retry: it runs on every Edit/Write/MultiEdit across the
@@ -461,14 +461,14 @@ fn rule_set_digest(registry: &crate::project::ProjectionRegistry) -> String {
 ///
 /// It takes `&RuleSetStatus` rather than re-measuring, and that is a fix, not a
 /// refactor: `status()` measured once for the JSON surface and this function
-/// measured AGAIN for the text surface, so a text-mode `hank status` ran the
+/// measured AGAIN for the text surface, so a text-mode `yupana status` ran the
 /// projection twice — two HTTP round-trips per invocation, and two measurements
 /// that could disagree. The struct's own doc comment forbids exactly that ("two
 /// renderers of one measurement, never two measurements"); the second call had
 /// quietly reintroduced it. On a plane that flaps (see `PROJECTION_ATTEMPTS`)
 /// the two could genuinely differ, and the one printed was not the one the
 /// exit code would have been computed from.
-fn print_rule_set_status(config: &HankConfig, st: &RuleSetStatus) {
+fn print_rule_set_status(config: &YupanaConfig, st: &RuleSetStatus) {
     let local = st.local;
 
     {
@@ -519,7 +519,7 @@ fn print_rule_set_status(config: &HankConfig, st: &RuleSetStatus) {
                     st.attempts,
                 );
                 // Name the CONSEQUENCE, not just the fault. "could not project"
-                // is a fact about hank; "every edit is sailing through" is the
+                // is a fact about yupana; "every edit is sailing through" is the
                 // fact the reader has to act on.
                 println!(
                     "  {} the guard is FAILING OPEN for governed rules until this clears \

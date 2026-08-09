@@ -4,14 +4,14 @@
 //!   `/status` (the resident graph's real counts).
 //! - stage 2: the graph-backed query endpoints — `/callers`, `/callees`,
 //!   `/impact` — answered from the RESIDENT graph with no per-call rebuild, which
-//!   is the daemon's whole point. They mirror the `hank_callers`/`callees`/`impact`
+//!   is the daemon's whole point. They mirror the `yupana_callers`/`callees`/`impact`
 //!   MCP tools, so stage 3 can point the MCP surface at the same engine methods.
 //! - stage 3a: `/measure` (POST) — the pre-edit guard's exact blast-radius
 //!   question, sized against the resident graph. This is what the hook becomes a
 //!   thin client of; the client + hook cutover (with loud-when-absent) is stage 3b.
 //! - stage 4: the rest of the FR-27 query surface — `/references` and `/symbols`
 //!   from the resident node index, and `/dataflow`, which is NOT resident (no
-//!   resident dataflow model exists yet, hank #22) but is served per-request so
+//!   resident dataflow model exists yet, yupana #22) but is served per-request so
 //!   the HTTP API is complete rather than silently partial.
 
 use std::path::PathBuf;
@@ -60,7 +60,7 @@ async fn health() -> &'static str {
     "ok"
 }
 
-/// The resident graph's real facts — what an operator (or `hank daemon status`,
+/// The resident graph's real facts — what an operator (or `yupana daemon status`,
 /// later) reads to confirm the daemon is holding a non-empty graph.
 async fn status(State(engine): State<ResidentEngine>) -> Json<EngineStatus> {
     Json(engine.status())
@@ -207,7 +207,7 @@ async fn edit(
         .ok_or(NO_TENANT_LAYER)
 }
 
-/// Query for `/dataflow`, mirroring the `hank_dataflow` request.
+/// Query for `/dataflow`, mirroring the `yupana_dataflow` request.
 #[derive(Debug, Deserialize)]
 struct DataflowQuery {
     /// The function to analyze.
@@ -222,7 +222,7 @@ struct DataflowQuery {
     hops: Option<u32>,
 }
 
-/// Intra-procedural data dependence, mirroring `hank_dataflow`. NOT resident —
+/// Intra-procedural data dependence, mirroring `yupana_dataflow`. NOT resident —
 /// built per request (see the module doc) — and CONFINED TO THE ROOT like
 /// `/measure`: a `path` resolving outside the resident root is refused (400),
 /// so the localhost daemon cannot be pointed at arbitrary trees.
@@ -339,11 +339,11 @@ async fn measure(
 pub async fn serve(engine: ResidentEngine, host: &str, port: u16) -> anyhow::Result<()> {
     let addr = format!("{host}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    eprintln!("hank daemon: liveness surface on http://{addr}/health");
+    eprintln!("yupana daemon: liveness surface on http://{addr}/health");
     axum::serve(listener, router(engine))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
-    eprintln!("hank daemon: shut down cleanly");
+    eprintln!("yupana daemon: shut down cleanly");
     Ok(())
 }
 
@@ -366,7 +366,7 @@ async fn shutdown_signal() {
         () = ctrl_c => {},
         () = terminate => {},
     }
-    eprintln!("hank daemon: shutdown signal received — draining");
+    eprintln!("yupana daemon: shutdown signal received — draining");
 }
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 //! ed25519 verdict signing + promotion (H-PROMOTE-VERDICT, `quipu` feature).
 //!
-//! A hank edit-time verdict promotes into quipu as a signed `aegis:Verdict`. The
+//! A yupana edit-time verdict promotes into quipu as a signed `aegis:Verdict`. The
 //! signing MIRRORS quipu's `signing.rs` exactly — the same `ring` ed25519, the
 //! same PKCS#8 host-file custody, the same canonical `v1|…` message, the same hex
-//! encodings — so a hank-signed verdict verifies under quipu's Phase-0 root of
-//! trust once a human registers hank's public key (`aegis:publicKey` on its
+//! encodings — so a yupana-signed verdict verifies under quipu's Phase-0 root of
+//! trust once a human registers yupana's public key (`aegis:publicKey` on its
 //! `aegis:VerifierRegistration`). Diverge from that scheme and the signature
 //! would be well-formed but never TRUSTED.
 //!
@@ -20,9 +20,9 @@ use sha2::{Digest, Sha256};
 
 use crate::errors::{Error, Result};
 
-/// The verifier identity hank attests as. Registered (human-authored) in quipu's
+/// The verifier identity yupana attests as. Registered (human-authored) in quipu's
 /// tree-sitter policy catalog.
-pub const VERIFIER: &str = "hank";
+pub const VERIFIER: &str = "yupana";
 /// The tier of a structural verdict — always tree-sitter for these rules.
 pub const TIER: &str = "tree-sitter";
 
@@ -54,7 +54,7 @@ pub fn load_or_generate(path: &Path) -> Result<Ed25519KeyPair> {
         .map_err(|_| Error::Promote("parse signing key (bad PKCS#8)".into()))
 }
 
-/// Hex-encoded public key — what a human pastes into hank's
+/// Hex-encoded public key — what a human pastes into yupana's
 /// `aegis:VerifierRegistration aegis:publicKey` in quipu.
 #[must_use]
 pub fn public_key_hex(keypair: &Ed25519KeyPair) -> String {
@@ -90,7 +90,7 @@ pub fn evidence_hash(evidence: &str) -> String {
 ///
 /// `satisfied` is the outcome: `true` when the policy holds, `false` when the
 /// edit violated it. The signature is over [`verdict_message`], so quipu can
-/// re-derive and check it against hank's registered public key.
+/// re-derive and check it against yupana's registered public key.
 #[must_use]
 pub fn verdict_turtle(
     keypair: &Ed25519KeyPair,
@@ -154,16 +154,16 @@ pub fn verdict_turtle(
     )
 }
 
-/// The `aegis:freshness` lexical value for a hank freshness.
+/// The `aegis:freshness` lexical value for a yupana freshness.
 ///
-/// The shape admits only `fresh` and `stale`. `Recomputing` is a hank-internal
+/// The shape admits only `fresh` and `stale`. `Recomputing` is a yupana-internal
 /// state with no governed counterpart, and it maps to STALE rather than fresh:
 /// a verdict computed while the registry was mid-refresh was computed against
 /// something that may already have moved, and the conservative reading is the
 /// only one that cannot overstate.
 ///
 /// This function exists because the field was a hardcoded `"fresh"` — every
-/// verdict hank could have promoted would have claimed currency it had not
+/// verdict yupana could have promoted would have claimed currency it had not
 /// checked, which is the precise thing the tier/freshness discipline exists to
 /// stop.
 #[must_use]
@@ -195,7 +195,7 @@ pub fn promote_verdict(
     crate::promote::write_knot(
         endpoint,
         &turtle,
-        &format!("hank verdict: {policy_name} on {target_ref}"),
+        &format!("yupana verdict: {policy_name} on {target_ref}"),
     )
 }
 
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn a_signed_verdict_verifies_under_the_shared_scheme() {
-        // The interop guarantee: hank signs with the exact message + encoding quipu
+        // The interop guarantee: yupana signs with the exact message + encoding quipu
         // verifies with (quipu::signing::verify_hex re-derives this same message).
         let kp = keypair();
         let outcome = "unsatisfied";
@@ -230,7 +230,7 @@ mod tests {
             UnparsedPublicKey::new(&ED25519, pk)
                 .verify(&message, &sig)
                 .is_ok(),
-            "a hank-signed verdict must verify under ed25519 with the registered key"
+            "a yupana-signed verdict must verify under ed25519 with the registered key"
         );
     }
 
@@ -254,7 +254,7 @@ mod tests {
             "aegis:targetRef \"src/a.rs\"",
             "aegis:outcome \"unsatisfied\"",
             "aegis:evidenceHash \"sha256:",
-            "aegis:verifier \"hank\"",
+            "aegis:verifier \"yupana\"",
             "aegis:signature \"",
             "aegis:tier \"tree-sitter\"",
             "aegis:blockerEvidence \"built\"",
@@ -284,7 +284,7 @@ mod tests {
         );
         assert!(
             !ttl.contains("a aegis:Blocker"),
-            "a passing Hank check is verification evidence, not a blocker: {ttl}"
+            "a passing Yupana check is verification evidence, not a blocker: {ttl}"
         );
     }
 

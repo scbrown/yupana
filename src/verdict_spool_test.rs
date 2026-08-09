@@ -20,11 +20,11 @@ fn precedence_explicit_then_xdg_then_home() {
     );
     assert_eq!(
         resolve_path(None, Some("/s"), Some("/h")).unwrap(),
-        PathBuf::from("/s/hank/verdicts.jsonl")
+        PathBuf::from("/s/yupana/verdicts.jsonl")
     );
     assert_eq!(
         resolve_path(None, None, Some("/h")).unwrap(),
-        PathBuf::from("/h/.local/state/hank/verdicts.jsonl")
+        PathBuf::from("/h/.local/state/yupana/verdicts.jsonl")
     );
     assert!(resolve_path(None, None, None).is_none());
 }
@@ -54,7 +54,7 @@ fn a_fired_constraint_spools_a_signed_verdict() {
         "aegis:outcome \"unsatisfied\"",
         "aegis:evidenceHash \"sha256:",
         "aegis:signature \"",
-        "aegis:verifier \"hank\"",
+        "aegis:verifier \"yupana\"",
     ] {
         assert!(
             spooled[0].turtle.contains(field),
@@ -93,7 +93,7 @@ fn a_satisfied_constraint_records_satisfied_not_the_guard_outcome() {
 
 #[test]
 fn an_unknown_outcome_spools_nothing() {
-    // `unknown` asserts "there was no evidence", and a constraint hank evaluated
+    // `unknown` asserts "there was no evidence", and a constraint yupana evaluated
     // had evidence by construction. Minting satisfied or unsatisfied for it
     // would be a signed claim about something that concluded neither.
     let dir = tempfile::tempdir().unwrap();
@@ -116,7 +116,7 @@ fn an_unknown_outcome_spools_nothing() {
 
 #[test]
 fn a_stale_projection_produces_a_stale_verdict() {
-    // The field was a hardcoded "fresh". Every verdict hank could have promoted
+    // The field was a hardcoded "fresh". Every verdict yupana could have promoted
     // would have claimed currency it never checked.
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("v.jsonl");
@@ -134,7 +134,7 @@ fn a_stale_projection_produces_a_stale_verdict() {
 
 #[test]
 fn recomputing_maps_to_stale_never_fresh() {
-    // A hank-internal state with no governed counterpart. A verdict computed
+    // A yupana-internal state with no governed counterpart. A verdict computed
     // mid-refresh was computed against something that may already have moved;
     // the conservative reading is the only one that cannot overstate.
     let dir = tempfile::tempdir().unwrap();
@@ -154,7 +154,7 @@ fn recomputing_maps_to_stale_never_fresh() {
 #[test]
 fn a_missing_key_yields_no_key_rather_than_minting_one() {
     // Key custody: a keypair materialising as a side effect of an agent's edit
-    // is not something that should happen quietly. `hank verifier` is how an
+    // is not something that should happen quietly. `yupana verifier` is how an
     // operator creates one, deliberately.
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("absent.pk8");

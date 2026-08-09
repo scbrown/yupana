@@ -1,4 +1,4 @@
-//! Tests for `config` — the layered `[hank]` table, its per-key overlay, and
+//! Tests for `config` — the layered `[yupana]` table, its per-key overlay, and
 //! the `--config` override contract. Child module of `config` (`super::*`
 //! reaches its private helpers); size-exempt (`_test.rs`).
 
@@ -6,7 +6,7 @@ use super::*;
 
 #[test]
 fn defaults_are_sensible() {
-    let config = HankConfig::default();
+    let config = YupanaConfig::default();
     assert_eq!(config.base_ref, "main");
     assert_eq!(config.serve.mcp_http_port, 3040);
     assert_eq!(config.quipu.branch_model, "named_graph");
@@ -16,21 +16,21 @@ fn defaults_are_sensible() {
 #[test]
 fn load_missing_project_returns_defaults() {
     let dir = tempfile::tempdir().unwrap();
-    let config = HankConfig::load(dir.path()).unwrap();
+    let config = YupanaConfig::load(dir.path()).unwrap();
     assert_eq!(config.base_ref, "main");
 }
 
 #[test]
-fn load_reads_hank_table() {
+fn load_reads_yupana_table() {
     let dir = tempfile::tempdir().unwrap();
     let bobbin = dir.path().join(".bobbin");
     std::fs::create_dir_all(&bobbin).unwrap();
     std::fs::write(
         bobbin.join("config.toml"),
-        "[hank]\nbase_ref = \"develop\"\n",
+        "[yupana]\nbase_ref = \"develop\"\n",
     )
     .unwrap();
-    let config = HankConfig::load(dir.path()).unwrap();
+    let config = YupanaConfig::load(dir.path()).unwrap();
     assert_eq!(config.base_ref, "develop");
     // Unspecified keys fall back to defaults.
     assert_eq!(config.serve.mcp_http_port, 3040);
@@ -47,8 +47,8 @@ fn a_project_config_does_not_wipe_user_level_policy() {
     let user_config = user.path().join("config.toml");
     std::fs::write(
         &user_config,
-        "[hank.policy]\nmode = \"enforce\"\n\
-         [hank.policy.scopes.weaver]\nallow_paths = [\"src/**\"]\n",
+        "[yupana.policy]\nmode = \"enforce\"\n\
+         [yupana.policy.scopes.weaver]\nallow_paths = [\"src/**\"]\n",
     )
     .unwrap();
 
@@ -58,11 +58,11 @@ fn a_project_config_does_not_wipe_user_level_policy() {
     // Sets one unrelated key; says nothing about policy.
     std::fs::write(
         bobbin.join("config.toml"),
-        "[hank]\nbase_ref = \"develop\"\n",
+        "[yupana]\nbase_ref = \"develop\"\n",
     )
     .unwrap();
 
-    let config = HankConfig::load_layered(Some(&user_config), project.path()).unwrap();
+    let config = YupanaConfig::load_layered(Some(&user_config), project.path()).unwrap();
     // The workspace's own key wins...
     assert_eq!(config.base_ref, "develop");
     // ...without disarming the guard.
@@ -81,7 +81,7 @@ fn a_project_config_overrides_the_same_key() {
     let user_config = user.path().join("config.toml");
     std::fs::write(
         &user_config,
-        "[hank]\nbase_ref = \"main\"\n[hank.policy]\nmode = \"enforce\"\n",
+        "[yupana]\nbase_ref = \"main\"\n[yupana.policy]\nmode = \"enforce\"\n",
     )
     .unwrap();
 
@@ -90,11 +90,11 @@ fn a_project_config_overrides_the_same_key() {
     std::fs::create_dir_all(&bobbin).unwrap();
     std::fs::write(
         bobbin.join("config.toml"),
-        "[hank.policy]\nmode = \"off\"\n",
+        "[yupana.policy]\nmode = \"off\"\n",
     )
     .unwrap();
 
-    let config = HankConfig::load_layered(Some(&user_config), project.path()).unwrap();
+    let config = YupanaConfig::load_layered(Some(&user_config), project.path()).unwrap();
     assert_eq!(config.policy.mode, crate::policy::Mode::Off);
     // Untouched keys from the user config survive the override.
     assert_eq!(config.base_ref, "main");
@@ -104,17 +104,17 @@ fn a_project_config_overrides_the_same_key() {
 fn policy_mode_provenance_names_a_workspace_lowering() {
     let user = tempfile::tempdir().unwrap();
     let user_config = user.path().join("config.toml");
-    std::fs::write(&user_config, "[hank.policy]\nmode = \"enforce\"\n").unwrap();
+    std::fs::write(&user_config, "[yupana.policy]\nmode = \"enforce\"\n").unwrap();
     let project = tempfile::tempdir().unwrap();
     let bobbin = project.path().join(".bobbin");
     std::fs::create_dir_all(&bobbin).unwrap();
     std::fs::write(
         bobbin.join("config.toml"),
-        "[hank.policy]\nmode = \"off\"\n",
+        "[yupana.policy]\nmode = \"off\"\n",
     )
     .unwrap();
 
-    let effective = HankConfig::load_layered(Some(&user_config), project.path()).unwrap();
+    let effective = YupanaConfig::load_layered(Some(&user_config), project.path()).unwrap();
     let provenance = policy_mode_provenance_from_paths(
         Some(&user_config),
         &bobbin.join("config.toml"),
@@ -134,8 +134,8 @@ fn a_project_config_replaces_rather_than_widens_allow_paths() {
     let user_config = user.path().join("config.toml");
     std::fs::write(
         &user_config,
-        "[hank.policy]\nmode = \"enforce\"\n\
-         [hank.policy.scopes.weaver]\nallow_paths = [\"src/**\"]\n",
+        "[yupana.policy]\nmode = \"enforce\"\n\
+         [yupana.policy.scopes.weaver]\nallow_paths = [\"src/**\"]\n",
     )
     .unwrap();
 
@@ -144,11 +144,11 @@ fn a_project_config_replaces_rather_than_widens_allow_paths() {
     std::fs::create_dir_all(&bobbin).unwrap();
     std::fs::write(
         bobbin.join("config.toml"),
-        "[hank.policy.scopes.weaver]\nallow_paths = [\"docs/**\"]\n",
+        "[yupana.policy.scopes.weaver]\nallow_paths = [\"docs/**\"]\n",
     )
     .unwrap();
 
-    let config = HankConfig::load_layered(Some(&user_config), project.path()).unwrap();
+    let config = YupanaConfig::load_layered(Some(&user_config), project.path()).unwrap();
     let scope = config.policy.scope_for(Some("weaver")).unwrap();
     assert_eq!(scope.allow_paths, vec!["docs/**".to_string()]);
 }
@@ -162,18 +162,18 @@ fn resolve_with_override_reads_the_named_file_not_the_cwd() {
     std::fs::create_dir_all(&bobbin).unwrap();
     std::fs::write(
         bobbin.join("config.toml"),
-        "[hank]\nbase_ref = \"from-cwd\"\n",
+        "[yupana]\nbase_ref = \"from-cwd\"\n",
     )
     .unwrap();
 
     let other = project.path().join("other.toml");
-    std::fs::write(&other, "[hank]\nbase_ref = \"from-flag\"\n").unwrap();
+    std::fs::write(&other, "[yupana]\nbase_ref = \"from-flag\"\n").unwrap();
 
-    let overridden = HankConfig::resolve(Some(&other), project.path()).unwrap();
+    let overridden = YupanaConfig::resolve(Some(&other), project.path()).unwrap();
     assert_eq!(overridden.base_ref, "from-flag");
 
     // And without the override, discovery still finds the cwd config.
-    let discovered = HankConfig::resolve(None, project.path()).unwrap();
+    let discovered = YupanaConfig::resolve(None, project.path()).unwrap();
     assert_eq!(discovered.base_ref, "from-cwd");
 }
 
@@ -183,18 +183,18 @@ fn resolve_with_override_reads_the_named_file_not_the_cwd() {
 fn load_from_a_missing_path_is_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("nope.toml");
-    let err = HankConfig::load_from(&missing).unwrap_err();
+    let err = YupanaConfig::load_from(&missing).unwrap_err();
     assert!(err.to_string().contains("does not exist"));
 }
 
-/// A file that exists but has no `[hank]` table is a valid request for
+/// A file that exists but has no `[yupana]` table is a valid request for
 /// defaults, not an error.
 #[test]
-fn load_from_a_file_without_a_hank_table_yields_defaults() {
+fn load_from_a_file_without_a_yupana_table_yields_defaults() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("empty.toml");
     std::fs::write(&path, "[something_else]\nkey = 1\n").unwrap();
-    let config = HankConfig::load_from(&path).unwrap();
+    let config = YupanaConfig::load_from(&path).unwrap();
     assert_eq!(config.base_ref, "main");
 }
 
@@ -202,7 +202,7 @@ fn load_from_a_file_without_a_hank_table_yields_defaults() {
 /// docs promised and did not perform (aegis-ltjo).
 #[test]
 fn read_only_guards_a_write() {
-    let mut config = HankConfig::default();
+    let mut config = YupanaConfig::default();
     assert!(
         config.write_guard("promotion").is_ok(),
         "default must allow writes"
@@ -232,9 +232,9 @@ fn every_config_key_is_read_or_explicitly_phased() {
         ("enable_lsp", "Phase 2/3 — LSP tier not built"),
         ("enable_cpg", "Phase 2 — CPG tier not built"),
         ("lsp_on", "LSP tier not built"),
-        // The [hank.tenancy] keys (tenancy / max_overlays /
+        // The [yupana.tenancy] keys (tenancy / max_overlays /
         // high_fanin_threshold / overlay_eviction) are now LIVE — read by
-        // TenantRegistry's FR-18 lifecycle (hank #6) — so they are no longer
+        // TenantRegistry's FR-18 lifecycle (yupana #6) — so they are no longer
         // phased. The guard's "allowlist must not rot" check enforces that.
         ("promote_on", "Phase 4 — Quipu promotion not built"),
         ("shapes_path", "Phase 4 — Quipu promotion not built"),

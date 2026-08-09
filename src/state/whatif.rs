@@ -1,4 +1,4 @@
-//! `hank_whatif` — speculative impact over the board (FR-38).
+//! `yupana_whatif` — speculative impact over the board (FR-38).
 //!
 //! [`crate::graph::reachable_over`] generalized from the call graph to the fact
 //! graph: apply an order set to a copy-on-write overlay, then walk outward from
@@ -8,7 +8,7 @@
 //!
 //! The addendum names the impacts it wants: bases exposed, own units entering
 //! enemy threat range, reachability / zone-of-control / supply shifts. None of
-//! those are computed here by name, and that is deliberate. Hank does not know
+//! those are computed here by name, and that is deliberate. Yupana does not know
 //! what a supply line is; hardcoding a `supply` traversal would put a slice of
 //! *Alpha Centauri*'s rules inside a general fact-graph engine, where nobody
 //! playing a different game could see it and nobody would maintain it.
@@ -22,7 +22,7 @@
 //!
 //! ## The contrast to hold on to
 //!
-//! | | `hank_whatif` | Quipu `quipu_impact remove=true` |
+//! | | `yupana_whatif` | Quipu `quipu_impact remove=true` |
 //! |---|---|---|
 //! | Subject | ephemeral live board | persisted knowledge |
 //! | Speed | fast, this-turn | durable, cross-game |

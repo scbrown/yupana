@@ -1,6 +1,6 @@
 //! Intra-procedural data-dependence — the Rust-native start of the CPG tier.
 //!
-//! Per `docs/hank-spec.md` §14.1, Hank takes the Rust-native path rather than
+//! Per `docs/yupana-spec.md` §14.1, Yupana takes the Rust-native path rather than
 //! embedding Joern: we reimplement the traversals we need. This module builds a
 //! per-function variable data-dependence graph from tree-sitter (a binding
 //! depends on the locals used in its initializer) and answers flow queries:

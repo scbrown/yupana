@@ -1,5 +1,5 @@
 //! The composed `base + overlay` VIEW — one tenant's query surface, split out
-//! of `tenant` for size (hank #83).
+//! of `tenant` for size (yupana #83).
 //!
 //! [`TenantView`] is built per query and dropped at its end: it borrows, it
 //! never owns, so no overlay ever holds a base `NodeIndex`. Isolation stays
@@ -222,7 +222,7 @@ impl TenantView<'_> {
 
     /// Base callers of `name` from UNTOUCHED files, of `language`, via the
     /// FR-16 frontier index. This answers even when `name` has NO base
-    /// definition — the overlay-new symbol a tenant just introduced (hank #3) —
+    /// definition — the overlay-new symbol a tenant just introduced (yupana #3) —
     /// which walking a definition's incoming edges never could.
     fn base_callers_of_name(&self, name: &str, language: &'static str) -> Vec<SymRef> {
         let mut out = Vec::new();
@@ -324,7 +324,7 @@ impl Adjacency for TenantView<'_> {
                 }
                 // Base callers of my NAME, via the FR-16 frontier index — this
                 // now answers even when the overlay INTRODUCED the name (zero
-                // base defs), which the old edge-walk could not (hank #3).
+                // base defs), which the old edge-walk could not (yupana #3).
                 out.extend(self.base_callers_of_name(&me.name, me.language));
             }
         }

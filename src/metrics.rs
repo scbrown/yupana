@@ -7,7 +7,7 @@
 //! with nothing to scrape, and coupling its numbers to the resident daemon
 //! would make the metrics vanish exactly when the daemon is down — the moment
 //! they matter most. The daemon can grow a /metrics later; the spool is the
-//! form that is true for every process shape hank runs as.
+//! form that is true for every process shape yupana runs as.
 //!
 //! ABSOLUTE FAIL-SILENCE, stricter than the guard's own fail-open: a metrics
 //! write must never change a guard outcome, never block an edit, never print.
@@ -35,8 +35,8 @@ use std::path::PathBuf;
 /// feature would recreate the incident that motivated its own fail-silence.
 const ROTATE_BYTES: u64 = 64 * 1024 * 1024;
 
-/// Where the spool lives: `$HANK_METRICS_PATH`, else
-/// `$XDG_STATE_HOME/hank/metrics.jsonl`, else `~/.local/state/hank/metrics.jsonl`.
+/// Where the spool lives: `$YUPANA_METRICS_PATH`, else
+/// `$XDG_STATE_HOME/yupana/metrics.jsonl`, else `~/.local/state/yupana/metrics.jsonl`.
 /// Pure so the precedence is testable without touching the process environment
 /// (parallel tests race on env vars).
 pub fn resolve_path(
@@ -48,20 +48,20 @@ pub fn resolve_path(
         return Some(PathBuf::from(p));
     }
     if let Some(x) = xdg_state {
-        return Some(PathBuf::from(x).join("hank").join("metrics.jsonl"));
+        return Some(PathBuf::from(x).join("yupana").join("metrics.jsonl"));
     }
     home.map(|h| {
         PathBuf::from(h)
             .join(".local")
             .join("state")
-            .join("hank")
+            .join("yupana")
             .join("metrics.jsonl")
     })
 }
 
 fn spool_path() -> Option<PathBuf> {
     resolve_path(
-        std::env::var("HANK_METRICS_PATH").ok().as_deref(),
+        std::env::var("YUPANA_METRICS_PATH").ok().as_deref(),
         std::env::var("XDG_STATE_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
     )
@@ -143,11 +143,11 @@ mod tests {
         );
         assert_eq!(
             resolve_path(None, Some("/s"), Some("/h")).unwrap(),
-            PathBuf::from("/s/hank/metrics.jsonl")
+            PathBuf::from("/s/yupana/metrics.jsonl")
         );
         assert_eq!(
             resolve_path(None, None, Some("/h")).unwrap(),
-            PathBuf::from("/h/.local/state/hank/metrics.jsonl")
+            PathBuf::from("/h/.local/state/yupana/metrics.jsonl")
         );
         assert!(resolve_path(None, None, None).is_none());
     }

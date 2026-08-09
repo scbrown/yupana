@@ -37,7 +37,7 @@ impl CodeGraph {
 
     /// The symbol whose definition ENCLOSES `line` in `rel`, innermost first.
     ///
-    /// This is the position half of FR-4 (hank #8) at the tree-sitter tier: name
+    /// This is the position half of FR-4 (yupana #8) at the tree-sitter tier: name
     /// lookup over-connects on common names — `build`, `new`, `write` — and a
     /// caller looking at one of them in an editor knows the position, not which
     /// of the twelve it is. Pointing at it resolves it.
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn symbol_at_picks_the_innermost_enclosing_definition() {
-        // The hank #8 win: `shared` exists in two files, so the NAME is
+        // The yupana #8 win: `shared` exists in two files, so the NAME is
         // ambiguous by construction. A position is not.
         let dir = repo();
         let graph = CodeGraph::build(dir.path()).unwrap();

@@ -1,7 +1,7 @@
 # The Game-State Harness
 
 FR-35..FR-39, behind the `game-state` Cargo feature. This is a real widening of
-Hank's mandate: from a *code* graph analyzer to a **general in-memory fact graph
+Yupana's mandate: from a *code* graph analyzer to a **general in-memory fact graph
 and policy harness**. It reuses the machinery — copy-on-write overlays,
 multi-tenancy, the impact walk, the Selector/Predicate policy shape — over a
 different subject.
@@ -15,10 +15,10 @@ The driving consumer is
 
 | Surface | Requirement | What it does |
 |---------|-------------|--------------|
-| `hank_ingest` / `POST /ingest` | FR-35 | Load span-free facts into the hot board |
+| `yupana_ingest` / `POST /ingest` | FR-35 | Load span-free facts into the hot board |
 | — | FR-36 | The `graph-pattern` policy model over those facts |
-| `hank_guard` / `POST /guard` | FR-37 | Check proposed orders against those policies |
-| `hank_whatif` / `POST /whatif` | FR-38 | Ranked speculative impact, uncommitted |
+| `yupana_guard` / `POST /guard` | FR-37 | Check proposed orders against those policies |
+| `yupana_whatif` / `POST /whatif` | FR-38 | Ranked speculative impact, uncommitted |
 | — | FR-39 | `(game_id, faction_id)` tenancy as a fog-of-war boundary |
 
 ## A different node type, on purpose
@@ -34,7 +34,7 @@ Everything it serves carries `tier: "engine-state"`, a peer of
 a code fact must be equally impossible to mistake for each other, in both
 directions.
 
-The tier is advertised by `hank status` exactly when the `game-state` engine is
+The tier is advertised by `yupana status` exactly when the `game-state` engine is
 compiled in. That is not the empty-feature pattern the removed `lsp`/`cpg` flags
 fell into: `game-state` gates `src/state/`, which *is* the ingestion path, so the
 flag and the implementation are the same thing.
@@ -57,7 +57,7 @@ POST /ingest
 
 The node and edge JSON mirrors `quipu_episode` (`name`/`type`/`description`,
 `source`/`target`/`relation`) so one adapter output feeds both stores. `attrs` is
-Hank's addition: scalars the pattern engine can compare.
+Yupana's addition: scalars the pattern engine can compare.
 
 `visibility` has **no default**, and that is deliberate:
 
@@ -105,13 +105,13 @@ filter  := ?var ('=' | '!=' | '<' | '<=' | '>' | '>=') literal
 Two things worth knowing before writing one:
 
 - **No prefix expansion.** `smac:BaseState` is matched byte for byte against what
-  the adapter ingested. Hank has no prefix map, and inventing one would be a
+  the adapter ingested. Yupana has no prefix map, and inventing one would be a
   second, drifting copy of Quipu's.
 - **A `name` predicate resolves to an attribute first, an outgoing edge second.**
   Edge traversal is outgoing only; a symmetric relation is ingested both ways.
 
 **`selector_lang: "sparql"` is reserved for Quipu and is refused here** — not
-skipped, not best-effort matched. Hank is not an RDF store. If a predicate starts
+skipped, not best-effort matched. Yupana is not an RDF store. If a predicate starts
 wanting property paths or aggregation, that is the signal the policy belongs in
 Quipu, not the signal to grow this grammar. Project the datalinks it needs into
 the board instead.
@@ -126,11 +126,11 @@ POST /guard
    {"op": "set_attr", "id": "base_alpha", "key": "smac:garrisonCount", "value": 0}]}]}
 ```
 
-Orders carry **declared effects**. Hank does not know that `MOVE` implies a
+Orders carry **declared effects**. Yupana does not know that `MOVE` implies a
 supply change and does not try to infer it — it applies exactly the deltas the
 adapter states. That is what bounds FR-37's standing divergence risk: the gap is
 "what the adapter declared vs. what the engine will do", which its author can
-see and close, rather than "Hank's reimplementation of the rules vs. the real
+see and close, rather than "Yupana's reimplementation of the rules vs. the real
 ones", which nobody can enumerate.
 
 **The game engine remains the sole authority on legality and effects.** This
@@ -145,7 +145,7 @@ The report has four lists, and reading only the first is a mistake:
 |-------|---------|
 | `violations` | `deny` policies that fired |
 | `advisories` | `warn` policies that fired |
-| `unevaluated` | policies that could not be compiled, or are not Hank's to run |
+| `unevaluated` | policies that could not be compiled, or are not Yupana's to run |
 | `vacuous` | policies whose **selector matched nothing** — never asked, not passed |
 
 `vacuous` exists because a selector that has rotted away from the adapter's
@@ -163,7 +163,7 @@ is the property a caller most needs to be able to check.
 The ranking is **structural and domain-neutral**: which entities a change reaches,
 how far, by which relations, over the adapter's own vocabulary. "Is this base
 exposed" is a `graph-pattern` policy over the same speculative board, not a
-hardcoded traversal — Hank does not know what a supply line is, and putting a
+hardcoded traversal — Yupana does not know what a supply line is, and putting a
 slice of one game's rules inside a general engine would hide it from everyone
 playing a different one.
 
@@ -203,7 +203,7 @@ only a re-touch.
 
 **A board lives in the process it was ingested into.** There is no store behind
 these surfaces; that is what a hot graph means. Ingesting over `POST /ingest` and
-then guarding through `hank_guard` in a *different* process guards an empty
+then guarding through `yupana_guard` in a *different* process guards an empty
 board.
 
 So an empty board is **refused**, never reported as zero violations: `409

@@ -13,7 +13,7 @@ fn precedence_explicit_then_xdg_then_home() {
     );
     assert_eq!(
         resolve_path(None, Some("/s"), Some("/h")).unwrap(),
-        PathBuf::from("/s/hank/throttles.jsonl")
+        PathBuf::from("/s/yupana/throttles.jsonl")
     );
     assert!(resolve_path(None, None, None).is_none());
 }

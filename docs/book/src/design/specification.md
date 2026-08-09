@@ -2,7 +2,7 @@
 
 The full PRD-style build specification lives at the repository root:
 
-- **[`docs/hank-spec.md`](https://github.com/scbrown/hank/blob/main/docs/hank-spec.md)**
+- **[`docs/yupana-spec.md`](https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md)**
 
 It covers the problem statement and the three-tool split, personas and user
 stories, functional and non-functional requirements, the technical architecture
@@ -12,7 +12,7 @@ Quipu), phasing, risks, and open questions.
 
 ## Phasing at a glance
 
-- **Phase 1 — Hank, single-tenant.** Tree-sitter structure + LSP facts served
+- **Phase 1 — Yupana, single-tenant.** Tree-sitter structure + LSP facts served
   over MCP; Bobbin fuses them.
 - **Phase 2 — Dataflow & blast radius.** CPG/dataflow; blast radius as a served
   capability and the incremental-update primitive.

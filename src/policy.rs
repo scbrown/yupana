@@ -54,7 +54,7 @@ impl Mode {
         }
     }
 
-    /// The lowercase name, matching the `[hank.policy] mode` config value.
+    /// The lowercase name, matching the `[yupana.policy] mode` config value.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -71,7 +71,7 @@ impl std::fmt::Display for Mode {
     }
 }
 
-/// The `[hank.policy]` table.
+/// The `[yupana.policy]` table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PolicyConfig {
@@ -89,7 +89,7 @@ pub struct PolicyConfig {
     /// entry here is unconstrained.
     pub scopes: BTreeMap<String, Scope>,
     /// Structural (tree-sitter-tier) rules applied to the text an edit
-    /// introduces (`[[hank.policy.rules]]`). Unlike [`Self::scopes`], these are
+    /// introduces (`[[yupana.policy.rules]]`). Unlike [`Self::scopes`], these are
     /// not per-tenant: a rule like "no ticket id in a comment" governs the code,
     /// not who wrote it. See [`crate::rules`].
     pub rules: Vec<crate::rules::Rule>,
@@ -119,7 +119,7 @@ impl PolicyConfig {
         self.scopes.get(tenant?)
     }
 
-    /// A snapshot of the policy layer for `hank status`, resolved for `tenant`.
+    /// A snapshot of the policy layer for `yupana status`, resolved for `tenant`.
     ///
     /// Observability is the whole point (aegis-hac0): an operator must be able
     /// to see whether the guard is armed for a tenant and against what. The
@@ -141,7 +141,7 @@ impl PolicyConfig {
     }
 }
 
-/// A `hank status` view of the policy layer, resolved for one tenant.
+/// A `yupana status` view of the policy layer, resolved for one tenant.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PolicyStatus {
     /// Enforcement mode in force.
@@ -209,7 +209,7 @@ pub struct Violation {
     pub kind: ViolationKind,
     /// Model-facing explanation: what was exceeded, by how much, what to do.
     pub message: String,
-    /// Stable id of what actually fired, for the audit record (hank #77): the
+    /// Stable id of what actually fired, for the audit record (yupana #77): the
     /// matching `deny_paths` glob, `allow_paths` when nothing matched, or the
     /// exceeded ceiling. `kind` says which CLASS denied; this says which rule —
     /// the field that tells a wrongly-scoped rule from a correct one.
@@ -238,7 +238,7 @@ impl Scope {
             return Some(Violation {
                 kind: ViolationKind::PathOutOfScope,
                 message: format!(
-                    "hank: `{rel}` is explicitly denied to tenant `{tenant}` (matches deny_paths \
+                    "yupana: `{rel}` is explicitly denied to tenant `{tenant}` (matches deny_paths \
                      pattern `{pattern}`). This path is outside your capability scope — do not \
                      retry it; if the change genuinely belongs there, ask for a wider scope."
                 ),
@@ -253,7 +253,7 @@ impl Scope {
         Some(Violation {
             kind: ViolationKind::PathOutOfScope,
             message: format!(
-                "hank: `{rel}` is outside the writable capability scope of tenant `{tenant}` \
+                "yupana: `{rel}` is outside the writable capability scope of tenant `{tenant}` \
                  (allowed: {}). Make the change inside your scope, or ask for a wider one.",
                 self.allow_paths.join(", ")
             ),
@@ -295,7 +295,7 @@ impl Scope {
             rule: fired.join("+"),
             kind: ViolationKind::BlastRadiusExceeded,
             message: format!(
-                "hank: editing `{rel}` reaches {} — beyond the blast radius allowed for tenant \
+                "yupana: editing `{rel}` reaches {} — beyond the blast radius allowed for tenant \
                  `{tenant}`. Split this into a narrower change that touches fewer callers, or ask \
                  for a wider capability scope. (tree-sitter tier: the reach is an approximation.)",
                 exceeded.join(" and ")
@@ -359,11 +359,11 @@ mod tests {
     #[test]
     fn denies_a_path_outside_scope() {
         let violation = scope()
-            .check_path("docs/hank-spec.md", "polecat-3")
+            .check_path("docs/yupana-spec.md", "polecat-3")
             .unwrap();
         assert_eq!(violation.kind, ViolationKind::PathOutOfScope);
         // The reason names the path, the tenant, and what is allowed.
-        assert!(violation.message.contains("docs/hank-spec.md"));
+        assert!(violation.message.contains("docs/yupana-spec.md"));
         assert!(violation.message.contains("polecat-3"));
         assert!(violation.message.contains("src/**"));
     }

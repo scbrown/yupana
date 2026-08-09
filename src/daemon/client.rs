@@ -12,7 +12,7 @@
 //! Deliberately dependency-free (`std::net` only, no async, no `reqwest`): the
 //! pre-edit hook runs synchronously on stdin, so the probe it will call in stage 3
 //! must work in that context. A raw HTTP/1.1 `GET /health` over a connect-timed
-//! `TcpStream` is enough to answer the only question here — "is a hank daemon
+//! `TcpStream` is enough to answer the only question here — "is a yupana daemon
 //! listening and healthy at this address?"
 
 use std::io::{Read, Write};
@@ -21,7 +21,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use super::{Definitions, Impact, MeasureReply, Neighbors};
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::graph::Dir;
 
 /// Whether a resident daemon answered a liveness probe.
@@ -331,7 +331,7 @@ pub fn fetch_impact(
 ///   canonicalized). The caller falls back and reports the reason.
 /// - `Some(Ok((host, port)))`: usable — query it.
 pub fn expected_same_root_daemon(
-    config: &HankConfig,
+    config: &YupanaConfig,
     root: &Path,
     timeout: Duration,
 ) -> Option<Result<(String, u16), String>> {
@@ -401,7 +401,7 @@ pub fn fetch_references(
 // emphasis the prose and comments use throughout this repo, and it is load-
 // bearing in a test name: it says which word the assertion turns on. Allowed
 // explicitly, and scoped to tests, so the lint stays live everywhere else
-// rather than being switched off crate-wide (hank #83).
+// rather than being switched off crate-wide (yupana #83).
 #[allow(non_snake_case)]
 mod tests {
     use super::*;
@@ -422,7 +422,7 @@ mod tests {
     fn an_unroutable_host_is_DOWN_not_UP() {
         // A resolve/connect failure is Down, never mistaken for Up.
         let r = probe(
-            "no.such.host.hank.invalid",
+            "no.such.host.yupana.invalid",
             3040,
             Duration::from_millis(200),
         );

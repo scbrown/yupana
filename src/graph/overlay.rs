@@ -1,4 +1,4 @@
-//! The per-tenant copy-on-write overlay (FR-14) — slice 2 of hank #2.
+//! The per-tenant copy-on-write overlay (FR-14) — slice 2 of yupana #2.
 //!
 //! An overlay owns the truth for the files its tenant has TOUCHED, and nothing
 //! else: each touched file's re-parsed structure, plus a derived index over
@@ -35,7 +35,7 @@ pub struct ParsedFile {
     /// Hex sha256 of the source — the FR-15 intern key.
     pub hash: String,
     /// The language the file parses as (by extension), or `None` for a file
-    /// hank does not extract — which still masks its base symbols when touched.
+    /// yupana does not extract — which still masks its base symbols when touched.
     pub language: Option<&'static str>,
     /// The extracted structure; empty when `language` is `None` or the parse
     /// found nothing.
@@ -99,7 +99,7 @@ pub struct Overlay {
 }
 
 /// The FR-16 frontier of editing `changed` symbols, over `view`'s composed
-/// `base + overlay` graph (hank #3). Updating an overlay is NOT just the
+/// `base + overlay` graph (yupana #3). Updating an overlay is NOT just the
 /// edited file: a signature change perturbs every symbol that references it,
 /// often in files the tenant never opened (§5.5). This bounds that blast to
 /// the changed symbols' transitive callers AND callees — reusing the ONE

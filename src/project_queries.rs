@@ -21,7 +21,7 @@
 /// both-sides-shipped-and-the-seam-went-silent failure this module's own
 /// [`TEXT_POLICY_QUERY`] comment records happening once already. A projected
 /// policy that predates the field decodes with `class: None` and falls back to
-/// the ambient mode, which is the behaviour hank had before the field existed.
+/// the ambient mode, which is the behaviour yupana had before the field existed.
 pub const POLICY_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>

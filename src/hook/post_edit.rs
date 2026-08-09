@@ -1,13 +1,13 @@
-//! The `PostToolUse` advisory — Hank's answer to "what did that edit reach?".
+//! The `PostToolUse` advisory — Yupana's answer to "what did that edit reach?".
 //!
-//! `hank hook post-edit` reads the harness's `PostToolUse` JSON on stdin and
+//! `yupana hook post-edit` reads the harness's `PostToolUse` JSON on stdin and
 //! returns an advisory: which symbols in the edited file have callers elsewhere,
 //! so the agent learns the blast radius of its own change synchronously, without
 //! calling a tool. **Advisory only** — the blocking companion is
 //! [`super::pre_edit`].
 //!
-//! With `[hank.serve] use_daemon = true` this is a thin client of the resident
-//! daemon (FR-31, hank #1 stage 5): the edited file's symbols are still
+//! With `[yupana.serve] use_daemon = true` this is a thin client of the resident
+//! daemon (FR-31, yupana #1 stage 5): the edited file's symbols are still
 //! extracted fresh HERE (their content is what just changed), but their callers
 //! come from the resident graph — no per-invocation `CodeGraph::build`. The
 //! daemon being unusable falls back to the transient build with a stderr note;
@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::{HookInput, ToolInput};
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::daemon::client::{expected_same_root_daemon, fetch_edit};
 use crate::extract::extract_symbols;
 use crate::graph::{CodeGraph, Dir};
@@ -185,11 +185,11 @@ type ExternalCallers = (Vec<(String, usize)>, BTreeSet<String>);
 /// be loud about). On fallback the edit is not recorded anywhere, which is
 /// fine: the overlay caches the tenant's edits, the file on disk is the record.
 fn resident_feed(root: &Path, rel: &str, tenant: Option<&str>) -> Option<ExternalCallers> {
-    let config = HankConfig::resolve(None, root).ok()?;
+    let config = YupanaConfig::resolve(None, root).ok()?;
     let (host, port) = match expected_same_root_daemon(&config, root, DAEMON_TIMEOUT)? {
         Ok(addr) => addr,
         Err(reason) => {
-            eprintln!("hank post-edit: daemon expected but unusable, transient fallback: {reason}");
+            eprintln!("yupana post-edit: daemon expected but unusable, transient fallback: {reason}");
             return None;
         }
     };
@@ -204,7 +204,7 @@ fn resident_feed(root: &Path, rel: &str, tenant: Option<&str>) -> Option<Externa
             reply.files.into_iter().collect(),
         )),
         Err(reason) => {
-            eprintln!("hank post-edit: daemon edit feed failed, transient fallback: {reason}");
+            eprintln!("yupana post-edit: daemon edit feed failed, transient fallback: {reason}");
             None
         }
     }
@@ -235,7 +235,7 @@ fn transient_callers(root: &Path, rel: &str, names: &[String]) -> Option<Externa
 /// Format the advisory shown to the agent.
 fn render(rel: &str, per_symbol: &[(String, usize)], files: &BTreeSet<String>) -> String {
     let mut out = format!(
-        "Hank (tree-sitter): your edit to {rel} touches symbol(s) with callers elsewhere \
+        "Yupana (tree-sitter): your edit to {rel} touches symbol(s) with callers elsewhere \
          — re-check these still compile.\n"
     );
     for (name, count) in per_symbol.iter().take(MAX_LISTED) {
@@ -258,7 +258,7 @@ fn render(rel: &str, per_symbol: &[(String, usize)], files: &BTreeSet<String>) -
 // emphasis the prose and comments use throughout this repo, and it is load-
 // bearing in a test name: it says which word the assertion turns on. Allowed
 // explicitly, and scoped to tests, so the lint stays live everywhere else
-// rather than being switched off crate-wide (hank #83).
+// rather than being switched off crate-wide (yupana #83).
 #[allow(non_snake_case)]
 mod tests {
     use super::*;
@@ -388,7 +388,7 @@ mod tests {
         std::fs::write(
             bobbin.join("config.toml"),
             format!(
-                "[hank.serve]\nuse_daemon = true\nbind_address = \"127.0.0.1\"\n\
+                "[yupana.serve]\nuse_daemon = true\nbind_address = \"127.0.0.1\"\n\
                  mcp_http_port = {port}\n"
             ),
         )

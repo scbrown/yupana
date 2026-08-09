@@ -1,6 +1,6 @@
 //! Bodies for the board tools, feature-split on `game-state`.
 //!
-//! The same shape `hank_promote` uses for the `quipu` arm: the tool is always
+//! The same shape `yupana_promote` uses for the `quipu` arm: the tool is always
 //! registered, and without the engine the body is an honest refusal naming the
 //! feature. A tool that accepted a board and silently did nothing would be worse
 //! than one that is absent — the caller would believe it had guarded.
@@ -10,21 +10,21 @@
 //! The MCP server holds its own [`crate::state::StateRegistry`], as the daemon
 //! holds its own. That is what a hot in-memory graph means, and it has a sharp
 //! edge worth stating: ingesting over `POST /ingest` and then guarding through
-//! `hank_guard` guards an EMPTY board. The refusal on an empty board is what
+//! `yupana_guard` guards an EMPTY board. The refusal on an empty board is what
 //! makes that a loud error instead of a clean report.
 
 use super::*;
 
-/// Body of `hank_ingest`.
+/// Body of `yupana_ingest`.
 pub(super) fn ingest(
-    server: &HankMcpServer,
+    server: &YupanaMcpServer,
     req: &StateIngestRequest,
 ) -> Result<CallToolResult, McpError> {
     #[cfg(not(feature = "game-state"))]
     {
         let _ = (server, req);
         Err(internal(crate::errors::Error::Config(
-            "hank_ingest needs the `game-state` feature; this server was built without it. \
+            "yupana_ingest needs the `game-state` feature; this server was built without it. \
              Nothing was ingested."
                 .to_string(),
         )))
@@ -43,16 +43,16 @@ pub(super) fn ingest(
     }
 }
 
-/// Body of `hank_guard`.
+/// Body of `yupana_guard`.
 pub(super) fn guard(
-    server: &HankMcpServer,
+    server: &YupanaMcpServer,
     req: &StateGuardRequest,
 ) -> Result<CallToolResult, McpError> {
     #[cfg(not(feature = "game-state"))]
     {
         let _ = (server, req);
         Err(internal(crate::errors::Error::Config(
-            "hank_guard needs the `game-state` feature; this server was built without it. These \
+            "yupana_guard needs the `game-state` feature; this server was built without it. These \
              orders were NOT checked — do not read this error as an approval."
                 .to_string(),
         )))
@@ -77,16 +77,16 @@ pub(super) fn guard(
     }
 }
 
-/// Body of `hank_whatif`.
+/// Body of `yupana_whatif`.
 pub(super) fn whatif(
-    server: &HankMcpServer,
+    server: &YupanaMcpServer,
     req: &StateWhatIfRequest,
 ) -> Result<CallToolResult, McpError> {
     #[cfg(not(feature = "game-state"))]
     {
         let _ = (server, req);
         Err(internal(crate::errors::Error::Config(
-            "hank_whatif needs the `game-state` feature; this server was built without it."
+            "yupana_whatif needs the `game-state` feature; this server was built without it."
                 .to_string(),
         )))
     }

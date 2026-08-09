@@ -1,4 +1,4 @@
-//! Integration: the REAL `hank daemon` binary over REAL HTTP (hank #1 close-out).
+//! Integration: the REAL `yupana daemon` binary over REAL HTTP (yupana #1 close-out).
 //!
 //! Everything else tests the router in-process; this drives the shipped binary:
 //! start → poll `/health` → tier-tagged query replies → §6.1 latency targets on
@@ -45,7 +45,7 @@ fn get(port: u16, path: &str) -> (u16, String) {
     (status, body)
 }
 
-/// Spawn `hank daemon` on an OS-assigned free port and wait for `/health`.
+/// Spawn `yupana daemon` on an OS-assigned free port and wait for `/health`.
 /// Returns the child and the port. Panics (with the daemon's stderr) if it
 /// does not come up — a daemon that cannot build the graph must refuse loudly.
 fn start_daemon(root: &std::path::Path) -> (Child, u16) {
@@ -56,7 +56,7 @@ fn start_daemon(root: &std::path::Path) -> (Child, u16) {
         .local_addr()
         .unwrap()
         .port();
-    let child = Command::new(env!("CARGO_BIN_EXE_hank"))
+    let child = Command::new(env!("CARGO_BIN_EXE_yupana"))
         .args(["daemon", "--port", &port.to_string()])
         .current_dir(root)
         .stdout(Stdio::null())
@@ -78,7 +78,7 @@ fn start_daemon(root: &std::path::Path) -> (Child, u16) {
             // implicitly, which neither kills nor waits on it: a daemon that came
             // up slowly (or came up but failed /health) survived the test run,
             // holding its port and its graph. In CI that is a stray process per
-            // failed run; locally it is a background `hank daemon` nobody
+            // failed run; locally it is a background `yupana daemon` nobody
             // remembers starting. Take its stderr with us, too — the panic that
             // follows is the only place it will ever be read.
             let _ = child.kill();

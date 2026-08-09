@@ -39,10 +39,10 @@ repos:
         types: [rust]
         # The hook reads the files it is HANDED. With pass_filenames off it fell
         # back to the index, so `pre-commit run --all-files` checked nothing and
-        # still reported Passed (hank #83).
+        # still reported Passed (yupana #83).
         pass_filenames: true
         # Show the hook's output even when it PASSES. It prints how many files it
-        # examined (hank #84), and pre-commit suppresses stdout for passing hooks
+        # examined (yupana #84), and pre-commit suppresses stdout for passing hooks
         # by default — so without this the subject count is visible only on the
         # failures it exists to make unnecessary. A count nobody can see in a green
         # log does not distinguish "checked 0" from "checked everything", which is

@@ -1,5 +1,5 @@
 //! The long-running commands — `watch`, `serve` (MCP) and `daemon` — split out
-//! of `cli` for size (hank #83). See `cli_analyze` for why this is a child
+//! of `cli` for size (yupana #83). See `cli_analyze` for why this is a child
 //! module.
 //!
 //! Each has a feature-stub arm that calls `self.planned`, which stays in `cli`
@@ -113,7 +113,7 @@ impl Cli {
 
 #[cfg(feature = "quipu")]
 impl super::Cli {
-    /// `hank verdicts` — promote the spooled verdicts into quipu.
+    /// `yupana verdicts` — promote the spooled verdicts into quipu.
     ///
     /// The endpoint is deployment config, not a caller's choice, for the same
     /// reason promotion's is: the graph a verdict lands in is data identity. A
@@ -125,18 +125,18 @@ impl super::Cli {
         spool: Option<&std::path::Path>,
     ) -> anyhow::Result<()> {
         let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let config = crate::config::HankConfig::resolve(None, &root).unwrap_or_default();
+        let config = crate::config::YupanaConfig::resolve(None, &root).unwrap_or_default();
         let endpoint = to
             .map(str::to_string)
             .filter(|e| !e.is_empty())
             .or_else(|| Some(config.quipu.endpoint.clone()).filter(|e| !e.is_empty()))
             .ok_or_else(|| {
-                anyhow::anyhow!("no quipu endpoint: set `[hank.quipu] endpoint` or pass --to")
+                anyhow::anyhow!("no quipu endpoint: set `[yupana.quipu] endpoint` or pass --to")
             })?;
         let path = match spool {
             Some(p) => p.to_path_buf(),
             None => crate::verdict_spool::resolve_path(
-                std::env::var("HANK_VERDICT_PATH").ok().as_deref(),
+                std::env::var("YUPANA_VERDICT_PATH").ok().as_deref(),
                 std::env::var("XDG_STATE_HOME").ok().as_deref(),
                 std::env::var("HOME").ok().as_deref(),
             )

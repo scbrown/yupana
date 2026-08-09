@@ -2,12 +2,12 @@
 //! policies (`quipu` feature).
 //!
 //! **Evidence locality** (`docs/book/src/design/policy-edit-hooks.md`): a
-//! `tree-sitter`-tier policy is *defined* in quipu but *evaluated* in Hank, where
-//! the code structure is hot. Hank never originates a policy — it projects
+//! `tree-sitter`-tier policy is *defined* in quipu but *evaluated* in Yupana, where
+//! the code structure is hot. Yupana never originates a policy — it projects
 //! quipu's canonical `boundary:"action"` structural policies into the same
 //! [`Rule`](crate::rules::Rule) shape the local config uses, and evaluates them at
 //! the pre-edit seam. The projection is strictly one-directional (quipu canonical
-//! → hank cache); if it diverged, Hank could allow what quipu would deny, so a
+//! → yupana cache); if it diverged, Yupana could allow what quipu would deny, so a
 //! projected verdict always declares the cache's [`Freshness`].
 //!
 //! Like promotion (`src/promote.rs`), this talks to quipu over HTTP — quipu's
@@ -24,9 +24,9 @@ use crate::types::Freshness;
 pub use crate::project_decode::{decode_policies, decode_text_rules};
 pub use crate::project_queries::{EXPOSURE_POLICY_IRI, POLICY_QUERY, TEXT_POLICY_QUERY};
 
-/// A policy projected from quipu: the [`Rule`] Hank evaluates, plus the governed
+/// A policy projected from quipu: the [`Rule`] Yupana evaluates, plus the governed
 /// `effect` that decides what a violation does (independent of the local
-/// `[hank.policy] mode`, so a quipu `deny` denies and a `warn` advises).
+/// `[yupana.policy] mode`, so a quipu `deny` denies and a `warn` advises).
 ///
 /// Serializable so the projection can be PERSISTED between hook invocations
 /// ([`crate::projection_cache`]). Every field round-trips: a cache that dropped
@@ -42,7 +42,7 @@ pub struct ProjectedPolicy {
     /// distinct from `rule.class`, which is what kind of bound it is.
     pub effect: String,
     /// The per-constraint latency budget quipu declared (SARC §5.1), if any.
-    /// Carried rather than enforced today: hank's guard already has a
+    /// Carried rather than enforced today: yupana's guard already has a
     /// whole-run `deadline_ms`, and a per-rule budget only becomes meaningful
     /// once rules can individually exceed it.
     pub latency_budget_ms: Option<u64>,
@@ -100,7 +100,7 @@ pub enum RepoExposure {
 
 /// Ask quipu whether `repo` (by label) is public, via the governed policy's
 /// own `/policy/check` — the same signed-verdict seam every other consumer of
-/// rule #1 uses, so hank and the pre-push gate can never disagree about what
+/// rule #1 uses, so yupana and the pre-push gate can never disagree about what
 /// "public" means. NEVER errors: any failure IS the `Unknown` answer, with the
 /// reason carried.
 ///
@@ -163,7 +163,7 @@ pub struct ProjectedViolation {
 }
 
 /// Whether a governed `effect` blocks an edit. Unknown effects are treated as
-/// blocking — the conservative direction for a governed decision Hank does not
+/// blocking — the conservative direction for a governed decision Yupana does not
 /// recognise.
 ///
 /// `throttle` is advisory HERE and only here: it is the soft-class PAA response
@@ -191,7 +191,7 @@ pub fn effect_blocks(effect: &str) -> bool {
 ///   is contradictory, and quipu's placement check now refuses to define it —
 ///   but a store that predates the check can still hold one, and honouring the
 ///   class is the reading that matches what the author declared it to BE.
-/// - a policy declared at a point hank does not host at pre-edit (`PAA`, `ATM`)
+/// - a policy declared at a point yupana does not host at pre-edit (`PAA`, `ATM`)
 ///   does not fire here at all. Evaluating a PAA rule at the gate would block on
 ///   evidence its author said should be judged after the fact.
 #[must_use]
@@ -204,9 +204,9 @@ pub fn policy_blocks(policy: &ProjectedPolicy, mode: crate::policy::Mode) -> boo
     }
 }
 
-/// Whether this policy is evaluated at hank's pre-edit gate.
+/// Whether this policy is evaluated at yupana's pre-edit gate.
 ///
-/// An undeclared verification point means "wherever hank evaluates it", which
+/// An undeclared verification point means "wherever yupana evaluates it", which
 /// is the pre-edit seam — the behaviour before the field existed. A DECLARED
 /// point is honoured: a `PAA` policy is skipped here and belongs to the
 /// post-edit auditor.
@@ -223,7 +223,7 @@ pub fn runs_at_pre_edit(policy: &ProjectedPolicy) -> bool {
 /// The rule engine is the same one local config uses — congruence means a
 /// projected policy is just a [`Rule`].
 ///
-/// Policies declared at a point hank does not host here ([`runs_at_pre_edit`])
+/// Policies declared at a point yupana does not host here ([`runs_at_pre_edit`])
 /// are SKIPPED, not evaluated-and-ignored: a PAA rule has nothing to say about
 /// a proposed edit, and reporting it at the gate would tell the model to fix
 /// something the rule's author scoped to after the fact.
@@ -414,7 +414,7 @@ impl ProjectionRegistry {
         let Some(path) = cache_path else {
             return Err(format!(
                 "{live_error}; and no cache path could be resolved (no \
-                 $HANK_PROJECTION_CACHE_PATH, $XDG_STATE_HOME or $HOME)"
+                 $YUPANA_PROJECTION_CACHE_PATH, $XDG_STATE_HOME or $HOME)"
             ));
         };
         match crate::projection_cache::load_servable(path, &self.endpoint, ttl_secs, now) {
@@ -463,7 +463,7 @@ fn report_overclaims(policies: &[ProjectedPolicy]) {
         .iter()
         .map(|p| (p.rule.name.clone(), p.hosted_at_layer))
         .collect();
-    let notices = crate::hosting::audit_projection(&claims, crate::hosting::HANK_HOSTS_AT);
+    let notices = crate::hosting::audit_projection(&claims, crate::hosting::YUPANA_HOSTS_AT);
     if notices.is_empty() {
         return;
     }
@@ -472,7 +472,7 @@ fn report_overclaims(policies: &[ProjectedPolicy]) {
         &[
             (
                 "actual_layer",
-                crate::hosting::HANK_HOSTS_AT.as_str().into(),
+                crate::hosting::YUPANA_HOSTS_AT.as_str().into(),
             ),
             ("count", (notices.len() as u64).into()),
             ("notices", notices.into()),

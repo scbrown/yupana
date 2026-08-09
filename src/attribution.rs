@@ -12,20 +12,20 @@
 //!   credentials are broader than its caller's uses them, which is only
 //!   *detectable* if the record says what the whole chain was.
 //!
-//! ## What hank can honestly supply, and what it deliberately will not
+//! ## What yupana can honestly supply, and what it deliberately will not
 //!
 //! `C_eval` is the `constraints` array [`crate::trace`] already emits, and
 //! `tool` comes straight off the hook payload. The rest turns on one question:
-//! is there a declared chain, or is hank being asked to invent one?
+//! is there a declared chain, or is yupana being asked to invent one?
 //!
-//! - **`P`, the principal-and-agent chain** — read from `HANK_PRINCIPAL_CHAIN`,
+//! - **`P`, the principal-and-agent chain** — read from `YUPANA_PRINCIPAL_CHAIN`,
 //!   a comma-separated list ordered caller-first. A dispatcher that spawns a
 //!   sub-agent appends itself and exports the extended chain; the sub-agent's
 //!   hook then records the real chain rather than its own leaf identity.
 //!   **Absent when undeclared.** Filling it with `[$SHANTY_AGENT]` would assert
 //!   "this action had exactly one principal" to precisely the auditor the field
 //!   exists for, and an undeclared chain is not a one-link chain.
-//! - **`planner`** — read from `HANK_PLANNER`, absent when unset. It is *not*
+//! - **`planner`** — read from `YUPANA_PLANNER`, absent when unset. It is *not*
 //!   derived from the chain's head: which link deliberated and which executed is
 //!   a fact about the dispatch, and reading it off list position would be an
 //!   inference wearing a record's clothes.
@@ -34,7 +34,7 @@
 //!   check below possible.
 //! - **`auth`** — **not recorded here, on purpose.** The effective authority is
 //!   the intersection of every link's grant, those grants live in quipu
-//!   (`governance::authority`), and hank cannot read them inside a 100 ms
+//!   (`governance::authority`), and yupana cannot read them inside a 100 ms
 //!   pre-edit budget. Recording `P` is what lets quipu's checker *derive* `auth`
 //!   at audit time from the authoritative source; recording a locally-guessed
 //!   `auth` would put a number in the field that the grant store never agreed
@@ -42,7 +42,7 @@
 //!
 //! ## The conflict flag
 //!
-//! `HANK_PRINCIPAL_CHAIN` is a declaration; `$SHANTY_AGENT` is what is running.
+//! `YUPANA_PRINCIPAL_CHAIN` is a declaration; `$SHANTY_AGENT` is what is running.
 //! When a chain is declared and its last link disagrees with the executor, the
 //! record says so (`attribution_conflict`) rather than silently preferring one.
 //! That disagreement is the observable signature of a laundered chain — an agent
@@ -52,11 +52,11 @@
 use serde_json::Value;
 
 /// The environment variable carrying the declared principal chain.
-pub const CHAIN_ENV: &str = "HANK_PRINCIPAL_CHAIN";
+pub const CHAIN_ENV: &str = "YUPANA_PRINCIPAL_CHAIN";
 /// The environment variable naming the planner, when the dispatcher declares one.
-pub const PLANNER_ENV: &str = "HANK_PLANNER";
+pub const PLANNER_ENV: &str = "YUPANA_PLANNER";
 
-/// The attribution tuple, as far as hank can honestly fill it.
+/// The attribution tuple, as far as yupana can honestly fill it.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Attribution {
     /// `P`, caller-first. Empty when undeclared — *not* a one-element chain.

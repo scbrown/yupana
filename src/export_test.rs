@@ -340,7 +340,7 @@ fn to_turtle_at_reads_an_older_commit_not_just_head() {
 /// why one vendored JavaScript file could freeze the entire code graph. The hourly
 /// quipu code-promote failed on 55 runs across 12 days with
 /// `Invalid IRI code point '['`, and CodeSymbol/CodeModule stayed at their
-/// 2026-07-23 state for quipu and hank the whole time.
+/// 2026-07-23 state for quipu and yupana the whole time.
 ///
 /// Every real offender was a JS computed method name, `[Symbol.iterator]`, not the
 /// Rust slice type one would predict — so this asserts the actual shape observed.

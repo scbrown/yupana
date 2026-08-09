@@ -30,7 +30,7 @@ pub struct EngineStatus {
     pub uptime_secs: u64,
     /// Precision tiers this build actually serves.
     pub tier: Vec<String>,
-    /// The tenant layer (hank #2): base commit + active overlays. `None` means
+    /// The tenant layer (yupana #2): base commit + active overlays. `None` means
     /// the layer is ABSENT (the root is not a git repo, so there is no commit
     /// to anchor a shared base to) — distinct from present-with-no-overlays.
     pub tenant_layer: Option<crate::graph::RegistryStatus>,
@@ -188,7 +188,7 @@ pub(super) fn def_item(n: &SymbolNode) -> DefItem {
 }
 
 /// Reply for `/references` — definition sites of a symbol by name, from the
-/// resident graph. Mirrors `hank_references` (which walks every file per call);
+/// resident graph. Mirrors `yupana_references` (which walks every file per call);
 /// here the node index answers with no re-extraction.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Definitions {
@@ -256,9 +256,9 @@ pub struct DepEdgeItem {
     pub line: usize,
 }
 
-/// Reply for `/dataflow`, mirroring `hank_dataflow`. Unlike every other query
+/// Reply for `/dataflow`, mirroring `yupana_dataflow`. Unlike every other query
 /// endpoint this is NOT resident — dataflow is a separate subsystem with no
-/// resident model yet (hank #22), so the daemon computes it per request over
+/// resident model yet (yupana #22), so the daemon computes it per request over
 /// the requested subtree. Served here anyway so the HTTP surface is complete
 /// (FR-27); the reply shape will not change when a resident model arrives.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

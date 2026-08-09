@@ -1,6 +1,6 @@
-# Cargo-invoked processes must never write hank's REAL state (aegis-0upyu).
+# Cargo-invoked processes must never write yupana's REAL state (aegis-0upyu).
 #
-# hank's spools resolve to `$XDG_STATE_HOME/hank/...`, else `~/.local/state/hank/...`,
+# yupana's spools resolve to `$XDG_STATE_HOME/yupana/...`, else `~/.local/state/yupana/...`,
 # unless an explicit env var overrides them. On a crew machine that default is the
 # LIVE fleet spool — the same file the aegis-mqnl advise-soak is measured from and
 # the same one the guard's durable projection cache lives in. So every `cargo test`
@@ -30,6 +30,6 @@
 # `relative = true` resolves against this file's parent, so the paths land under
 # the build directory and are cleaned by `cargo clean` like any other build output.
 [env]
-HANK_METRICS_PATH = { value = "target/test-state/metrics.jsonl", relative = true }
-HANK_VERDICT_PATH = { value = "target/test-state/verdicts.jsonl", relative = true }
-HANK_PROJECTION_CACHE_PATH = { value = "target/test-state/projection.json", relative = true }
+YUPANA_METRICS_PATH = { value = "target/test-state/metrics.jsonl", relative = true }
+YUPANA_VERDICT_PATH = { value = "target/test-state/verdicts.jsonl", relative = true }
+YUPANA_PROJECTION_CACHE_PATH = { value = "target/test-state/projection.json", relative = true }

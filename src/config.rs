@@ -1,10 +1,10 @@
-//! Hank configuration.
+//! Yupana configuration.
 //!
-//! Hank shares the stack's `.bobbin/config.toml` under a `[hank]` table, with
+//! Yupana shares the stack's `.bobbin/config.toml` under a `[yupana]` table, with
 //! the same resolution order Quipu uses: compiled defaults are overlaid by the
 //! user config (`~/.config/bobbin/config.toml`) and then the project config
 //! (`.bobbin/config.toml`). CLI flags win over all of them (applied by the
-//! caller). See `docs/hank-spec.md` §11.
+//! caller). See `docs/yupana-spec.md` §11.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -24,10 +24,10 @@ pub struct PolicyModeProvenance {
     pub lowered_by_project: bool,
 }
 
-/// Top-level Hank configuration (the `[hank]` table).
+/// Top-level Yupana configuration (the `[yupana]` table).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct HankConfig {
+pub struct YupanaConfig {
     /// Baseline ref the shared read-only graph is built at.
     pub base_ref: String,
     /// Run the LSP tier for precise facts where a build resolves.
@@ -46,11 +46,11 @@ pub struct HankConfig {
     pub quipu: QuipuConfig,
     /// Capability-scoped edit policy for the pre-edit guard (§5.8/FR-25).
     pub policy: crate::policy::PolicyConfig,
-    /// What the usage spool records about a guard decision (hank #77).
+    /// What the usage spool records about a guard decision (yupana #77).
     pub metrics: crate::audit::MetricsConfig,
 }
 
-impl Default for HankConfig {
+impl Default for YupanaConfig {
     fn default() -> Self {
         Self {
             base_ref: "main".to_string(),
@@ -159,7 +159,7 @@ pub struct QuipuConfig {
     /// When to promote: `"commit"`, `"merge"`, or `"manual"`.
     pub promote_on: String,
     /// Branch model: `"named_graph"` (preferred, needs Quipu quads) or
-    /// `"qualifier"` (fallback). See `docs/hank-spec.md` §9.4.
+    /// `"qualifier"` (fallback). See `docs/yupana-spec.md` §9.4.
     pub branch_model: String,
     /// Directory holding the SHACL shapes promotion validates against.
     pub shapes_path: String,
@@ -172,7 +172,7 @@ pub struct QuipuConfig {
     /// Path to the PKCS#8 verdict-signing key. The pre-edit guard signs with
     /// this key IF IT ALREADY EXISTS and spools the verdict; it never creates
     /// one, because a key materialising as a side effect of an agent's edit is
-    /// not something that should happen quietly. `hank verifier` creates it.
+    /// not something that should happen quietly. `yupana verifier` creates it.
     pub signing_key_path: String,
     /// How old the persisted projection (`crate::projection_cache`) may be and
     /// still be SERVED when quipu cannot be projected live. Past it the guard
@@ -202,28 +202,28 @@ impl Default for QuipuConfig {
             branch_model: "named_graph".to_string(),
             shapes_path: "shapes/".to_string(),
             endpoint: String::new(),
-            signing_key_path: "hank-signing.pk8".to_string(),
+            signing_key_path: "yupana-signing.pk8".to_string(),
             projection_cache_ttl_secs: 3600,
         }
     }
 }
 
-impl HankConfig {
+impl YupanaConfig {
     /// Refuse a mutating operation when `serve.read_only` is set.
     ///
     /// The write guard the docs promise (config.md: "Write guard for the broker /
     /// promotion endpoints"). Before this it was documented, settable, and INERT —
-    /// an operator who set `read_only = true` before exposing `hank serve` to a
+    /// an operator who set `read_only = true` before exposing `yupana serve` to a
     /// broker got no guard and no warning, which is strictly worse than an absent
     /// switch: a safety control that does nothing invites the trust it cannot
-    /// honour (aegis-ltjo). Now the one write hank performs — promotion — calls
+    /// honour (aegis-ltjo). Now the one write yupana performs — promotion — calls
     /// this and REFUSES with a distinguishable error naming the key, so the guard
     /// is real and any future served write is one `write_guard` call from being
     /// covered too.
     pub fn write_guard(&self, operation: &str) -> Result<()> {
         if self.serve.read_only {
             return Err(Error::Config(format!(
-                "refused: `serve.read_only = true` — this hank instance is \
+                "refused: `serve.read_only = true` — this yupana instance is \
                  configured read-only, so {operation} (a write) is refused. \
                  Unset serve.read_only to allow writes."
             )));
@@ -234,13 +234,13 @@ impl HankConfig {
     /// Load the merged configuration for a project rooted at `root`.
     ///
     /// Starts from defaults, overlays the user config if present, then the
-    /// project's `.bobbin/config.toml` `[hank]` table. Missing files are not an
+    /// project's `.bobbin/config.toml` `[yupana]` table. Missing files are not an
     /// error; a malformed file is.
     ///
     /// "Overlay" is per-key, not per-file. Replacing the whole table would mean
     /// a project config that sets one unrelated key silently discards every
     /// other setting the user config established — and when the discarded
-    /// setting is `[hank.policy]`, the capability guard goes inert while
+    /// setting is `[yupana.policy]`, the capability guard goes inert while
     /// looking exactly like a clean run. A fleet keeps its scopes in one
     /// user-level file precisely so they cannot drift, so that file has to
     /// survive a workspace defining `base_ref`.
@@ -284,10 +284,10 @@ impl HankConfig {
 
     /// Load configuration from exactly one file, over defaults — no discovery.
     ///
-    /// The file must exist: [`read_hank_table`] returns `None` both for an
-    /// absent file and for a present file with no `[hank]` table, and only the
+    /// The file must exist: [`read_yupana_table`] returns `None` both for an
+    /// absent file and for a present file with no `[yupana]` table, and only the
     /// first is an error, so existence is checked explicitly. A present file
-    /// with no `[hank]` table is a valid (if unusual) request for defaults.
+    /// with no `[yupana]` table is a valid (if unusual) request for defaults.
     pub fn load_from(path: &Path) -> Result<Self> {
         if !path.exists() {
             return Err(Error::Config(format!(
@@ -295,10 +295,10 @@ impl HankConfig {
                 path.display()
             )));
         }
-        match read_hank_table(path)? {
+        match read_yupana_table(path)? {
             Some(value) => value
                 .try_into()
-                .map_err(|e| Error::Config(format!("{}: [hank]: {e}", path.display()))),
+                .map_err(|e| Error::Config(format!("{}: [yupana]: {e}", path.display()))),
             None => Ok(Self::default()),
         }
     }
@@ -314,7 +314,7 @@ impl HankConfig {
 
         let mut merged: Option<toml::Value> = None;
         for path in sources.into_iter().flatten() {
-            let Some(table) = read_hank_table(path)? else {
+            let Some(table) = read_yupana_table(path)? else {
                 continue;
             };
             merged = Some(match merged {
@@ -327,7 +327,7 @@ impl HankConfig {
             None => Ok(Self::default()),
             Some(value) => value
                 .try_into()
-                .map_err(|e| Error::Config(format!("[hank]: {e}"))),
+                .map_err(|e| Error::Config(format!("[yupana]: {e}"))),
         }
     }
 }
@@ -381,7 +381,7 @@ fn merge(base: toml::Value, overlay: toml::Value) -> toml::Value {
 }
 
 fn explicit_policy_mode(path: &Path) -> Result<Option<crate::policy::Mode>> {
-    let Some(table) = read_hank_table(path)? else {
+    let Some(table) = read_yupana_table(path)? else {
         return Ok(None);
     };
     let Some(mode) = table
@@ -393,7 +393,7 @@ fn explicit_policy_mode(path: &Path) -> Result<Option<crate::policy::Mode>> {
     };
     let Some(mode) = mode.as_str() else {
         return Err(Error::Config(format!(
-            "{}: [hank.policy].mode must be a string",
+            "{}: [yupana.policy].mode must be a string",
             path.display()
         )));
     };
@@ -402,7 +402,7 @@ fn explicit_policy_mode(path: &Path) -> Result<Option<crate::policy::Mode>> {
         "advise" => Ok(Some(crate::policy::Mode::Advise)),
         "enforce" => Ok(Some(crate::policy::Mode::Enforce)),
         _ => Err(Error::Config(format!(
-            "{}: invalid [hank.policy].mode `{mode}`",
+            "{}: invalid [yupana.policy].mode `{mode}`",
             path.display()
         ))),
     }
@@ -418,7 +418,7 @@ fn user_config_path() -> Option<PathBuf> {
     })
 }
 
-/// Read the raw `[hank]` table from a config file, if the file exists.
+/// Read the raw `[yupana]` table from a config file, if the file exists.
 ///
 /// Returns the un-deserialized [`toml::Value`] so callers can merge tables
 /// before building the struct — deserializing each file separately would bake
@@ -426,21 +426,21 @@ fn user_config_path() -> Option<PathBuf> {
 /// real values from a lower-precedence file.
 ///
 /// Each file is still type-checked here, even though the result is discarded,
-/// so a malformed `[hank]` is reported against the file that actually contains
+/// so a malformed `[yupana]` is reported against the file that actually contains
 /// it rather than surfacing later as an error about the merged whole.
-fn read_hank_table(path: &Path) -> Result<Option<toml::Value>> {
+fn read_yupana_table(path: &Path) -> Result<Option<toml::Value>> {
     if !path.exists() {
         return Ok(None);
     }
     let text = std::fs::read_to_string(path)?;
     let root: toml::Value =
         toml::from_str(&text).map_err(|e| Error::Config(format!("{}: {e}", path.display())))?;
-    match root.get("hank") {
+    match root.get("yupana") {
         Some(section) => {
-            let _: HankConfig = section
+            let _: YupanaConfig = section
                 .clone()
                 .try_into()
-                .map_err(|e| Error::Config(format!("{}: [hank]: {e}", path.display())))?;
+                .map_err(|e| Error::Config(format!("{}: [yupana]: {e}", path.display())))?;
             Ok(Some(section.clone()))
         }
         None => Ok(None),

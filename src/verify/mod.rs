@@ -1,14 +1,14 @@
 //! Monitor-guided edit verification — a verdict on a *proposed* buffer.
 //!
 //! FR-23: given an edited buffer, re-run analysis on it against the base graph
-//! Hank already holds and return a boolean verdict plus violations. FR-24: this
+//! Yupana already holds and return a boolean verdict plus violations. FR-24: this
 //! is single-signal and boolean, served **directly** to agents — Bobbin may
-//! consume verdicts like any other Hank fact, but verification does not live
+//! consume verdicts like any other Yupana fact, but verification does not live
 //! there.
 //!
 //! ## What this tier can and cannot decide
 //!
-//! Every fact Hank serves carries a tier (FR-3), and a verdict is no exception.
+//! Every fact Yupana serves carries a tier (FR-3), and a verdict is no exception.
 //! At the tree-sitter tier there is no type information and no name resolution,
 //! so the verifier checks only what is decidable *syntactically* and reports the
 //! rest as unchecked rather than implying a clean bill of health:

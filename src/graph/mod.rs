@@ -5,8 +5,8 @@
 //! traversal answers "what does this change affect?" (callers, transitively)
 //! and "what does this call?" (callees). Phase 3 layers the tenant model over it:
 //! a shared read-only [`Base`] at a resolved commit, per-tenant copy-on-write
-//! [`Overlay`]s, and the composed [`TenantView`] the same BFS walks (hank #2;
-//! the FR-16 frontier recompute is hank #3).
+//! [`Overlay`]s, and the composed [`TenantView`] the same BFS walks (yupana #2;
+//! the FR-16 frontier recompute is yupana #3).
 //!
 //! The single breadth-first traversal lives in [`blast`] behind the [`Adjacency`]
 //! trait, so the base graph, the composed per-tenant view, and the frontier
@@ -50,7 +50,7 @@ pub struct SymbolNode {
     pub start_line: usize,
     /// 1-based last line of the definition. Carried so a graph-backed answer can
     /// report the symbol's EXTENT, not just where it starts — `refs` served this
-    /// from its own file walk before it read the graph (hank #76), and a lookup
+    /// from its own file walk before it read the graph (yupana #76), and a lookup
     /// that reads the graph must not have to drop a field to do so.
     pub end_line: usize,
     /// Provenance tier.
@@ -63,7 +63,7 @@ pub struct CodeGraph {
     by_name: HashMap<String, Vec<NodeIndex>>,
     /// Every call site keyed by CALLEE NAME → the caller nodes that invoke it,
     /// recorded whether or not the callee resolves to a definition here. This
-    /// is the FR-16 frontier index (hank #3): the materialized edges above only
+    /// is the FR-16 frontier index (yupana #3): the materialized edges above only
     /// exist when the callee had a definition at build time, so a name a tenant
     /// overlay ADDS (zero base definitions) has no incoming edge — but its base
     /// callers are still here, under its name. Deduplicated per name.
@@ -132,8 +132,8 @@ impl CodeGraph {
     /// repo before this existed:
     ///
     /// ```text
-    /// $ hank analyze --at main          analyzed 1 file(s), 1 symbol(s) @ main
-    /// $ hank analyze --at no-such-ref   analyzed 0 file(s), 0 symbol(s) @ no-such-ref
+    /// $ yupana analyze --at main          analyzed 1 file(s), 1 symbol(s) @ main
+    /// $ yupana analyze --at no-such-ref   analyzed 0 file(s), 0 symbol(s) @ no-such-ref
     /// ```
     ///
     /// A baseline that failed to build must SAY SO. A change-time rule diffs
@@ -262,7 +262,7 @@ impl CodeGraph {
     /// The base caller nodes that invoke `callee_name` anywhere in the tree —
     /// the FR-16 frontier index. Unlike walking incoming edges of `callee_name`'s
     /// definitions, this also answers for a name with NO definition here, which
-    /// is exactly the overlay-new symbol a tenant just introduced (hank #3).
+    /// is exactly the overlay-new symbol a tenant just introduced (yupana #3).
     #[must_use]
     pub fn callers_of_name(&self, callee_name: &str) -> &[NodeIndex] {
         self.callers_by_callee

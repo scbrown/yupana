@@ -1,4 +1,4 @@
-//! The `hank` command-line interface.
+//! The `yupana` command-line interface.
 //!
 //! `analyze`, `refs`, `status`, `serve` (MCP), the Phase-2 call-graph commands
 //! `callers`/`impact` and `dataflow`, `export` (referential structure as Turtle,
@@ -6,7 +6,7 @@
 //! §5.5/FR-17), and the `hook` adapter (edit-reactive harness integration,
 //! §5.9/FR-30) and `verify` (the FR-23/FR-24 edit-buffer verdict) are live.
 //! `promote` (Phase-4 Quipu promotion, FR-19/20/21) is live behind the `quipu`
-//! feature and prints a phase notice in a build without it (`docs/hank-spec.md`).
+//! feature and prints a phase notice in a build without it (`docs/yupana-spec.md`).
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -16,11 +16,11 @@ use colored::Colorize;
 use tracing_subscriber::EnvFilter;
 
 use crate::cli_cmds;
-use crate::config::HankConfig;
+use crate::config::YupanaConfig;
 use crate::extract::extract_symbols;
 
 // Command bodies live in child modules to keep this file under the size
-// limit (hank #83); they are `impl Cli` blocks reaching `self` as before.
+// limit (yupana #83); they are `impl Cli` blocks reaching `self` as before.
 #[path = "cli_analyze.rs"]
 mod cli_analyze;
 #[path = "cli_promote.rs"]
@@ -30,9 +30,9 @@ mod cli_serve;
 #[path = "cli_status.rs"]
 mod cli_status;
 
-/// Hank — live, per-tenant code structure for the Bobbin × Quipu stack.
+/// Yupana — live, per-tenant code structure for the Bobbin × Quipu stack.
 #[derive(Debug, Parser)]
-#[command(name = "hank", version, about, long_about = None)]
+#[command(name = "yupana", version, about, long_about = None)]
 pub struct Cli {
     /// The subcommand to run.
     #[command(subcommand)]
@@ -173,7 +173,7 @@ enum Commands {
         #[arg(long, default_value = "turtle")]
         format: ExportFormat,
         /// Promote into the Quipu at this base URL instead of printing Turtle.
-        /// SHACL-validates before writing, exactly like `hank promote`.
+        /// SHACL-validates before writing, exactly like `yupana promote`.
         #[arg(long)]
         to: Option<String>,
     },
@@ -210,7 +210,7 @@ enum Commands {
         commit: String,
         /// Quipu base URL to promote into (e.g. `http://localhost:8080`).
         /// REQUIRED for a write, and it is the ONLY thing that authorizes one: a
-        /// discovered `[hank.quipu] endpoint` is deliberately NOT enough, because
+        /// discovered `[yupana.quipu] endpoint` is deliberately NOT enough, because
         /// that key is set host-wide so the pre-edit guard can READ the rule
         /// catalogue. Without `--to`, promotion refuses and names the endpoint it
         /// found. `--dry-run` needs no target.
@@ -253,12 +253,12 @@ enum Commands {
         /// Target shell.
         shell: clap_complete::Shell,
     },
-    /// Show the ed25519 public key of hank's verdict-signing identity, to
+    /// Show the ed25519 public key of yupana's verdict-signing identity, to
     /// register in quipu as this verifier's `aegis:publicKey` (quipu feature).
     #[cfg(feature = "quipu")]
     Verifier {
         /// Path to the PKCS#8 signing key (created 0600 if absent).
-        #[arg(long, default_value = "hank-signing.pk8")]
+        #[arg(long, default_value = "yupana-signing.pk8")]
         key_path: PathBuf,
     },
     /// Promote spooled verdicts into quipu (quipu feature).
@@ -270,7 +270,7 @@ enum Commands {
     /// is the other half.
     #[cfg(feature = "quipu")]
     Verdicts {
-        /// Quipu base URL. Defaults to `[hank.quipu] endpoint`.
+        /// Quipu base URL. Defaults to `[yupana.quipu] endpoint`.
         #[arg(long)]
         to: Option<String>,
         /// Spool file. Defaults to the same resolution the guard uses.
@@ -292,7 +292,7 @@ enum HookEvent {
     PreBash,
 }
 
-/// Output formats for `hank export`.
+/// Output formats for `yupana export`.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ExportFormat {
     /// RDF Turtle in the `bobbin:` code ontology.
@@ -342,15 +342,15 @@ impl Cli {
     /// Every command that reads config goes through here, so `--config` is
     /// honoured uniformly rather than silently ignored on all but a chosen few
     /// (aegis-ll3p).
-    fn load_config(&self, root: &Path) -> anyhow::Result<HankConfig> {
-        HankConfig::resolve(self.config.as_deref(), root).map_err(Into::into)
+    fn load_config(&self, root: &Path) -> anyhow::Result<YupanaConfig> {
+        YupanaConfig::resolve(self.config.as_deref(), root).map_err(Into::into)
     }
 
     /// Run the parsed command.
     pub async fn run(self) -> anyhow::Result<()> {
         // DELIBERATE-USE metric (aegis-0nng): the leverage signal aegis-m9ln's
         // workflow half exists to move — is anyone running analyze/impact/refs
-        // BEFORE a change, or does hank only ever fire as the passive guard?
+        // BEFORE a change, or does yupana only ever fire as the passive guard?
         // The hook is excluded (the guard spools its own richer line) and so is
         // shell completion (not a use). Fail-silent by the spool's contract.
         if let Some(cmd) = deliberate_use_name(&self.command) {
@@ -372,7 +372,7 @@ impl Cli {
             },
             Commands::Completions { shell } => {
                 let mut cmd = Cli::command();
-                clap_complete::generate(*shell, &mut cmd, "hank", &mut io::stdout());
+                clap_complete::generate(*shell, &mut cmd, "yupana", &mut io::stdout());
                 Ok(())
             }
             #[cfg(feature = "quipu")]
@@ -453,7 +453,7 @@ impl Cli {
                 path,
             } => {
                 // THE WRITE GUARD, made real (aegis-ltjo). Promotion is the write
-                // hank performs, so `serve.read_only` must refuse it — BEFORE any
+                // yupana performs, so `serve.read_only` must refuse it — BEFORE any
                 // work, so the guard holds regardless of feature.
                 //
                 // `--dry-run` is still gated here, deliberately. A dry run writes
@@ -481,7 +481,7 @@ impl Cli {
     fn planned(&self, name: &str, phase: u8, detail: &str) {
         if !self.quiet {
             eprintln!(
-                "{} `{name}` is planned for Phase {phase}: {detail}. See docs/hank-spec.md.",
+                "{} `{name}` is planned for Phase {phase}: {detail}. See docs/yupana-spec.md.",
                 "note:".yellow().bold()
             );
         }

@@ -1,4 +1,4 @@
-//! FR-3 on the CLI surface: `hank impact` / `callers` / `dataflow --json` carry
+//! FR-3 on the CLI surface: `yupana impact` / `callers` / `dataflow --json` carry
 //! their provenance `tier` (aegis-8yrn). These served an unlabelled tree-sitter
 //! approximation before the fix — no `tier` field — which is what FR-3 exists to
 //! forbid, worst of all on `impact` (the blast-radius / trust-boundary surface).
@@ -16,7 +16,7 @@ fn project() -> tempfile::TempDir {
 }
 
 fn run(dir: &tempfile::TempDir, args: &[&str]) -> serde_json::Value {
-    let out = Command::cargo_bin("hank")
+    let out = Command::cargo_bin("yupana")
         .unwrap()
         .args(args)
         .arg(dir.path())
@@ -73,7 +73,7 @@ fn refs_not_found_message_is_unchanged() {
     // Guard the shared not_found() edit: adding a tier field must not disturb the
     // human-readable path other commands rely on.
     let dir = project();
-    Command::cargo_bin("hank")
+    Command::cargo_bin("yupana")
         .unwrap()
         .args(["callers", "does_not_exist"])
         .arg(dir.path())
@@ -84,7 +84,7 @@ fn refs_not_found_message_is_unchanged() {
 
 #[test]
 fn status_json_advertises_only_implemented_tiers() {
-    // `hank status` used to push "lsp"/"cpg" onto the advertised tier
+    // `yupana status` used to push "lsp"/"cpg" onto the advertised tier
     // list under empty Cargo features that gated no code, so `--features lsp` made
     // the tool claim a precision tier it did not have. status now advertises a tier
     // only when something can actually produce one.
@@ -104,8 +104,8 @@ fn status_json_advertises_only_implemented_tiers() {
     // with `code=3` and an empty stderr whenever it did not.
     let dir = tempfile::tempdir().unwrap();
     let pinned = dir.path().join("pinned.toml");
-    std::fs::write(&pinned, "[hank.quipu]\nenabled = false\n").unwrap();
-    let out = Command::cargo_bin("hank")
+    std::fs::write(&pinned, "[yupana.quipu]\nenabled = false\n").unwrap();
+    let out = Command::cargo_bin("yupana")
         .unwrap()
         .args(["status", "--json", "--config"])
         .arg(&pinned)

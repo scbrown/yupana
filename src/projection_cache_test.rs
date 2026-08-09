@@ -62,11 +62,11 @@ fn precedence_explicit_then_xdg_then_home() {
     );
     assert_eq!(
         resolve_path(None, Some("/s"), Some("/h")).unwrap(),
-        PathBuf::from("/s/hank/projection.json")
+        PathBuf::from("/s/yupana/projection.json")
     );
     assert_eq!(
         resolve_path(None, None, Some("/h")).unwrap(),
-        PathBuf::from("/h/.local/state/hank/projection.json")
+        PathBuf::from("/h/.local/state/yupana/projection.json")
     );
     assert!(resolve_path(None, None, None).is_none());
 }
