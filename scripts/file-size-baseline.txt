@@ -8,8 +8,6 @@
 # Regenerate with: scripts/check-file-size.sh --update-baseline
 # Removing a line once its file is under the limit is the point; do not add lines by
 # hand to silence a new violation — that is what the limit is for.
-src/cli.rs	510
-src/cli_status.rs	619
 src/export.rs	605
 src/hook/rule_planes.rs	567
-src/promote.rs	709
+src/promote.rs	625

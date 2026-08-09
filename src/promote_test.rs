@@ -4,6 +4,9 @@
 
 use super::*;
 
+use super::promote_chunk::CLASS_CONSTRAINED_PREDICATES;
+use super::promote_payload::{dump_payload_to, payload_slug};
+
 const SHAPES: &str = CODE_EDGE_SHAPES;
 
 // The round-trip that pins the exporter to the shapes (#13/#14): a REAL

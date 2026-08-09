@@ -50,6 +50,7 @@ All notable changes to this project will be documented in this file.
 - Seal the last three fixtures that reached the live graph([1fd9d20](https://github.com/scbrown/yupana/commit/1fd9d204095b5a95d1cda3b075497079c1d4ebb8))
 - Pin the graph plane off in the tier-advertisement test([2c162a2](https://github.com/scbrown/yupana/commit/2c162a223e2e8466f2693f00ad3b44ef66867d79))
 - Session ids must not collide, or tests suppress each other's fail-open notice([09d9717](https://github.com/scbrown/yupana/commit/09d971719572d840620c0427aca87049bbbff575))
+
 ## [0.5.0] - 2026-08-03
 
 ### Added

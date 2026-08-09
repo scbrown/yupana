@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use colored::Colorize;
-use tracing_subscriber::EnvFilter;
 
 use crate::cli_cmds;
 use crate::config::YupanaConfig;
@@ -29,6 +28,12 @@ mod cli_promote;
 mod cli_serve;
 #[path = "cli_status.rs"]
 mod cli_status;
+#[path = "cli_status_rules.rs"]
+mod cli_status_rules;
+#[path = "cli_tracing.rs"]
+mod cli_tracing;
+
+pub use cli_tracing::init_tracing;
 
 /// Yupana — live, per-tenant code structure for the Bobbin × Quipu stack.
 #[derive(Debug, Parser)]
@@ -485,39 +490,5 @@ impl Cli {
                 "note:".yellow().bold()
             );
         }
-    }
-}
-
-///
-/// `RUST_LOG` wins when set — the conventional Rust escape hatch, and it can
-/// target specific modules, which a boolean flag cannot. Absent it, `--verbose`
-/// raises the default from `info` to `debug`. So precedence is
-/// `RUST_LOG` > `--verbose` > the `info` default.
-pub fn init_tracing(verbose: bool) {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(default_log_level(verbose)));
-    let _ = tracing_subscriber::fmt()
-        .with_writer(io::stderr)
-        .with_env_filter(filter)
-        .try_init();
-}
-
-/// The default tracing level when `RUST_LOG` is unset.
-fn default_log_level(verbose: bool) -> &'static str {
-    if verbose {
-        "debug"
-    } else {
-        "info"
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verbose_raises_the_default_log_level() {
-        assert_eq!(default_log_level(false), "info");
-        assert_eq!(default_log_level(true), "debug");
     }
 }
