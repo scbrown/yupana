@@ -19,12 +19,12 @@
 
 ## Known debt inherited from hank main (pre-existing, not caused by the rename)
 
-`just check` was already red on hank's final `main`: the file-size
-ratchet reports `src/cli.rs` at 523 lines against a frozen baseline of
-510, and `src/cli_status.rs` at 647 against 619. The growth landed in
-earlier commits; the honest fixes are to shrink both files back under
-their baselines (the ratchet permits shrinking only). Tracked here so
-it isn't mistaken for rename fallout.
+**Resolved (2032fb1).** `just check` was red on hank's final `main`:
+four files stood above the file-size ratchet — `cli.rs` (523>510),
+`cli_status.rs` (647>619), `promote.rs` (1022>709), and `policy.rs`
+(514, over the hard limit unlisted). All four were paid down by
+extraction into child modules and size-exempt `_test.rs` files; the
+baseline regenerated strictly downward and the gate exits 0.
 
 ## Projects that need updating (reference map)
 
