@@ -1,0 +1,324 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Policy edit hooks - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/design/policy-edit-hooks.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="policy-edit-hooks--the-yupana-side"><a class="header" href="#policy-edit-hooks--the-yupana-side">Policy edit hooks — the yupana side</a></h1>
+<p>This documents yupana's half of the <strong>performant edit hooks for policy</strong> design.
+The write-time enforcement half lives in quipu and is already implemented; see
+<a href="https://github.com/scbrown/quipu/blob/main/docs/design/policy-edit-hooks.md">quipu <code>docs/design/policy-edit-hooks.md</code></a>
+for the full split. This page records what yupana owns, why none of it ships yet,
+and the backlog.</p>
+<h2 id="deciding-principle-evidence-locality"><a class="header" href="#deciding-principle-evidence-locality">Deciding principle: evidence locality</a></h2>
+<p>Evaluate a policy where its evidence is already hot.</p>
+<ul>
+<li><strong>Governed-fact policies</strong> — the claim reasons over quipu's committed graph
+(provenance, prior verdicts, workflow state). Quipu evaluates these at its
+pre-commit gate.</li>
+<li><strong>Structural-evidence policies</strong> — the claim reasons over the call graph,
+reachability, blast radius, or symbols. <strong>Yupana</strong> holds that hot, per tenant,
+at the <code>boundary:"action"</code> edit-time seam (<code>yupana hook pre-edit</code> + the resident
+daemon). Yupana evaluates these against a hot <strong>projection</strong> of quipu's canonical
+policies.</li>
+</ul>
+<p>Canonical policy definitions, SHACL validation, verdict signing, and the
+human-owned <code>VerifierRegistration</code> root of trust stay in quipu regardless. Yupana
+holds only a projected read cache — a policy is never <em>defined</em> in yupana.</p>
+<h2 id="what-yupana-owns"><a class="header" href="#what-yupana-owns">What yupana owns</a></h2>
+<ul>
+<li>A <strong>hot projection</strong> of quipu's <code>boundary:"action"</code> policies whose claims are
+structural, refreshed through yupana's existing watch/daemon machinery. Strictly
+one-directional (quipu canonical → yupana cache) with invalidation on quipu
+policy writes. If it diverged, yupana could allow what quipu would deny — so the
+projection is a cache, never a source of truth.</li>
+<li><strong>Edit-time evaluation</strong> at <code>hook pre-edit</code>: an edit that violates a structural
+<code>deny</code> policy is blocked at edit time, against the resident graph, with a
+tier-tagged verdict.</li>
+<li><strong>Verdict promotion</strong>: yupana's edit-time verdicts promote back into quipu as
+signed, bitemporal facts, extending the existing <code>commit → touched</code> promote
+path.</li>
+</ul>
+<h2 id="two-rule-sources-one-engine"><a class="header" href="#two-rule-sources-one-engine">Two rule sources, one engine</a></h2>
+<p>Structural policies reach the guard from two sources, evaluated by the same
+<code>rules</code> engine (<code>src/rules.rs</code>) — a Selector (a tree-sitter <code>.scm</code> capture) + a
+Predicate (a regex + a <code>must-match</code> / <code>must-not-match</code> / <code>must-exist</code> direction)
+over the text an edit <strong>introduces</strong>:</p>
+<ul>
+<li><strong>Local config</strong> (<code>[[yupana.policy.rules]]</code>) — ships today, no quipu needed. The
+operational plane, the same status the capability <code>scopes</code> have: yupana-local,
+authoritative, always fresh. This is where "no ticket id in a comment" lives
+for a standalone yupana.</li>
+<li><strong>Projected from quipu</strong> (<code>quipu</code> feature) — the governed plane. Yupana fetches
+quipu's <code>boundary:"action"</code>, <code>tree-sitter</code>-tier policies and decodes them into
+the <em>same</em> <code>Rule</code> shape (field-for-field congruence with <code>aegis:Selector</code> +
+<code>aegis:Predicate</code>), so a projected policy is just a <code>Rule</code> the engine already
+runs. Opt-in via <code>[yupana.quipu] enabled + endpoint</code>. Yupana never <em>defines</em> a
+governed policy — the projection is one-directional (quipu canonical → yupana
+cache), and a verdict declares the cache's freshness.</li>
+</ul>
+<p>Both are <code>Mode</code>-staged (advise-first) and fail open: a rule set that will not
+compile, or a quipu that cannot be reached, is a LOUD allow, never a silent pass.</p>
+<h2 id="what-ships-now-and-what-remains"><a class="header" href="#what-ships-now-and-what-remains">What ships now, and what remains</a></h2>
+<p>The <code>cpg</code>/<code>lsp</code> lesson still binds — a feature must gate real code and never
+advertise precision it lacks. What ships is real and tier-tagged; what does not
+is named honestly below.</p>
+<p><strong>Reframed:</strong> projection is HTTP, not a crate pin. Like promotion (<code>POST /knot</code>),
+Yupana reads policies over quipu's <code>POST /query</code> (W3C <code>sparql-results+json</code>), so
+<code>--features quipu</code> needs no <code>quipu</code> <em>crate</em> dependency — H-DEP's "pin the dep" is
+not a prerequisite for projection. The commented-out <code>quipu = { git = … }</code> line
+stays commented; the RDF/<code>ureq</code> crates the feature already pulls are enough.</p>
+<h2 id="backlog"><a class="header" href="#backlog">Backlog</a></h2>
+<ul>
+<li><strong>H-DEP</strong> ✅ (reframed) Projection + promotion run over HTTP; no quipu crate
+pin needed. <code>--features quipu</code> is in the CI matrix.</li>
+<li><strong>H-PROJECTION</strong> ✅ <code>src/project.rs</code>: decode quipu's structural policies into
+<code>Rule</code>s, a <code>ProjectionRegistry</code> with sync-state freshness. <em>Remaining:</em> the
+resident/async refresh cache (FR-31) — today's projection fetches per edit,
+which is the daemon-side optimization, not the semantics.</li>
+<li><strong>H-EDIT-EVAL</strong> ✅ <code>hook pre-edit</code> evaluates projected policies; a <code>deny</code>-effect
+policy blocks under <code>Enforce</code>, tier- and freshness-tagged.</li>
+<li><strong>H-FRESHNESS</strong> ✅ (slice) A verdict declares its freshness: local config is
+<code>fresh</code> (evidence is the exact proposed edit); a projection reports its real
+sync state (<code>fresh</code>, or <code>stale</code> when a refresh fails). The full copy-on-write /
+frontier code-graph freshness (Phase 3) is only needed for <em>graph-consulting</em>
+structural rules, which are not shipped — the buffer-local rules are fresh by
+construction.</li>
+<li><strong>H-PROMOTE-VERDICT</strong> ✅ <code>src/verdict.rs</code>: ed25519 signing that MIRRORS quipu's
+<code>signing.rs</code> (same <code>ring</code>, same canonical <code>v1|…</code> message, same hex encodings),
+a <code>VerdictShape</code>-conformant signed <code>aegis:Verdict</code> Turtle, and <code>promote_verdict</code>
+over <code>/knot</code>. <code>yupana verifier</code> prints the public key a human registers as
+<code>aegis:publicKey</code>. <em>Remaining:</em> wiring the trigger (promote a verdict on the
+post-commit <code>commit → touched</code> path) and key rotation — the signing + promotion
+primitives are done and interop-tested against the shared scheme.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../design/vision.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../design/governance-plane.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../design/vision.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../design/governance-plane.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

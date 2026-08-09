@@ -1,0 +1,823 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Governance Plane - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/design/governance-plane.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="governance-plane--policy-workflows--verification"><a class="header" href="#governance-plane--policy-workflows--verification">Governance Plane — Policy, Workflows &amp; Verification</a></h1>
+<p>Status: <strong>design — ready to implement.</strong> This describes a governance capability
+that layers on the Yupana × Quipu × Bobbin stack. The primitives, trust model,
+integration contract, and build order are settled; see
+<a href="#implementation-phasing">Implementation phasing</a> for the MVP and the build order,
+and <a href="#decisions-and-deferrals">Decisions and deferrals</a> for the calls made. Not
+yet built. Scope for v1 is a single trust domain.</p>
+<h2 id="motivation"><a class="header" href="#motivation">Motivation</a></h2>
+<p>The stack today is a <strong>knowledge plane</strong> — Yupana (live code structure), Quipu
+(governed bitemporal record), Bobbin (search / fusion / RAG). Its job is to
+<em>know things about the code and feed context to agents</em>.</p>
+<p>Missing is a <strong>governance plane</strong>: the layer that decides <em>what a fleet of
+agents should be doing, and what they are allowed to do</em>. Today that intent
+lives in skills — advisory checklists an agent may freely ignore. The goal is to
+make it <strong>load-bearing</strong>:</p>
+<ul>
+<li><strong>Workflows propel</strong> the agent — soft but pervasive, always driving toward the
+next step.</li>
+<li><strong>Policy constrains</strong> the agent — hard but targeted, a wall at the boundaries
+that matter.</li>
+</ul>
+<p>The governance plane <em>uses</em> the knowledge plane; it is not part of it. Policies
+query Yupana/Quipu/Bobbin for the facts they evaluate over.</p>
+<h2 id="the-verification-spine"><a class="header" href="#the-verification-spine">The verification spine</a></h2>
+<p>"How is an artifact verified?" and "what is a policy?" are the same question. A
+policy <strong>is</strong> a verification predicate. So the plane is not three sibling
+concepts (artifact, workflow, policy) — it is <strong>one recursive primitive,
+verification</strong>, with policy as the verifier at each node.</p>
+<p>Verification composes bottom-up:</p>
+<pre><code class="language-text">Workflow    — verified iff its Steps are (per its order / dependencies)
+  └ Step     — verified iff its required Artifacts are + its gate policy holds
+     └ Artifact — verified iff its Reference, dereferenced, satisfies its Claim   ← leaf
+</code></pre>
+<p>Only the <strong>leaf</strong> touches reality — it dereferences to concrete evidence from
+the knowledge plane. Everything above is composition of leaf verdicts.</p>
+<h2 id="primitives"><a class="header" href="#primitives">Primitives</a></h2>
+<p>The minimal vocabulary. <code>Artifact</code> / <code>Step</code> / <code>Workflow</code> / <code>Policy</code> are <em>types</em>
+of <code>Entity</code>; the rest are base primitives.</p>
+<ul>
+<li><strong>Entity</strong> — a governed, typed node in Quipu (bitemporal, provenanced).</li>
+<li><strong>Reference</strong> — an entity's handle to a <em>concrete target</em>: a commit, a file, a
+Yupana code-symbol IRI, a URL. The entity is the governed abstraction; the
+reference points at the real thing.</li>
+<li><strong>Claim</strong> — the verifiable assertion an entity carries (e.g. <em>"exists and is
+approved"</em>).</li>
+<li><strong>Evidence</strong> — facts that bear on a claim, drawn from the knowledge plane
+(Yupana), the record (Quipu), or external systems (git, CI). Evidence is either
+<strong>canonical</strong> (read directly from a source of truth) or an <strong>attestation</strong> (a
+signed statement from the system that owns the fact).</li>
+<li><strong>Verifier (= Policy)</strong> — a <strong>pure predicate</strong> mapping evidence → verdict
+<code>{satisfied | unsatisfied | unknown}</code>. <code>unknown</code> (no evidence yet) is distinct
+from <code>unsatisfied</code> (evidence says no). Policies are <strong>external</strong>: a policy
+<em>targets an entity type</em>, the way a SHACL shape targets a class. One policy
+governs all entities of that type.</li>
+<li><strong>Verdict</strong> — the result, <strong>stored</strong> as a governed bitemporal fact. Carries a
+<code>tier</code> and <code>freshness</code> (see <a href="../concepts/tiers-and-freshness.html">Tiers and Freshness</a>),
+is signed, is bound to the evidence it saw, and is reproducible (see
+<a href="#verdict-integrity">Verdict integrity</a>).</li>
+<li><strong>Actor / Role</strong> — who performs a step. Enables fleet-level assignment and
+separation-of-duties policies (<em>"the reviewer must differ from the author"</em>).</li>
+<li><strong>Binding / Gate</strong> — attaches a policy to a <em>boundary</em> with an <em>effect</em>. The
+boundary is either an <strong>action</strong> (pre-edit) or a <strong>transition</strong> (step
+completion) — the same policy can be <code>unknown</code> at one and decisive at the
+other. The policy stays pure; the effect is contextual and may be <strong>computed
+from risk × confidence</strong> (see <a href="#risk-and-confidence">Risk and confidence</a>)
+rather than fixed.</li>
+<li><strong>Instance (Run)</strong> — a definition gone live for a specific run (this bead, this
+session), holding live state + verdicts. Distinct from the definition it
+instantiates.</li>
+<li><strong>Catalog leaf</strong> — the composable atoms policies are built from, of two kinds
+(see <a href="#catalog-initial">Catalog</a>): a <strong>selector</strong> (evidence → a <em>set</em>, e.g.
+<code>changed-symbols</code>) and a <strong>predicate</strong> (element → bool, e.g. <code>has-test</code>).
+Registered, evidence-grounded, tier-tagged.</li>
+<li><strong>Parameterization</strong> — definitions are <em>templates</em>. References and actors are
+<em>patterns</em> (<code>repo://{repo}/docs/design/{bead}.md</code>, role <code>reviewer</code>) resolved
+when an Instance binds its parameters (bead, repo, agent).</li>
+<li><strong>Temporal trigger</strong> — a scheduled re-verification for verdicts that depend on
+<em>elapsed time</em> (SLAs, deadlines), which reactive fact-change invalidation does
+not cover.</li>
+</ul>
+<h3 id="composition-types"><a class="header" href="#composition-types">Composition types</a></h3>
+<ul>
+<li><strong>Artifact</strong> — an entity standing for a thing produced or required (design doc,
+test result, ADR, commit, review). Verified at the leaf.</li>
+<li><strong>Step</strong> — one unit of work: <code>{ produces: [Artifact], requires: [Artifact], gated-by: [Policy], actor: Role }</code>.</li>
+<li><strong>Transition</strong> — a <em>guarded</em> edge from a step: <code>{on: &lt;outcome&gt;, to: &lt;step&gt;}</code>. A
+step may have several — <code>approve → next</code>, <code>request-changes → back to implement</code>, <code>reject → terminal</code>, <code>escalate → higher role</code> — so the workflow is
+a branching, possibly looping graph, not a line. The guard is a predicate over
+the step's verdicts / decision, evaluated by the same machinery. Loops are
+bounded (an iteration cap or temporal trigger) so a review ↔ changes cycle
+cannot spin forever.</li>
+<li><strong>Workflow</strong> — a directed graph of Steps and guarded Transitions (branches,
+loops, terminals).</li>
+</ul>
+<h2 id="verdict-integrity"><a class="header" href="#verdict-integrity">Verdict integrity</a></h2>
+<p>A bare "satisfied ✓" written into the record is forgeable by anyone who can
+write a fact. The plane defends against the <strong>agent</strong> (including a compromised
+one), not the human operator — the human is the trust root. A verdict is
+therefore an <strong>attestation, not a claim</strong>, with four properties:</p>
+<ul>
+<li><strong>Authenticity</strong> — every verdict is signed by a <em>registered</em> verifier
+identity. Quipu accepts a verdict-fact only if signed by a verifier registered
+for that predicate. An agent cannot mint Yupana's signature.</li>
+<li><strong>Binding</strong> — the verdict names the <em>content hash</em> of the evidence it saw.
+Change the referent → hash changes → the stored verdict is automatically
+stale. Kills tamper-after-the-fact and replay.</li>
+<li><strong>Reproducibility</strong> — because the predicate is pure and deterministic and the
+evidence is content-addressed, any independent verifier can re-run it over the
+same evidence and must get the same result. Verdicts are <strong>checked, not
+trusted</strong>. (Purity is the security property, not just clean design.) The
+verdict retains <code>evidence-hash + predicate-id</code> so third parties can re-derive.</li>
+<li><strong>Evidence provenance</strong> — every evidence input is either <strong>canonical</strong> (Yupana
+reads the source of truth directly from its own live map — the agent's edit
+<em>is</em> the evidence, nothing to fake) or a <strong>signed attestation</strong> from the owning
+system (CI signs "green over hash H"; the approver signs the approval). The
+chain terminates at a root; nothing in it is an agent's self-report.</li>
+</ul>
+<p><strong>Architectural constraint:</strong> the verifier must run <strong>out-of-band from the agent
+it verifies</strong> — a service the agent <em>calls</em>, not a library the agent <em>hosts</em> —
+or the agent runs its own verifier over a doctored repo and signs anything. The
+gatekeeper sits outside the gate.</p>
+<p><strong>Root of trust:</strong> this reduces "trust every verdict" to "trust the verifier
+<em>keys</em> and the <em>registry</em> of which identity may attest which predicate." That
+registry is a governed, human-authored definition. The scheme does not eliminate
+trust; it concentrates it into a small, human-owned surface and makes everything
+downstream reproducible.</p>
+<h2 id="risk-and-confidence"><a class="header" href="#risk-and-confidence">Risk and confidence</a></h2>
+<p>Fixed allow / deny gates are too blunt. Two derived signals let the plane
+<em>modulate</em> enforcement instead of hardcoding it.</p>
+<h3 id="confidence--how-sure-a-verdict-is"><a class="header" href="#confidence--how-sure-a-verdict-is">Confidence — how sure a verdict is</a></h3>
+<p>Derived from the evidence behind it, reusing tier + freshness:</p>
+<ul>
+<li><strong>tier</strong> — a <code>has-test</code> from a tree-sitter heuristic is lower-confidence than
+one LSP-resolved; a <code>tests-green</code> from a signed CI attestation is highest.</li>
+<li><strong>freshness</strong> — a <code>stale</code> verdict is less trustworthy than a <code>fresh</code> one.</li>
+<li><strong>verifier reliability</strong> — attested-and-reproduced &gt; attested &gt; self-reported.</li>
+</ul>
+<p>Confidence composes <strong>weakest-link</strong>: a policy is only as confident as its
+least-confident leaf (a selector's tier bounds the predicate quantified over it).
+<code>unknown</code> has no confidence — it is not a soft <code>unsatisfied</code>.</p>
+<h3 id="risk--how-much-is-at-stake"><a class="header" href="#risk--how-much-is-at-stake">Risk — how much is at stake</a></h3>
+<p>An attribute of an action / change / step:</p>
+<ul>
+<li><strong>blast radius</strong> (Yupana) — more dependents reached, more risk.</li>
+<li><strong>criticality</strong> — a human-authored <strong>risk map</strong> (<code>auth/**</code>, <code>payments/**</code> =
+high). A governed artifact; sovereignty applies.</li>
+<li><strong>reversibility / sensitivity</strong> — a deploy or a data migration outranks a lint.</li>
+</ul>
+<h3 id="risk-adaptive-effect"><a class="header" href="#risk-adaptive-effect">Risk-adaptive effect</a></h3>
+<p>The gate's effect becomes <code>effect(risk, confidence)</code>, not a constant:</p>
+<ul>
+<li>low risk + high confidence → <strong>allow</strong> silently</li>
+<li>low risk + low confidence → <strong>warn</strong></li>
+<li>high risk + low confidence → <strong>require-approval / escalate</strong></li>
+<li>high risk + high confidence → allow, but <strong>record</strong></li>
+</ul>
+<p>Two consequences:</p>
+<ul>
+<li><strong>Confidence sufficiency scales with risk.</strong> A high-risk change can <em>require</em> a
+minimum confidence tier — "for an <code>auth</code> change, <code>tests-green</code> must be CI-tier,
+not a tree-sitter guess" (<code>require-confidence ≥ X when risk ≥ Y</code>).</li>
+<li><strong>The enforcement floor interacts with risk.</strong> On a harness that can only
+<code>observe</code>, high-risk work must be pre-authorized or routed to a hard-gating
+harness. Risk decides which harness may run which work.</li>
+</ul>
+<p>This is the market's <em>adaptive governance</em> — assisted by default, promoted or
+blocked by measured gates — expressed as one function over signals the stack
+already produces.</p>
+<h2 id="roles-in-the-stack"><a class="header" href="#roles-in-the-stack">Roles in the stack</a></h2>
+<ul>
+<li><strong>Yupana — live verifier, gatekeeper, guide.</strong> Holds the code in memory, so it
+evaluates code-grounded claims <em>before commit</em> at <code>tier=live</code>, and that live
+verdict stream <em>is</em> the propulsion: it tells the agent which claims are not yet
+green. It enforces gates (via a harness adapter) and injects workflow context.
+It also <strong>exports its verification capabilities</strong> into the catalog — predicates
+like <code>has-tests</code>, <code>blast-radius-within</code>, <code>doc-section-exists</code> that only the
+live map can evaluate. It runs a <strong>co-located decision point</strong>: Quipu pushes the
+relevant policy <em>bundle</em> and Yupana evaluates the live-tier leaves locally at the
+edit boundary — no per-tick round-trip (the OPA-bundle pattern). Runs as a
+<strong>service</strong>, out-of-band from the agent.</li>
+<li><strong>Quipu — the policy / workflow engine of record.</strong> Holds the entities,
+references, and durable bitemporal verdicts; verifies the committed tier;
+enforces definition-time well-formedness via SHACL; keeps the audit trail. It
+owns <strong>composition, storage, committed-tier evaluation, reproducibility, and
+the reactive reasoner</strong> — generalizing SHACL (policy-as-schema is one policy
+kind) into a capability Quipu can also apply to its <em>own</em> data.</li>
+<li><strong>Bobbin — authoring intelligence + surfacing.</strong> Powers conversational
+authoring (drafting in the vocabulary of <em>this</em> codebase) and surfaces
+governance state to agents.</li>
+<li><strong>Harness adapters — propel / constrain actuation.</strong> Thin per-harness shims
+(Claude Code hooks; a fleet daemon; a generic governance-MCP + tool-call
+proxy). Enforcement strength is a <strong>gradient</strong>, tagged like a tier:
+<code>prevented</code> (harness exposes a pre-action gate) vs <code>observed</code> (detect,
+record, escalate). Never present <code>observed</code> as <code>prevented</code>.</li>
+</ul>
+<h2 id="entities-in-quipu"><a class="header" href="#entities-in-quipu">Entities in Quipu</a></h2>
+<p>The primitives are RDF classes in Quipu's governed ontology — so definition-time
+verification is just SHACL over them, and the plane is <em>native</em> to Quipu, not
+bolted on. Where Quipu already has a governance type, reuse it:</p>
+<div class="table-wrapper"><table><thead><tr><th>Primitive</th><th>Quipu class</th><th>Notes</th></tr></thead><tbody>
+<tr><td>Policy</td><td>extends <code>Directive</code></td><td>governed rule / intent, human provenance</td></tr>
+<tr><td>Verdict / violation</td><td><code>Observation</code></td><td>bitemporal, signed, content-bound</td></tr>
+<tr><td>Decision (human)</td><td><code>DecisionRecord</code></td><td>signed approve / reject / changes</td></tr>
+<tr><td>Workflow / Step / Transition</td><td>new classes</td><td>the composition graph</td></tr>
+<tr><td>Artifact / PlanStep</td><td>new classes</td><td>reference concrete targets / code symbols</td></tr>
+<tr><td>Selector / predicate</td><td>new classes</td><td>evidence-source-bound catalog leaves</td></tr>
+</tbody></table>
+</div>
+<p>References resolve to existing stack IRIs: a code-grounded Artifact or PlanStep
+points at <code>bobbin:code/{repo}/{path}::{symbol}</code> — the same identity Yupana mints on
+promotion — so intent, structure, and governance reconcile on one identifier.</p>
+<p>Each class ships a SHACL shape; a definition that violates its shape is rejected
+at write (definition-time verification). The governance ontology thus <em>extends</em>
+the code-entities ontology (<code>CodeModule</code>, <code>CodeSymbol</code>, <code>Document</code>, <code>Section</code>,
+<code>Bundle</code>) already in Quipu — governance facts and code facts live in one graph,
+queryable together in a single SPARQL query.</p>
+<h2 id="integration-contract-yupana--quipu"><a class="header" href="#integration-contract-yupana--quipu">Integration contract (Yupana ↔ Quipu)</a></h2>
+<p>Four exchanges across the seam. Quipu signs bundles; Yupana signs verdicts; both
+verify against the shared verifier registry.</p>
+<pre><code class="language-text">Quipu (engine of record)                         Yupana (co-located decision point)
+  │  1. bundle pull ─────────────────────────────▶  cache live-evaluable policies
+  │◀──── 2. signed live verdicts (at milestones) ──  evaluate live-tier leaves
+  │◀──── 4. milestone promotion ──────────────────  on transition
+  ▲                                                 3. yupana_plan_declare ◀── agent/harness
+</code></pre>
+<ol>
+<li><strong>Bundle pull (Quipu → Yupana).</strong> On instance bind — and reactively on any
+policy change — Quipu compiles the <em>live-evaluable</em> subset of the workflow's
+policies into a <strong>signed bundle</strong>: the catalog leaves Yupana can evaluate, their
+gates + effect matrix, the relevant risk-map slice, and the registry entries.
+A re-pushed bundle invalidates the affected cached verdicts.</li>
+<li><strong>Live verdict envelope (Yupana → Quipu).</strong> Yupana emits signed verdicts —
+<code>{predicate-id, target-ref, outcome, evidence-hash, tier, freshness, confidence, verifier, sig}</code> — cached live in Yupana and <strong>promoted to Quipu only
+at milestones</strong> (the live / settled split).</li>
+<li><strong><code>yupana_plan_declare</code> (agent / harness → Yupana).</strong> <code>{instance, targets: [symbol-ref], rationale}</code>; Yupana binds targets to symbols, reconciles against
+the inferred plan, and returns the plan + an immediate coverage verdict.
+Companion <code>yupana_plan_status</code> returns the plan and per-<code>PlanStep</code> verdicts.</li>
+<li><strong>Milestone promotion (Yupana / plane → Quipu).</strong> On a transition,
+<code>{instance, step, transition, verdicts[], committed-evidence, actor, valid-time}</code> is written as bitemporal facts, waking the reactive reasoner.</li>
+</ol>
+<p>Tool surface: <code>yupana_policy_check</code>, <code>yupana_plan_declare</code>, <code>yupana_plan_status</code> join
+Yupana's existing <code>yupana_*</code> MCP tools (and REST mirror); harness adapters call these
+plus the pre-edit hook. The <code>quipu</code> Cargo feature already carries Yupana's
+promotion path; policy bundles ride the same channel.</p>
+<h2 id="authoring"><a class="header" href="#authoring">Authoring</a></h2>
+<p>Two distinct "creations" — do not conflate:</p>
+<ul>
+<li><strong>Definition</strong> — authoring a workflow / policy <em>template</em>. Governed,
+human-driven, written to Quipu. This is what "authoring" means below.</li>
+<li><strong>Instance</strong> — a definition going live for a run. Automatic, runtime, held in
+Yupana's overlay + Quipu state. Not authored.</li>
+</ul>
+<h3 id="creation-is-composition-over-a-catalog"><a class="header" href="#creation-is-composition-over-a-catalog">Creation is composition over a catalog</a></h3>
+<p>Underneath authoring sits a <strong>catalog</strong> of atomic, pre-verified,
+evidence-grounded <strong>selectors and predicates</strong> (see <a href="#catalog-initial">Catalog</a>).
+Authoring is composition three layers deep, bottoming out in the catalog:</p>
+<pre><code class="language-text">Workflow  = directed graph of Steps + guarded Transitions
+  Step    = { produces, requires, gated-by: [Policy], actor: Role }
+  Policy  = { targets: EntityType, claim: &lt;composed catalog leaves&gt; }   (external)
+  Catalog leaf = selector | predicate, bound to an evidence source      (leaf)
+</code></pre>
+<p>Nobody writes raw predicates to build a workflow — they <strong>assemble named
+pieces</strong>. That is what makes authoring both user-oriented and safe (cf. a
+Semgrep rule registry, Terraform modules). The authoring <em>modalities</em> are
+interchangeable front-ends over this same composition:</p>
+<ul>
+<li><strong>Conversational</strong> — describe the process to a builder agent; it decomposes to
+a workflow + inferred policies, renders a draft, iterates. Powered by Bobbin
+retrieval.</li>
+<li><strong>Visual</strong> — phases as nodes, gates as policy-chips; edit rules via a guided
+builder. Fits Quipu's embeddable web components.</li>
+<li><strong>Guided rule builder</strong> — WHO / WHAT / WHEN (condition over facts) / THEN
+(effect). Never raw predicate syntax.</li>
+<li><strong>Mined</strong> — the plane observes fleet behavior in Quipu's bitemporal log and
+<em>proposes</em> a codification of a recurring sequence; a human approves.</li>
+</ul>
+<h3 id="the-composition-grammar"><a class="header" href="#the-composition-grammar">The composition grammar</a></h3>
+<p>The grammar over the catalog is small: a <strong>selector</strong> yields a set, a
+<strong>predicate</strong> tests an element, and <strong>combinators</strong> (<code>and</code> / <code>or</code> / <code>not</code>) plus
+<strong>quantifiers</strong> (<code>all</code> / <code>any</code>) bind them. A composed policy — a fitness
+function — reads:</p>
+<pre><code class="language-text">∀ s ∈ changed-public-symbols(run) : has-test(s)
+      └─ selector (Yupana)             └─ predicate (Yupana)
+targets Step[implement].exit-gate  ·  effect: block
+</code></pre>
+<p>Definitions are <strong>templates</strong>: references and actors are patterns
+(<code>repo://{repo}/docs/design/{bead}.md</code>, role <code>reviewer</code>) that an Instance
+resolves when it binds its parameters (bead, repo, agent). Authoring is over
+roles and patterns; runtime resolves them.</p>
+<h3 id="dry-run-against-history"><a class="header" href="#dry-run-against-history">Dry-run against history</a></h3>
+<p>Because predicates are pure and reproducible, a draft policy is replayed over
+past evidence <em>before</em> promotion — <em>"this would have blocked 3 of the last 20
+merges"</em> — via Quipu's counterfactual <code>speculate()</code> over the bitemporal log. You
+tune against reality, then promote; the same replay validates a <strong>mined</strong>
+proposal. No governance rule goes live blind.</p>
+<h3 id="creation-is-itself-verified"><a class="header" href="#creation-is-itself-verified">Creation is itself verified</a></h3>
+<p>A definition is an Entity with the Claim <em>"well-formed"</em> — acyclic step graph,
+every referenced policy exists in the catalog, every <code>produces</code> / <code>requires</code>
+resolves. That claim is checked at write time by <strong>SHACL</strong> (definition-time
+verification), the same spine one altitude up:</p>
+<ul>
+<li><strong>Definition-time</strong> — <em>is this workflow well-formed?</em> (SHACL, at write, Quipu)</li>
+<li><strong>Run-time</strong> — <em>is this workflow satisfied by reality?</em> (stored verdicts, at
+execution, Yupana + Quipu)</li>
+</ul>
+<h3 id="catalog-growth-and-sovereignty"><a class="header" href="#catalog-growth-and-sovereignty">Catalog growth and sovereignty</a></h3>
+<ul>
+<li><strong>Catalog + escape hatch.</strong> 90% is composition of named predicates; an expert
+may author a <em>raw</em> predicate (a graph query / Yupana capability) and <strong>register
+it back</strong> into the catalog as a new named primitive. A newly registered
+predicate is itself an entity that must be verified/reviewed before it enters
+the catalog — creation-is-verified, recursively.</li>
+<li><strong>Sovereignty.</strong> Three producers — human composes, agent proposes, system mines
+— all emit a candidate that becomes governing only after definition-time
+verification <strong>and</strong> human promotion. The thing that governs the agents cannot
+be silently rewritten by an agent.</li>
+</ul>
+<h2 id="catalog-initial"><a class="header" href="#catalog-initial">Catalog (initial)</a></h2>
+<p>A starting set — deliberately small, meant to be refined. Every entry is
+evidence-grounded and tier-tagged; the escape hatch grows it. <code>run</code> is the bound
+Instance context.</p>
+<h3 id="selectors-evidence--set"><a class="header" href="#selectors-evidence--set">Selectors (evidence → set)</a></h3>
+<ul>
+<li><code>changed-files(run)</code> — files touched — <em>git / Yupana overlay</em></li>
+<li><code>changed-symbols(run)</code> — symbols touched — <em>Yupana</em></li>
+<li><code>changed-public-symbols(run)</code> — exported subset of the above — <em>Yupana</em></li>
+<li><code>blast-radius(change)</code> — dependents / frontier of a change — <em>Yupana</em></li>
+<li><code>callers(symbol)</code> / <code>callees(symbol)</code> — <em>Yupana</em></li>
+<li><code>sinks-reached(source)</code> — taint / dataflow reachable sinks — <em>Yupana (cpg)</em></li>
+<li><code>referencing-docs(symbol)</code> / <code>referenced-symbols(section)</code> — doc↔code — <em>Yupana</em></li>
+<li><code>required-artifacts(step)</code> / <code>prior-steps(step)</code> — <em>Quipu (definition)</em></li>
+</ul>
+<h3 id="predicates-element--bool"><a class="header" href="#predicates-element--bool">Predicates (element → bool)</a></h3>
+<p>Code-grounded, live tier (<em>Yupana</em>):</p>
+<ul>
+<li><code>has-test(symbol)</code> · <code>symbol-exists(ref)</code> · <code>doc-section-exists(ref)</code></li>
+<li><code>blast-radius-within(change, scope)</code> · <code>in-scope(action, scope)</code></li>
+<li><code>sanitized-before(source, sink-class)</code> — no unsanitized taint path</li>
+</ul>
+<p>Record-grounded, committed tier (<em>Quipu</em>):</p>
+<ul>
+<li><code>approval-exists(entity, by-role)</code> · <code>decision-record-exists(change)</code></li>
+<li><code>different-actor-than(step-a, step-b)</code> · <code>artifact-verified(artifact)</code></li>
+<li><code>within-duration(event, dur)</code> — depends on a temporal trigger</li>
+</ul>
+<p>Attested by external owners:</p>
+<ul>
+<li><code>tests-green(artifact)</code> · <code>build-succeeds(commit)</code> — <em>CI (signed)</em></li>
+<li><code>commit-exists(ref)</code> — <em>git</em> · <code>no-secrets(change)</code> — <em>scanner (signed)</em></li>
+</ul>
+<h3 id="combinators"><a class="header" href="#combinators">Combinators</a></h3>
+<ul>
+<li>boolean: <code>and</code> · <code>or</code> · <code>not</code></li>
+<li>quantifiers over a selector: <code>all</code> · <code>any</code></li>
+</ul>
+<h2 id="execution-model"><a class="header" href="#execution-model">Execution model</a></h2>
+<p>Per run, the plane drives the loop through the harness adapter:</p>
+<pre><code class="language-text">turn
+  ├─ propel     inject "phase, done, next step, unmet claims"  (derived: definition × live verdicts)
+  ├─ constrain  each action → policy gate → allow / ask / deny  (PreToolUse-equivalent)
+  ├─ advance    observe completion → verify → advance state machine
+  └─ gate       on attempted stop → exit-criteria verdicts met?
+                  ├─ no  → block, return remaining steps → agent continues
+                  └─ yes → transition / complete → promote run to Quipu (audit)
+</code></pre>
+<p>The injected guide content is <strong>not authored separately</strong> — it is <em>derived</em> from
+<code>definition × current verdicts</code>. Verdicts are derived facts: when a referent
+changes, the verdict goes <code>stale</code> and staleness propagates up the artifact →
+step → workflow chain (Quipu's reactive reasoner + Yupana freshness).</p>
+<h3 id="state-live-vs-settled"><a class="header" href="#state-live-vs-settled">State: live vs settled</a></h3>
+<p>The state machine obeys the same tier split as the rest of the stack — so the
+answer to <em>"do we write every step to Quipu?"</em> is <strong>no</strong>.</p>
+<ul>
+<li><strong>Live tier (Yupana).</strong> The hot loop runs in Yupana's session runtime over the
+overlay: live-tier gates, the current-step pointer, plan progress, propulsion.
+Volatile, per-session, re-derived on demand — <em>never</em> written to Quipu
+tick-by-tick. It is ephemeral precisely because it is re-derivable, the same
+reason overlays are.</li>
+<li><strong>Settled tier (Quipu).</strong> Only <strong>transitions and committed verdicts</strong> are
+promoted — step entered/exited, gate passed, run completed — each a sparse,
+audit-worthy bitemporal fact. Quipu's reactive reasoner drives the <em>settled</em>
+transitions (cross-agent handoffs, temporal triggers); Yupana drives the <em>live</em>
+ones.</li>
+</ul>
+<p>The <strong>Instance</strong> is a Quipu entity (identity, workflow, parameters, last durable
+milestone); Yupana holds a live <em>projection</em> of it. Agents coordinate through the
+Quipu record, not shared memory — a handoff is: agent A promotes a milestone →
+the reasoner enqueues the next step for agent B's role → agent B's Yupana
+rehydrates from that milestone.</p>
+<h3 id="resumability"><a class="header" href="#resumability">Resumability</a></h3>
+<p>Resume is not a context reload — it is <code>last-promoted-milestone (Quipu) + re-derived live verdicts (Yupana)</code>. Durable progress is never lost; the volatile
+delta since the last milestone is cheap to re-derive by re-verifying the current
+working tree. Because verdicts are content-bound, anything the world changed
+while paused surfaces as <strong>stale</strong>, so resume is precise about what shifted —
+which a silent checkpoint cannot be. State lives in the plane, not the context
+window, so a different agent (or harness) can resume the same Instance.</p>
+<h2 id="intent-map-tactical-plan"><a class="header" href="#intent-map-tactical-plan">Intent map (tactical plan)</a></h2>
+<p>Yupana maps what the code <em>is</em>; the intent map adds what the agent <em>intends to do
+to it</em>, and binds the two. It is the middle layer between the strategic workflow
+(Quipu) and the raw code graph (Yupana) — and the layer that makes tactical resume
+and intent-conformance possible.</p>
+<p>A <strong><code>PlanStep</code></strong> entity references a code symbol (<code>add-sanitizer → parseInput</code>)
+and belongs to the running Step / Instance. Only Yupana can bind intent to
+structure live, holding both the code graph and the edit overlay at once.</p>
+<h3 id="sourcing-the-plan"><a class="header" href="#sourcing-the-plan">Sourcing the plan</a></h3>
+<p>Yupana <strong>infers</strong> a draft plan from the harness's plan / todo output and the
+agent's opening edits, binding each item to symbols. The agent may <strong>declare</strong> a
+plan to override or correct the inference (<code>yupana_plan_declare</code>), and a declared
+plan wins. Inference is the low-friction default; declaration is the authority.
+Requiring a plan before edits is itself a policy (<code>plan-declared-before-edit</code>).</p>
+<h3 id="what-it-unlocks--all-on-the-existing-spine"><a class="header" href="#what-it-unlocks--all-on-the-existing-spine">What it unlocks — all on the existing spine</a></h3>
+<ul>
+<li><strong>Plan completeness</strong> — <code>∀ s ∈ blast-radius(change) : s ∈ plan.targets</code>
+(<code>plan-covers-blast-radius</code>): flags symbols in the blast radius the plan omits.
+Verification of the <em>plan's</em> coherence with the code, not the code's.</li>
+<li><strong>Tactical resume</strong> — verdicts on PlanSteps (done / pending / drifted) give
+resume granularity down to the individual edit.</li>
+<li><strong>Intent-conformance</strong> — <code>∀ edit ∈ run : edit.target ∈ plan.targets</code> → else
+scope-creep. <strong>Soft by default</strong> (<code>warn</code> / <code>require-revision</code>, since
+re-planning is healthy); <strong>hard only when composed</strong> with a scope policy that
+already matters (drift <em>into</em> a protected module → <code>deny</code>).</li>
+<li><strong>Targeted context</strong> — Yupana and Bobbin inject exactly the symbol, its blast
+radius, and its tests for the next planned edit instead of dumping context.</li>
+</ul>
+<p>Plan drift is expected: the plan is a living artifact, re-verified as it changes.</p>
+<h2 id="human-in-the-loop"><a class="header" href="#human-in-the-loop">Human in the loop</a></h2>
+<p>Human review needs <strong>no new machinery</strong> — a human decision is just another
+<em>attested evidence source</em>, the same shape as a CI attestation. A
+<code>require-approval</code> gate (which risk-adaptive effect already produces for
+high-risk / low-confidence) sits <code>unknown</code> until a human <strong>signs</strong> a decision,
+which lands as a fact and satisfies the gate. <em>Obtaining</em> the decision is a Step
+assigned to a human <strong>Actor</strong>; <em>checking</em> it is a policy. The decision is a
+signed Artifact — <code>{instance, gate, approve | reject | changes, by, rationale, valid-time}</code>.</p>
+<h3 id="asynchronous-by-default"><a class="header" href="#asynchronous-by-default">Asynchronous by default</a></h3>
+<p>A fleet of persistent agents cannot block on a synchronous human, so the flow
+suspends and resumes:</p>
+<pre><code class="language-text">gate → require-approval → verdict unknown
+  → Instance suspends (milestone promoted to Quipu — durable)
+  → DecisionRequest dispatched to the human's queue (adapter / notification)
+  → the agent is freed
+  ⟳ … human responds whenever …
+  → signed Decision lands as a fact
+  → reactive reasoner re-evaluates → resume / branch / terminate,
+     re-dispatching to whatever agent fills the role
+</code></pre>
+<p>The decision <strong>wakes the workflow, not the agent</strong> — human latency is decoupled
+from agent lifetime, because state lives in the plane (this is
+<a href="#resumability">Resumability</a> earning its rent). The operator becomes an <strong>async
+approver over a governance inbox</strong> (part of Quipu's web surface), each request
+pre-loaded with the context the plane already computed — diff, blast radius,
+failing verdict, risk score. The same DecisionRequest routes sync (harness-inline
+when present) or async (inbox) by availability.</p>
+<h3 id="async-specific-guarantees"><a class="header" href="#async-specific-guarantees">Async-specific guarantees</a></h3>
+<ul>
+<li><strong>Approvals are content-bound.</strong> The human approves <em>hash H</em>; if the artifact
+changes while the request waits, the approval is <strong>stale</strong> and does not
+auto-apply — re-request. This kills approve-then-sneak-in-changes, and is just
+verdict content-binding reused.</li>
+<li><strong>Approvals are role-restricted signed attestations</strong> under the verifier
+registry. An agent can no more forge or self-issue an approval than forge a
+Yupana verdict; separation-of-duties (<code>different-actor-than</code>) prevents
+self-approval. Sovereignty enforced cryptographically.</li>
+<li><strong>Waits are bounded by temporal triggers.</strong> No decision within the SLA →
+escalate to another role / auto-reject / notify.</li>
+</ul>
+<h3 id="the-spectrum"><a class="header" href="#the-spectrum">The spectrum</a></h3>
+<p>One mechanism, different triggers:</p>
+<ul>
+<li><strong>Approval gate</strong> — sign off before a transition.</li>
+<li><strong>Review with changes</strong> — approve / reject / <strong>request-changes</strong>, the last
+branching the workflow back to a prior step.</li>
+<li><strong>Ambiguity escalation</strong> — triggered by <em>low confidence</em> (not high risk): the
+plane asks a human a call it cannot make.</li>
+<li><strong>Human-authored step</strong> — the work is inherently human; a policy verifies the
+produced artifact.</li>
+<li><strong>Break-glass override</strong> — the human is the trust root and may overrule a
+<code>deny</code>, but <em>only</em> via a signed, recorded override fact — never a silent
+bypass. Gates are overridable by default; a small <code>non-overridable</code> set (e.g.
+legal / compliance) requires <strong>N-of-M</strong> human sign-off instead.</li>
+</ul>
+<h2 id="worked-example"><a class="header" href="#worked-example">Worked example</a></h2>
+<p>One <code>feature-sdlc</code> run, threading every primitive. Bead <code>KUE-42</code> — "add
+rate-limiting to the login handler," repo <code>yupana</code>, actor <code>agent-fix-3</code>. Risk map:
+<code>auth/**</code> = high.</p>
+<p><strong>Definitions (Quipu).</strong> <code>feature-sdlc</code> = Steps <code>design → implement → review → merge</code>, guarded transitions between them. The <code>implement</code> exit gate binds:</p>
+<pre><code class="language-text">plan-present               plan-declared-before-edit          (entry gate)
+plan-covers-blast-radius   ∀ s ∈ blast-radius(change) : s ∈ plan.targets
+all-public-tested          ∀ s ∈ changed-public-symbols(run) : has-test(s)
+tests-green(artifact)                                          [CI-attested]
+</code></pre>
+<p><code>review</code> binds <code>require-approval</code> + <code>different-actor-than(implement)</code>.</p>
+<p><strong>1 — Bind.</strong> Instance created for <code>(feature-sdlc, bead=KUE-42, repo=yupana, actor=agent-fix-3)</code>; <code>design-doc</code> pattern resolves to <code>docs/design/KUE-42.md</code>.
+Milestone <code>instance started, step=design</code> → Quipu. Quipu pushes the <code>implement</code>
+bundle to Yupana.</p>
+<p><strong>2 — Design.</strong> Agent writes the design doc; <code>design-artifact-approved</code> is an
+async <code>require-approval</code> gate → <strong>suspends</strong>; a human signs a <code>DecisionRecord</code>
+bound to the doc's hash → transition fires → <code>step=implement</code>.</p>
+<p><strong>3 — Plan (intent map).</strong> On entry, Yupana <em>infers</em> a plan from the harness todo
+→ <code>targets = {login_handler, RateLimiter}</code>, satisfying <code>plan-present</code>. Agent
+edits both, tries to finish.</p>
+<p><strong>4 — Live gate (Yupana PDP).</strong> <code>blast-radius(change)</code> at <code>tier=lsp</code> (high
+confidence) → <code>{login_handler, RateLimiter, session_store, auth_middleware}</code>.
+<code>plan-covers-blast-radius</code> → <strong>unsatisfied</strong> (two omitted). Risk = high (<code>auth</code>).
+<code>effect(high, high, unsatisfied)</code> → <strong>deny at the transition</strong> + inject the two
+missing symbols. (A docs change would <code>warn</code> — same policy, different effect.)</p>
+<p><strong>5 — Adapt.</strong> Agent declares a plan override (<code>yupana_plan_declare</code>) covering all
+four, edits them, adds tests. Re-eval: <code>plan-covers-blast-radius</code> ✓,
+<code>all-public-tested</code> ✓ (lsp). <code>tests-green</code> → <strong><code>unknown</code></strong> (no CI yet) → still
+cannot complete; propulsion: "CI pending."</p>
+<p><strong>6 — Commit → milestone (Quipu).</strong> Agent commits; Yupana promotes committed
+structural facts; CI <strong>signs</strong> <code>tests-green over hash H'</code>. Quipu's engine
+evaluates the gate over committed evidence → all ✓, high confidence. Milestone
+<code>step=implement completed</code> → reactive reasoner fires the <code>approve</code>-guarded
+transition target... but <code>review</code> first needs a human, and
+<code>different-actor-than</code> forbids <code>agent-fix-3</code>, so it enqueues <code>review</code> for
+<code>agent-review-2</code>.</p>
+<p><strong>7 — Review (HITL).</strong> <code>agent-review-2</code> runs review checks; <code>require-approval</code>
+<strong>suspends</strong> to the governance inbox. The human picks <code>request-changes</code> → the
+guarded transition branches <strong>back</strong> to <code>implement</code> (bounded loop). Second pass:
+approve → <code>merge</code>.</p>
+<p><strong>8 — Resume (if <code>agent-fix-3</code> had died at step 5).</strong> A fresh agent rehydrates
+from the last milestone (<code>implement in progress</code>); Yupana re-derives live verdicts;
+the diff shows <code>auth_middleware</code> still untested → precisely the remaining work.
+No context reload.</p>
+<p>Every step is a stored, bitemporal, signed fact — the run is fully auditable and
+reproducible after the fact.</p>
+<h2 id="decisions-and-deferrals"><a class="header" href="#decisions-and-deferrals">Decisions and deferrals</a></h2>
+<p>Settled:</p>
+<ul>
+<li><strong>Home</strong> — the policy / workflow <strong>engine lives in Quipu</strong> (widely applicable,
+usable by Quipu on its own data); Yupana is a co-located decision point; no new
+repo. Working name for the capability: <em>the loom</em>.</li>
+<li><strong>Enforcement floor</strong> — the default floor is <code>observed</code> (never block real work
+because a harness can't gate), but a <strong>high-risk action requires a <code>prevented</code>
+boundary</strong> — a hard-gating harness or explicit pre-authorization. Risk sets the
+required floor (see <a href="#risk-and-confidence">Risk and confidence</a>).</li>
+<li><strong>Task → workflow binding</strong> — a <strong>router</strong> selects by task type / label /
+files-touched, with a <strong>declared override</strong> and a <strong>repo-default</strong> fallback.</li>
+<li><strong>Catalog authority</strong> — an agent may <em>propose</em> a catalog predicate, but it
+becomes registered only on <strong>human (keeper) promotion</strong> after passing
+reproducibility review — creation-is-verified applied to the catalog itself.</li>
+<li><strong>Plan-before-edit</strong> — code-editing steps carry a <code>plan-present</code> entry gate
+(satisfiable by inference); the coverage gate is meaningless without it.</li>
+</ul>
+<p>Deferred (v1):</p>
+<ul>
+<li><strong>Compensation</strong> — runs with irreversible side effects use <strong>halt-and-escalate</strong>
+rather than defined Saga-style undo.</li>
+<li><strong>Capability naming</strong> — <em>the loom</em> is a working name, not final.</li>
+</ul>
+<h2 id="implementation-phasing"><a class="header" href="#implementation-phasing">Implementation phasing</a></h2>
+<p>Build order across the three repos. Each phase that wires a Cargo feature adds it
+to the CI matrix in the same change (don't ship dark), and every verdict it
+produces is tagged <code>tier</code> + <code>freshness</code> + <code>confidence</code>.</p>
+<ul>
+<li><strong>Phase 0 — Foundations (cross-cutting).</strong> Verifier registry + signing keys
+(the root of trust); content-hash evidence binding; the human-authored risk-map
+format. Everything downstream depends on these.</li>
+<li><strong>Phase 1 — Quipu: ontology + engine.</strong> Governance classes + SHACL shapes;
+definition-time validation; bitemporal verdict storage; committed-tier
+evaluation over the Datalog reasoner; retain <code>evidence-hash + predicate-id</code> for
+reproducibility. Extends the existing <code>shacl</code> + reasoner machinery.</li>
+<li><strong>Phase 2 — Yupana: policy module + live verdicts.</strong> <code>policy/{model,eval}.rs</code>
+over <code>serve/{refs,impact,dataflow,callgraph}</code>; bundle pull + cache; signed live
+verdict emission; <code>yupana_policy_check</code> (MCP + REST); wire the pre-edit hook to
+<code>deny</code>. Initial Yupana-grounded catalog leaves. Behind a <code>policy</code> feature.</li>
+<li><strong>Phase 3 — Yupana: intent map.</strong> <code>PlanStep</code> binding; inference + <code>yupana_plan_declare</code>
+/ <code>yupana_plan_status</code>; <code>plan-present</code>, <code>plan-covers-blast-radius</code>,
+intent-conformance.</li>
+<li><strong>Phase 4 — Harness adapters.</strong> Claude Code (<code>SessionStart</code> / <code>UserPromptSubmit</code>
+inject, <code>PreToolUse</code> gate, <code>PostToolUse</code> advance, <code>Stop</code> gate); the fleet
+daemon; the enforcement gradient (<code>prevented</code> / <code>observed</code>).</li>
+<li><strong>Phase 5 — Orchestration + HITL.</strong> Guarded transitions, instance lifecycle,
+milestone promotion, reactive handoffs; <code>DecisionRecord</code> flow, the governance
+inbox (Quipu web components), temporal triggers, break-glass; risk-adaptive
+effects fully wired.</li>
+<li><strong>Phase 6 — Authoring.</strong> Catalog composition + escape hatch; dry-run via
+<code>speculate</code>; conversational (Bobbin), visual (Quipu web), and mined front-ends.</li>
+</ul>
+<p><strong>MVP</strong> is the <a href="#worked-example">worked example</a>'s spine: Phases 0–2 (minimal) +
+one workflow (<code>feature-sdlc</code>), one live gate (<code>plan-covers-blast-radius</code> +
+<code>has-test</code>), and the Claude Code adapter's pre-edit <code>deny</code> + <code>Stop</code> gate. That
+proves propel + constrain + verify end-to-end on one harness.</p>
+<p><strong>Scope boundary (v1):</strong> a <strong>single trust domain</strong>. Enforceable multi-tenant
+isolation is a known, decided-deferred gap in Quipu (<code>group_id</code> is provenance
+only); multi-operator separation is a prerequisite to lift before the plane
+governs across trust boundaries, not a v1 deliverable.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../design/policy-edit-hooks.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../design/sarc-conformance.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../design/policy-edit-hooks.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../design/sarc-conformance.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

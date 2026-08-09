@@ -1,0 +1,412 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Game-State Harness - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/concepts/game-state.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-game-state-harness"><a class="header" href="#the-game-state-harness">The Game-State Harness</a></h1>
+<p>FR-35..FR-39, behind the <code>game-state</code> Cargo feature. This is a real widening of
+Yupana's mandate: from a <em>code</em> graph analyzer to a <strong>general in-memory fact graph
+and policy harness</strong>. It reuses the machinery — copy-on-write overlays,
+multi-tenancy, the impact walk, the Selector/Predicate policy shape — over a
+different subject.</p>
+<p>The driving consumer is
+<a href="https://github.com/scbrown/NeuralAmplifier">NeuralAmplifier</a>, an LLM brain for
+<em>Alpha Centauri</em>, but nothing here is game-specific. The design is in
+<a href="../design/specification.html">the addendum</a> (<code>docs/neuralamplifier-harness.md</code>).</p>
+<h2 id="the-layers"><a class="header" href="#the-layers">The layers</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Surface</th><th>Requirement</th><th>What it does</th></tr></thead><tbody>
+<tr><td><code>yupana_ingest</code> / <code>POST /ingest</code></td><td>FR-35</td><td>Load span-free facts into the hot board</td></tr>
+<tr><td>—</td><td>FR-36</td><td>The <code>graph-pattern</code> policy model over those facts</td></tr>
+<tr><td><code>yupana_guard</code> / <code>POST /guard</code></td><td>FR-37</td><td>Check proposed orders against those policies</td></tr>
+<tr><td><code>yupana_whatif</code> / <code>POST /whatif</code></td><td>FR-38</td><td>Ranked speculative impact, uncommitted</td></tr>
+<tr><td>—</td><td>FR-39</td><td><code>(game_id, faction_id)</code> tenancy as a fog-of-war boundary</td></tr>
+</tbody></table>
+</div>
+<h2 id="a-different-node-type-on-purpose"><a class="header" href="#a-different-node-type-on-purpose">A different node type, on purpose</a></h2>
+<p>A code node is a symbol anchored to <code>file:start_line..end_line</code>. A board fact
+("base Alpha holds 2 garrison units") has no file and no line. Rather than widen
+<code>SymbolNode</code> with an optional anchor — which a consumer will read as present —
+the harness adds a second node type whose identity is an opaque id and whose
+provenance is an <strong>adapter id + turn + faction</strong>.</p>
+<p>Everything it serves carries <code>tier: "engine-state"</code>, a peer of
+<code>treesitter</code>/<code>lsp</code>/<code>cpg</code> rather than a rung above or below them. A board fact and
+a code fact must be equally impossible to mistake for each other, in both
+directions.</p>
+<p>The tier is advertised by <code>yupana status</code> exactly when the <code>game-state</code> engine is
+compiled in. That is not the empty-feature pattern the removed <code>lsp</code>/<code>cpg</code> flags
+fell into: <code>game-state</code> gates <code>src/state/</code>, which <em>is</em> the ingestion path, so the
+flag and the implementation are the same thing.</p>
+<h2 id="ingestion-and-the-fog-of-war-routing-decision"><a class="header" href="#ingestion-and-the-fog-of-war-routing-decision">Ingestion, and the fog-of-war routing decision</a></h2>
+<pre><code class="language-json">POST /ingest
+{
+  "game_id": "g1", "faction_id": "gaians",
+  "visibility": "shared",
+  "provenance": {"adapter": "smac-worldview", "turn": 42},
+  "entities": [
+    {"name": "base_alpha", "type": "smac:BaseState",
+     "attrs": {"smac:isBorderBase": true, "smac:garrisonCount": 2}}
+  ],
+  "edges": [{"source": "base_alpha", "target": "base_beta", "relation": "adjacent_to"}]
+}
+</code></pre>
+<p>The node and edge JSON mirrors <code>quipu_episode</code> (<code>name</code>/<code>type</code>/<code>description</code>,
+<code>source</code>/<code>target</code>/<code>relation</code>) so one adapter output feeds both stores. <code>attrs</code> is
+Yupana's addition: scalars the pattern engine can compare.</p>
+<p><code>visibility</code> has <strong>no default</strong>, and that is deliberate:</p>
+<ul>
+<li><code>shared</code> writes the game's <strong>common-knowledge</strong> base, which every faction in
+that game reads — the map, public treaties, observed sightings.</li>
+<li><code>private</code> writes only the calling faction's copy-on-write overlay — its own
+units and bases, unexplored fog, plans.</li>
+</ul>
+<p>Guessing here means one faction's private intel silently becoming common
+knowledge, so a request omitting the field fails to parse rather than picking a
+side.</p>
+<p>Restating a board is idempotent: node ids are unique, so the same base arriving
+each turn with new numbers replaces rather than accumulates. A <strong>dangling edge is
+refused</strong> — a pattern traversing it would bind a variable to an id with no entity
+behind it.</p>
+<h2 id="policies-graph-pattern-and-where-the-line-to-quipu-is"><a class="header" href="#policies-graph-pattern-and-where-the-line-to-quipu-is">Policies: <code>graph-pattern</code>, and where the line to Quipu is</a></h2>
+<p>A policy is the code plane's shape with three additions: a <code>selector_lang</code>
+discriminator, a <code>boundary</code> value of <code>"order"</code>, and the <code>engine-state</code> tier.
+<code>match_type</code>, <code>gate</code>, <code>effect</code>, <code>claim</code>, <code>targets</code> and <code>label</code> are reused
+unchanged — <code>MatchType</code> is literally the same Rust type, so <code>must-match</code> cannot
+come to mean one thing over an AST and another over a board.</p>
+<pre><code class="language-text">pattern := clause { '.' clause } [ '|' filter { ',' filter } ]
+clause  := ?var pair { ';' pair }
+pair    := ('a' | name) term
+filter  := ?var ('=' | '!=' | '&lt;' | '&lt;=' | '&gt;' | '&gt;=') literal
+</code></pre>
+<pre><code class="language-json">{
+  "label": "garrison-border-bases",
+  "claim": "every border base retains &gt;=1 garrison after the proposed orders apply",
+  "boundary": "order", "effect": "deny",
+  "selector":  {"selector_lang": "graph-pattern",
+                "evidence_source": "?b a smac:BaseState ; smac:isBorderBase true"},
+  "predicate": {"selector_lang": "graph-pattern", "match_type": "must-match",
+                "evidence_source": "?b smac:garrisonCount ?n | ?n &gt;= 1"}
+}
+</code></pre>
+<p>Two things worth knowing before writing one:</p>
+<ul>
+<li><strong>No prefix expansion.</strong> <code>smac:BaseState</code> is matched byte for byte against what
+the adapter ingested. Yupana has no prefix map, and inventing one would be a
+second, drifting copy of Quipu's.</li>
+<li><strong>A <code>name</code> predicate resolves to an attribute first, an outgoing edge second.</strong>
+Edge traversal is outgoing only; a symmetric relation is ingested both ways.</li>
+</ul>
+<p><strong><code>selector_lang: "sparql"</code> is reserved for Quipu and is refused here</strong> — not
+skipped, not best-effort matched. Yupana is not an RDF store. If a predicate starts
+wanting property paths or aggregation, that is the signal the policy belongs in
+Quipu, not the signal to grow this grammar. Project the datalinks it needs into
+the board instead.</p>
+<h2 id="guarding-an-order-set"><a class="header" href="#guarding-an-order-set">Guarding an order set</a></h2>
+<pre><code class="language-json">POST /guard
+{"game_id": "g1", "faction_id": "gaians",
+ "policies": [ ... ],
+ "orders": [{"id": "move-out", "effects": [
+   {"op": "set_attr", "id": "base_alpha", "key": "smac:garrisonCount", "value": 0}]}]}
+</code></pre>
+<p>Orders carry <strong>declared effects</strong>. Yupana does not know that <code>MOVE</code> implies a
+supply change and does not try to infer it — it applies exactly the deltas the
+adapter states. That is what bounds FR-37's standing divergence risk: the gap is
+"what the adapter declared vs. what the engine will do", which its author can
+see and close, rather than "Yupana's reimplementation of the rules vs. the real
+ones", which nobody can enumerate.</p>
+<p><strong>The game engine remains the sole authority on legality and effects.</strong> This
+complements it and never replaces it: it can only subtract from, or annotate,
+moves that are already legal. Because the post-order board is an approximation,
+<code>deny</code> policies should be conservative — a false deny removes a legal, possibly
+correct move.</p>
+<p>The report has four lists, and reading only the first is a mistake:</p>
+<div class="table-wrapper"><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>violations</code></td><td><code>deny</code> policies that fired</td></tr>
+<tr><td><code>advisories</code></td><td><code>warn</code> policies that fired</td></tr>
+<tr><td><code>unevaluated</code></td><td>policies that could not be compiled, or are not Yupana's to run</td></tr>
+<tr><td><code>vacuous</code></td><td>policies whose <strong>selector matched nothing</strong> — never asked, not passed</td></tr>
+</tbody></table>
+</div>
+<p><code>vacuous</code> exists because a selector that has rotted away from the adapter's
+vocabulary matches zero nodes and produces zero violations, which reads exactly
+like a clean board. Every finding also carries <code>pre_existing</code>: a breach that
+already held before the orders blames no order ids.</p>
+<h2 id="what-if"><a class="header" href="#what-if">What-if</a></h2>
+<p><code>POST /whatif</code> speculates an order set onto a clone of the overlay and ranks what
+it reaches — nearest first, then by degree — then throws the clone away. The
+reply states <code>"committed": false</code> rather than leaving it implicit, because that
+is the property a caller most needs to be able to check.</p>
+<p>The ranking is <strong>structural and domain-neutral</strong>: which entities a change reaches,
+how far, by which relations, over the adapter's own vocabulary. "Is this base
+exposed" is a <code>graph-pattern</code> policy over the same speculative board, not a
+hardcoded traversal — Yupana does not know what a supply line is, and putting a
+slice of one game's rules inside a general engine would hide it from everyone
+playing a different one.</p>
+<p>Contrast with Quipu's <code>quipu_impact remove=true</code>: this is ephemeral, fast,
+this-turn and tactical; that is persisted, durable, cross-game and strategic.
+Blurring them is how the hot path acquires a database dependency it cannot
+afford.</p>
+<h2 id="tenancy-is-a-security-boundary"><a class="header" href="#tenancy-is-a-security-boundary">Tenancy is a security boundary</a></h2>
+<p>The tenant is <code>(game_id, faction_id)</code>. One <strong>shared base per game</strong> — not per
+process, which would make every fact in one game common knowledge in the next —
+plus one copy-on-write overlay per faction. A tenant reads the base plus its own
+overlay, never a sibling's.</p>
+<p>When several factions in one game are LLM-driven, a leak between overlays is not
+a tidiness bug: it is one player reading another's private intel, and it would be
+<strong>invisible in results</strong> — the run just looks unusually well-informed. So
+isolation is asserted three ways, because none of them is sufficient alone:</p>
+<ol>
+<li><strong>By construction.</strong> A view holds exactly one overlay reference, chosen from
+the tenant key. No API takes two keys and no method reaches a sibling, so a
+cross-tenant read is unrepresentable rather than merely checked.</li>
+<li><strong>By routing.</strong> A <code>shared</code> ingest carrying a faction is refused and counted —
+the one path by which private intel could reach the layer everybody reads.</li>
+<li><strong>By count.</strong> <code>isolation_report()</code> scans the shared bases for faction-stamped
+facts anyway. The first two are arguments; this is a measurement, and it is
+the only one that catches a leak arriving by a path nobody anticipated.</li>
+</ol>
+<p>The tenant cap <strong>refuses</strong> rather than evicting. An evicted overlay is a
+faction's private intel, and dropping it mid-game would silently widen that
+faction's view back to the shared base — a correctness change disguised as a
+resource policy. The code plane can evict because a developer's overlay costs
+only a re-touch.</p>
+<h2 id="the-one-operational-trap"><a class="header" href="#the-one-operational-trap">The one operational trap</a></h2>
+<p><strong>A board lives in the process it was ingested into.</strong> There is no store behind
+these surfaces; that is what a hot graph means. Ingesting over <code>POST /ingest</code> and
+then guarding through <code>yupana_guard</code> in a <em>different</em> process guards an empty
+board.</p>
+<p>So an empty board is <strong>refused</strong>, never reported as zero violations: <code>409 Conflict</code> over HTTP, an error result over MCP. Ingest and guard are separate
+calls, and "nothing was ingested here" and "these orders are fine" would
+otherwise be the same success response — a green light over a dead backend.</p>
+<p>A guard with <strong>no policies</strong> is refused for the same reason: it cannot clear an
+order set it never checked.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../concepts/promotion.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../reference/cli.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../concepts/promotion.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../reference/cli.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

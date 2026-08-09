@@ -1,0 +1,467 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Pre-Edit Policy Guard - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/policy-guard.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-pre-edit-policy-guard--integration-contract"><a class="header" href="#the-pre-edit-policy-guard--integration-contract">The Pre-Edit Policy Guard — Integration Contract</a></h1>
+<p><code>yupana hook pre-edit</code> is a Claude Code <strong><code>PreToolUse</code></strong> hook that can <strong>deny</strong> an
+edit whose blast radius or target path exceeds the calling agent's capability
+scope (spec §5.8, FR-25/FR-30).</p>
+<p>This page is the <strong>normative contract</strong> for harness integrators (Gas Town
+shantytown emits this hook per role/card). It is versioned with the binary: if
+any clause below changes, the change lands here in the same commit.</p>
+<p>Blocking is <strong>opt-in and off by default</strong>. A wrong hard-deny is worse than no
+guard at all.</p>
+<h2 id="a-input--the-payload-on-stdin"><a class="header" href="#a-input--the-payload-on-stdin">(a) Input — the payload on stdin</a></h2>
+<p>The hook reads one JSON object on stdin, the standard Claude Code <code>PreToolUse</code>
+payload:</p>
+<pre><code class="language-json">{
+  "session_id": "abc123",
+  "transcript_path": "/home/agent/.claude/projects/.../session.jsonl",
+  "cwd": "/home/agent/work/repo",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/home/agent/work/repo/src/graph/blast.rs",
+    "old_string": "...",
+    "new_string": "..."
+  }
+}
+</code></pre>
+<p>Yupana reads <code>cwd</code>, <code>tool_name</code>, and <code>tool_input</code>; everything else is ignored but
+tolerated. <code>tool_input</code> shape by tool:</p>
+<div class="table-wrapper"><table><thead><tr><th>Tool</th><th>Fields Yupana uses</th></tr></thead><tbody>
+<tr><td><code>Edit</code></td><td><code>file_path</code>, <code>old_string</code>, <code>new_string</code></td></tr>
+<tr><td><code>Write</code></td><td><code>file_path</code>, <code>content</code></td></tr>
+<tr><td><code>MultiEdit</code></td><td><code>file_path</code>, <code>edits[].old_string</code>, <code>edits[].new_string</code></td></tr>
+</tbody></table>
+</div>
+<p>Every field is optional as far as the parser is concerned. <strong>A payload Yupana
+cannot parse, or one naming a file in no known language, is an ALLOW</strong> — the
+guard only ever speaks up about edits it genuinely understands.</p>
+<h2 id="b-output--allow-and-deny"><a class="header" href="#b-output--allow-and-deny">(b) Output — allow and deny</a></h2>
+<p><strong>ALLOW: exit <code>0</code> with empty stdout.</strong> This is the overwhelmingly common path.</p>
+<p>The guard <strong>never emits <code>permissionDecision: "allow"</code>.</strong> That value suppresses
+the user's <em>own</em> permission prompt, and a structural guard has no business
+granting permission it was not asked about. The guard may only ever <em>subtract</em>
+permission, never add it. Staying silent leaves Claude Code's normal permission
+flow exactly as it found it.</p>
+<p><strong>DENY: exit <code>0</code> and print this object on stdout:</strong></p>
+<pre><code class="language-json">{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "yupana: edit to src/graph/blast.rs exceeds the blast-radius ceiling for tenant `polecat-3` (impacts 47 symbols across 12 files; ceiling is 25/10). Narrow the change, or request a wider capability scope."
+  }
+}
+</code></pre>
+<p><code>permissionDecisionReason</code> is fed back to the model, so it is written for a
+model to act on: what was exceeded, by how much, and what to do instead.</p>
+<p><strong>Yupana never exits <code>2</code>.</strong> Exit <code>2</code> is Claude Code's fail-<em>closed</em> channel
+(block, stderr to the model). Reserving it means no Yupana crash path can ever
+hard-block an agent — a panic exits <code>101</code>, which Claude Code treats as a
+non-blocking error and the tool call proceeds.</p>
+<p>That guarantee covers Yupana's own code, and argument parsing happens before any
+of it runs. A Yupana that predates a hook subcommand answers it with the argument
+parser's "invalid value" error and exit <code>2</code> — so <strong>staleness fails closed even
+though absence fails open.</strong> Since this version, an unparseable <code>yupana hook …</code>
+invocation degrades to a silent allow instead (exit <code>0</code>, empty stdout, a loud
+stderr line). Binaries older than that fix cannot be repaired retroactively,
+which is why the invocation in (d) is written to be skew-proof on its own.</p>
+<h2 id="c-latency--the-sub-100ms-budget"><a class="header" href="#c-latency--the-sub-100ms-budget">(c) Latency — the sub-100ms budget</a></h2>
+<p>The hook is synchronous in the agent's loop (FR-31). Yupana enforces its <strong>own</strong>
+wall-clock deadline, <code>[yupana.policy] deadline_ms</code> (default <strong>100</strong>). When the
+deadline expires, the in-flight analysis is abandoned and the edit is
+<strong>allowed</strong>.</p>
+<p>Do not rely on the harness <code>timeout</code> field for this: it is expressed in whole
+seconds and defaults to ten minutes — three orders of magnitude past the budget.
+Set it anyway as a backstop (<code>"timeout": 5</code>), but the real deadline is Yupana's.</p>
+<p>Until the Phase-3 resident daemon lands (FR-31), the guard builds the call graph
+transiently and will exceed 100ms on large trees — which, by the rule above,
+means it fails open. That is the intended degradation, not a bug: the guard gets
+teeth on big repos when the daemon does.</p>
+<h2 id="d-fail-open--non-negotiable"><a class="header" href="#d-fail-open--non-negotiable">(d) Fail open — non-negotiable</a></h2>
+<p><strong>Every failure mode allows the edit.</strong> The harness launches every crew agent
+through this hook; a guard that fails closed bricks the fleet the moment Yupana is
+unavailable.</p>
+<div class="table-wrapper"><table><thead><tr><th>Failure</th><th>Result</th></tr></thead><tbody>
+<tr><td><code>yupana</code> not on <code>PATH</code></td><td>exit <code>127</code> → non-blocking error → edit proceeds</td></tr>
+<tr><td><code>yupana</code> too old to know the subcommand</td><td>exit <code>2</code> → <strong>would block</strong>; see below</td></tr>
+<tr><td>Yupana panics</td><td>exit <code>101</code> → non-blocking error → edit proceeds</td></tr>
+<tr><td>Deadline exceeded</td><td>exit <code>0</code>, silent → edit proceeds</td></tr>
+<tr><td>Daemon unreachable, unreadable config, unparseable payload</td><td>exit <code>0</code> + loud line → edit proceeds</td></tr>
+<tr><td>quipu unprojectable, cache servable</td><td>exit <code>0</code> → <strong>rules still evaluated</strong>, verdict marked STALE</td></tr>
+<tr><td>quipu unprojectable, no servable cache</td><td>exit <code>0</code> + loud line → edit proceeds</td></tr>
+<tr><td>Policy says deny</td><td>exit <code>0</code> + deny JSON → <strong>edit blocked</strong></td></tr>
+</tbody></table>
+</div>
+<h3 id="failing-open-is-a-last-resort-not-the-first-response-to-a-slow-quipu"><a class="header" href="#failing-open-is-a-last-resort-not-the-first-response-to-a-slow-quipu">Failing open is a LAST resort, not the first response to a slow quipu</a></h3>
+<p>Fail-open is non-negotiable, but it is not free, and for one failure it was
+being reached far too eagerly. The governed plane projects its rule catalogue
+from quipu over HTTP, and the hook is a short-lived process <strong>per edit</strong> — so
+before aegis-0upyu every edit by every agent issued a live <code>/query</code>, and any
+one that could not complete in the 2s budget dropped that edit straight to
+"allow".</p>
+<p>Measured 2026-08-04 on this fleet: <strong>5.2% of all pre-edit invocations, and 19%
+of one day's</strong>, failed open on projection timeouts alone. The failure
+self-interferes — quipu serves <code>/query</code> effectively one at a time, so heavy
+graph work is exactly what starves the guard that reads the graph, and the
+guard was least available precisely when it mattered most.</p>
+<p>The guard now keeps a <strong>durable projection cache</strong> (<code>projection.json</code>, beside
+<code>metrics.jsonl</code> under <code>$XDG_STATE_HOME/yupana</code>, overridable with
+<code>$YUPANA_PROJECTION_CACHE_PATH</code>). Every successful projection writes it; a failed
+one serves it. The contract around it is what keeps a cache from becoming its
+own silent failure:</p>
+<ul>
+<li>a cache-served verdict is <strong>STALE, never fresh</strong>, and states the cache's AGE
+in seconds — "stale" alone cannot distinguish a slow quipu from a week-old
+catalogue, and those warrant opposite reactions;</li>
+<li>past <code>[yupana.quipu] projection_cache_ttl_secs</code> (default 3600, <code>0</code> disables
+serving) the cache is <strong>refused</strong> and the guard fails open loudly. A retired
+rule that keeps firing from disk is worse than no rule, because it is
+unfalsifiable from the outside;</li>
+<li>a cache written against a <strong>different endpoint</strong> is refused outright, rather
+than enforcing another deployment's policy while claiming to enforce this
+one's;</li>
+<li><strong><code>served_from_cache</code> and <code>fail_open</code> are different record kinds</strong> and must
+stay that way. One is the guard enforcing last-known policy; the other is the
+guard not running. Collapsing them is what made a soak count unguarded edits
+as clean ones.</li>
+</ul>
+<h3 id="invoke-it-so-version-skew-cannot-block-the-fleet"><a class="header" href="#invoke-it-so-version-skew-cannot-block-the-fleet">Invoke it so version skew cannot block the fleet</a></h3>
+<p>Every row above fails open except one, and that one is not exotic: it is what
+you get by rolling the hook out ahead of the binary, which is the normal
+ordering of a deploy. Invoke the guard through this wrapper rather than bare:</p>
+<pre><code class="language-sh">out=$(yupana hook pre-edit 2&gt;/dev/null) || exit 0
+printf '%s' "$out"
+</code></pre>
+<p><code>|| exit 0</code> converts <em>every</em> non-zero exit — <code>127</code> absent, <code>2</code> stale, <code>101</code>
+panic — into an allow. Capturing first and printing only on success also means
+a Yupana that dies mid-write contributes <strong>nothing</strong> to stdout, so a truncated
+run can never be parsed as a permission decision. Emitting the command bare is
+safe only once every host is known to be past the skew fix; the wrapper is safe
+now, and stays correct afterwards.</p>
+<h3 id="loud-means-systemmessage-not-stderr"><a class="header" href="#loud-means-systemmessage-not-stderr">"Loud" means <code>systemMessage</code>, not stderr</a></h3>
+<p>A hook's stderr is shown <strong>only when it exits <code>2</code></strong>; on exit <code>0</code> it goes to the
+debug log, where nobody looks. So a fail-open that only wrote to stderr would be
+silent in practice — exactly the failure this clause exists to prevent.</p>
+<p>Yupana therefore writes the stderr line <em>and</em> emits a user-visible
+<code>systemMessage</code>:</p>
+<pre><code class="language-json">{ "systemMessage": "yupana: policy guard failed open (daemon unreachable) — edits are UNGUARDED this session." }
+</code></pre>
+<p>No <code>hookSpecificOutput</code> accompanies it, so the edit is untouched. The message is
+emitted <strong>once per <code>session_id</code></strong> (tracked by a marker file under the system temp
+directory), because a per-edit warning on a down daemon trains agents and humans
+alike to ignore it.</p>
+<h2 id="registration"><a class="header" href="#registration">Registration</a></h2>
+<pre><code class="language-json">{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "yupana hook pre-edit", "timeout": 5 }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+<p>The tenant whose scope applies is resolved from <code>--tenant</code>, falling back to the
+<code>BOBBIN_ROLE</code> environment variable. Shantytown sets <code>BOBBIN_ROLE</code> per agent, so
+one hook registration serves every role.</p>
+<h2 id="policy-configuration"><a class="header" href="#policy-configuration">Policy configuration</a></h2>
+<p>Policy lives in the shared <code>.bobbin/config.toml</code> under <code>[yupana.policy]</code>, with the
+usual resolution order (project &gt; user &gt; defaults).</p>
+<pre><code class="language-toml">[yupana.policy]
+# off     — the guard is inert (default)
+# advise  — compute and report violations, but never deny
+# enforce — deny violations
+mode = "off"
+deadline_ms = 100
+notify_on_fail_open = true
+
+# Per-tenant capability scopes, keyed by tenant/role id.
+[yupana.policy.scopes.polecat-3]
+allow_paths = ["src/**", "tests/**"]
+deny_paths = ["src/config.rs"]
+max_impacted_symbols = 25
+max_impacted_files = 10
+</code></pre>
+<p>A tenant with no scope entry is unconstrained. <code>deny_paths</code> beats <code>allow_paths</code>.
+Path patterns are globs matched against the repo-relative path.</p>
+<p>With <code>mode = "advise"</code> the guard reports what it <em>would</em> have denied via
+<code>systemMessage</code> and never blocks — run a new scope in <code>advise</code> for a while
+before promoting it to <code>enforce</code>.</p>
+<p><strong>An advise run is visible to the operator, not to the agent.</strong> <code>systemMessage</code>
+surfaces in the user's pane; it does not enter the model's context, and the tool
+result of an advised edit is indistinguishable from an unguarded one. Confirmed
+by running the same violating edit in both modes on a live pane: <code>advise</code>
+returned an ordinary success to the model, <code>enforce</code> returned the reason.</p>
+<p>Two consequences when staging a scope. Agents will not self-correct during an
+advise run, so the violation counts you collect are the <em>uncorrected</em> rate —
+which is what you want for sizing a ceiling. And "agents behaved no differently
+under advise" is not evidence that they saw the advisory; they did not. Only
+<code>enforce</code> puts the reason in front of the model.</p>
+<h2 id="what-the-guard-checks"><a class="header" href="#what-the-guard-checks">What the guard checks</a></h2>
+<ol>
+<li><strong>Path scope</strong> (FR-25) — is the edited file inside this tenant's writable
+capability scope?</li>
+<li><strong>Blast radius</strong> (FR-12/FR-25) — do the symbols the edit touches transitively
+affect more symbols or files than the scope permits?</li>
+</ol>
+<p>Both are computed at the <strong>tree-sitter tier</strong> against the <em>requesting tenant's</em>
+graph, and every verdict carries that tier tag (FR-3). A tree-sitter blast radius
+is an approximation; the ceilings should be set with that in mind.</p>
+<h2 id="observing-the-guard--yupana-status"><a class="header" href="#observing-the-guard--yupana-status">Observing the guard — <code>yupana status</code></a></h2>
+<p>A guard you cannot observe is a guard you cannot trust: enforcement that has
+quietly stopped looks exactly like enforcement that found nothing wrong. So the
+policy layer is visible in <code>yupana status</code>, resolved for the queried <code>--tenant</code>:</p>
+<pre><code class="language-text">  policy      : mode=enforce  scope=configured (allow=1 deny=0 sym≤— files≤3)
+  rule set    : none — never loaded (local config only)
+</code></pre>
+<p>Two states are reported <strong>loudly</strong> rather than left to silence:</p>
+<ul>
+<li><strong><code>enforce</code> with no scope for the tenant</strong> — armed in appearance, inert in
+effect — prints a <code>⚠</code> caveat (<code>enforcing_without_scope: true</code> in <code>--json</code>).
+This is the disarm-that-reads-as-healthy shape behind more than one past bug.</li>
+<li><strong>No signed rule set loaded.</strong> The resident, signed rule cache does not exist
+yet; <code>status</code> reports its absence (<code>signed_rule_set.state: "never-loaded"</code>)
+rather than omitting it, so the surface is present and its absence is never
+silent. When the cache lands it populates the live rule-set version and age
+into this same field.</li>
+</ul>
+<p><code>--json</code> emits the full <code>policy</code> object (mode, <code>scope_configured</code>, ceilings) and
+the <code>signed_rule_set</code> state for <code>st doctor</code> and other tooling to gate on.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../reference/daemon.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../reference/enforcement-trace.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../reference/daemon.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../reference/enforcement-trace.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

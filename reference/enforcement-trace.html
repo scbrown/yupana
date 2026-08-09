@@ -1,0 +1,408 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Enforcement Trace - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/enforcement-trace.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-enforcement-trace"><a class="header" href="#the-enforcement-trace">The Enforcement Trace</a></h1>
+<p>What an action tells an auditor afterwards, and the two commands that carry it
+into quipu.</p>
+<p>This is the interface <code>quipu audit</code> consumes. If you are wiring the audit
+checker, this page is the contract; if you are reading a spool by hand, it is the
+field list. The reasoning behind the shape is in <a href="../design/sarc-conformance.html">SARC
+Conformance</a>.</p>
+<h2 id="why-the-record-has-this-shape"><a class="header" href="#why-the-record-has-this-shape">Why the record has this shape</a></h2>
+<p>SARC's invariant I3 asks that a trace be <strong>derived from the specification</strong>
+rather than reconstructed from logs afterwards. The audit checker needs four
+things per action — which constraints applied, where each was evaluated, what
+outcome it produced, and what response was taken — and none of them can be
+recovered from a record that says only which rules fired.</p>
+<p>Before this, the spool's <code>rule</code> field was a <code>+</code>-joined string of names. It
+answers "what fired" and cannot answer "was this evaluated at a point compatible
+with its class", which is exactly the placement pass of the checker. Two rules
+that fired identically at different points produced byte-identical records.</p>
+<h2 id="where-the-spool-lives"><a class="header" href="#where-the-spool-lives">Where the spool lives</a></h2>
+<p><code>$YUPANA_METRICS_PATH</code>, else <code>$XDG_STATE_HOME/yupana/metrics.jsonl</code>, else
+<code>~/.local/state/yupana/metrics.jsonl</code>. One JSON object per line, appended, rotated
+to <code>.jsonl.old</code> at 64 MiB.</p>
+<p>Writes are <strong>absolutely fail-silent</strong> — stricter than the guard's own fail-open.
+A metrics write must never change a guard outcome, never block an edit, never
+print. A bookkeeping layer that can take enforcement down with it measures
+negative value.</p>
+<h2 id="record-kinds"><a class="header" href="#record-kinds">Record kinds</a></h2>
+<div class="table-wrapper"><table><thead><tr><th><code>kind</code></th><th>emitted by</th><th>meaning</th></tr></thead><tbody>
+<tr><td><code>guard</code></td><td><code>yupana hook pre-edit</code></td><td>a Pre-Action Gate decision, one per edit</td></tr>
+<tr><td><code>audit</code></td><td><code>yupana hook post-edit</code></td><td>a Post-Action Auditor crossing, with <code>point: "PAA"</code></td></tr>
+<tr><td><code>governed</code></td><td>the pre-edit guard</td><td>which governed rules spoke, by name</td></tr>
+<tr><td><code>fail_open</code></td><td>anywhere on the guard path</td><td>the guard degraded, and why-kind</td></tr>
+<tr><td><code>hosting_overclaim</code></td><td>the projection refresh</td><td>policies claiming a stronger layer than the one evaluating them</td></tr>
+<tr><td><code>command</code></td><td>the CLI</td><td>deliberate tool use — the leverage signal</td></tr>
+</tbody></table>
+</div>
+<p>Every line also carries <code>ts</code> (unix seconds), and <code>agent</code> / <code>tenant</code> from
+<code>$SHANTY_AGENT</code> and <code>$BOBBIN_ROLE</code> when set.</p>
+<h2 id="the-constraint-set--constraints"><a class="header" href="#the-constraint-set--constraints">The constraint set — <code>constraints[]</code></a></h2>
+<p>One array rather than sibling keys, so a reader never has to reassemble which
+class went with which id by position:</p>
+<pre><code class="language-json">{
+  "kind": "guard", "mode": "enforce", "result": "deny",
+  "policy_freshness": "fresh",
+  "constraints": [
+    {
+      "id": "no-ticket-in-comment",
+      "class": "hard",
+      "verification_point": "PAG",
+      "hosted_at": "orchestration",
+      "outcome": "unsatisfied",
+      "response": "blocked"
+    }
+  ]
+}
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th>field</th><th>values</th><th>notes</th></tr></thead><tbody>
+<tr><td><code>id</code></td><td>string</td><td>the constraint's stable id — the same name its verdict cites</td></tr>
+<tr><td><code>class</code></td><td><code>hard</code> | <code>soft</code> | <code>escalation</code></td><td><strong>omitted</strong> when undeclared, never guessed</td></tr>
+<tr><td><code>verification_point</code></td><td><code>PAG</code> | <code>ATM</code> | <code>PAA</code> | <code>tool_layer</code> | <code>policy_layer</code></td><td>omitted when undeclared</td></tr>
+<tr><td><code>hosted_at</code></td><td><code>orchestration</code> | <code>tool</code> | <code>policy</code></td><td>the layer that <strong>actually</strong> evaluated it</td></tr>
+<tr><td><code>outcome</code></td><td><code>satisfied</code> | <code>unsatisfied</code> | <code>unknown</code></td><td>what the predicate concluded</td></tr>
+<tr><td><code>response</code></td><td><code>blocked</code> | <code>warned</code> | <code>logged</code> | <code>escalated</code> | <code>no-action</code></td><td>what the runtime did</td></tr>
+</tbody></table>
+</div>
+<p>Three of those distinctions carry weight:</p>
+<ul>
+<li><strong><code>unknown</code> is not a soft <code>unsatisfied</code>.</strong> A constraint that could not be
+evaluated has told you nothing, and collapsing the two is how an unevaluated
+check reads as a passing one.</li>
+<li><strong><code>outcome</code> and <code>response</code> are separate</strong> because they answer different audit
+questions — what the predicate concluded, versus what the runtime did with it —
+and the checker's outcome pass is precisely "does the recorded response match
+the one the policy declared".</li>
+<li><strong><code>hosted_at</code> is never the layer the policy claimed.</strong> It is stamped from the
+evaluating code's own constant. A field that echoed the declaration would let
+an overclaim survive the audit by being asserted twice (SARC I6).</li>
+</ul>
+<p><code>policy_freshness</code> rides alongside: how current the <em>policy set</em> behind those
+evaluations was. It is what stops a soak window counting verdicts computed
+against a stale projection as evidence about current policy.</p>
+<p>The legacy <code>rule</code> field is still emitted, derived from the same set, because live
+dashboards group on it. Dropping it would silently empty every panel built on it.</p>
+<h2 id="the-attribution-tuple--who-is-answerable"><a class="header" href="#the-attribution-tuple--who-is-answerable">The attribution tuple — who is answerable</a></h2>
+<p>SARC §9.6's <code>α = ⟨P, planner, executor, tool, auth, C_eval⟩</code>, on the gate record
+and the PAA record alike. Recorded on <strong>allow as well as deny</strong>: a field that
+appears only on refusals cannot answer "which chain has been acting here", which
+is the question it exists for.</p>
+<div class="table-wrapper"><table><thead><tr><th>field</th><th>source</th><th>notes</th></tr></thead><tbody>
+<tr><td><code>principal_chain</code></td><td><code>$YUPANA_PRINCIPAL_CHAIN</code></td><td>comma-separated, caller-first</td></tr>
+<tr><td><code>planner</code></td><td><code>$YUPANA_PLANNER</code></td><td>declared, never derived from the chain's head</td></tr>
+<tr><td><code>executor</code></td><td><code>$SHANTY_AGENT</code></td><td>the identity of the process that actually ran</td></tr>
+<tr><td><code>tool</code></td><td>the hook payload</td><td><code>Edit</code>, <code>Write</code>, <code>MultiEdit</code></td></tr>
+<tr><td><code>attribution_conflict</code></td><td>computed</td><td>emitted <strong>only when true</strong> — see below</td></tr>
+</tbody></table>
+</div>
+<p>A dispatcher that spawns a sub-agent appends itself and exports the extended
+chain; the sub-agent's hook then records the real chain rather than its own leaf
+identity:</p>
+<pre><code class="language-bash">YUPANA_PRINCIPAL_CHAIN="orchestrator,worker" \
+YUPANA_PLANNER="orchestrator" \
+SHANTY_AGENT="worker" \
+  claude --agent worker
+</code></pre>
+<p><strong>Every element is omitted when undeclared.</strong> Filling <code>principal_chain</code> with
+<code>[$SHANTY_AGENT]</code> would assert "this action had exactly one principal" to
+precisely the auditor the field exists for, and an undeclared chain is not a
+one-link chain.</p>
+<p><strong><code>planner</code> is not derived from the chain's head.</strong> Which link deliberated and
+which executed is a fact about the dispatch; reading it off list position would
+be an inference wearing a record's clothes.</p>
+<p><strong><code>auth</code> is deliberately absent.</strong> The effective authority is the intersection of
+every link's grant, those grants live in quipu, and yupana cannot read them inside
+a 100 ms pre-edit budget. Recording <code>principal_chain</code> is what lets quipu's
+checker <em>derive</em> <code>auth</code> from the authoritative source; a locally-guessed value
+would put a number in the field the grant store never agreed to.</p>
+<h3 id="attribution_conflict"><a class="header" href="#attribution_conflict"><code>attribution_conflict</code></a></h3>
+<p><code>YUPANA_PRINCIPAL_CHAIN</code> is a declaration; <code>$SHANTY_AGENT</code> is what is running. When
+a chain is declared and its last link disagrees with the executor, the record
+says so rather than silently preferring one. That disagreement is the observable
+signature of a <strong>laundered chain</strong> — an agent acting under a dispatch record that
+names somebody else — and a record that resolved it by precedence would delete
+the only evidence of it.</p>
+<p>It is emitted only when true. A <code>false</code> on every line trains a reader to skip the
+field, which is the opposite of what it is for.</p>
+<h2 id="verdicts--yupana-verifier-and-yupana-verdicts"><a class="header" href="#verdicts--yupana-verifier-and-yupana-verdicts">Verdicts — <code>yupana verifier</code> and <code>yupana verdicts</code></a></h2>
+<p>Both need the <code>quipu</code> feature.</p>
+<p>A trace record is diagnostic. A <strong>verdict</strong> is an attestation: ed25519-signed,
+bound to an evidence hash, and verifiable against a <code>aegis:VerifierRegistration</code>
+that a human authored.</p>
+<pre><code class="language-bash"># Show the public key to register in quipu as this verifier's aegis:publicKey.
+# This is the DELIBERATE key-creation act — it mints the key if absent.
+yupana verifier --key-path yupana-signing.pk8
+
+# Drain the local spool into quipu.
+yupana verdicts --to http://localhost:7878
+</code></pre>
+<p>The guard <strong>signs at the moment a constraint fires and appends locally</strong>; it
+never promotes on the edit path. A <code>/knot</code> round-trip does not fit inside the
+guard's 100 ms deadline, and putting one there would make every agent's edit
+latency a function of quipu's availability — a transiently wedged quipu once held
+a guard for the full two minutes a caller was willing to wait.</p>
+<p>The hook path uses an <strong>existing key only</strong> and never mints one. A signing
+identity materialising from an agent's edit is not something that should happen
+quietly; <code>yupana verifier</code> is where that decision is made.</p>
+<p>The spool is truncated only when <strong>every</strong> verdict was accepted. A partial drain
+leaves the file intact rather than losing the remainder.</p>
+<h2 id="the-post-action-auditor-and-throttle"><a class="header" href="#the-post-action-auditor-and-throttle">The Post-Action Auditor and <code>throttle</code></a></h2>
+<p><code>yupana hook post-edit</code> evaluates constraints declaring <code>verificationPoint "PAA"</code>
+against the file <em>as it now stands</em> — the completed-action state, which is the
+whole reason the point exists. The gate saw only the fragment an edit proposed.</p>
+<p>It <strong>cannot prevent the action it just watched</strong>, and saying so plainly matters:
+a PAA presented as prevention is the false-<code>prevented</code> claim the enforcement
+gradient exists to stop. What it can do is change what happens next.</p>
+<p><code>throttle</code> is that response. A crossing records an expiring backoff, and the
+<em>next</em> edit's advisory surfaces it. The fold is purely additive by construction —
+it only ever turns an allow into a notice or appends to an existing one, and it
+cannot reach a deny. A soft constraint must not become a block by this route.</p>
+<p>A satisfied PAA constraint is <strong>recorded, not skipped</strong>. "The rule ran and held"
+and "the rule never ran" are different facts, and the checker's coverage pass
+needs to tell them apart — an absent evaluation reads as a constraint nobody
+applied.</p>
+<h2 id="reading-a-trace-with-quipu"><a class="header" href="#reading-a-trace-with-quipu">Reading a trace with quipu</a></h2>
+<pre><code class="language-bash">quipu audit ~/.local/state/yupana/metrics.jsonl --db ops.db   # T ⊨ Σ
+quipu audit replay ~/.local/state/yupana/metrics.jsonl --db ops.db
+quipu audit tree ~/.local/state/yupana/metrics.jsonl
+quipu audit inheritance ~/.local/state/yupana/metrics.jsonl --db ops.db
+</code></pre>
+<p><code>quipu audit</code> exits non-zero when the trace <strong>contradicts</strong> the specification; an
+incompleteness (no principal chain, no declared class, a constraint the window
+never exercised) is reported and does not fail the gate. See quipu's <a href="https://scbrown.github.io/quipu/reference/cli.html">CLI
+reference</a> for the passes and
+what each one provably cannot decide.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../reference/policy-guard.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../design/specification.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../reference/policy-guard.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../design/specification.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

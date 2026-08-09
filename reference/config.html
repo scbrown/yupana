@@ -1,0 +1,382 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Configuration Reference - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/config.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h1>
+<p>Yupana reads the <code>[yupana]</code> table of <code>.bobbin/config.toml</code>. All keys are optional;
+unspecified keys fall back to the defaults shown below.</p>
+<pre><code class="language-toml">[yupana]
+# Baseline the shared read-only graph is built at.
+base_ref = "main"
+# (Phase 2/3 — not yet read) Run the LSP tier for precise facts where a build resolves.
+enable_lsp = true
+# (Phase 2 — not yet read) Run the CPG/dataflow tier.
+enable_cpg = false
+# Languages to extract. RESTRICTS `yupana analyze`: a file whose language is not
+# listed is not counted.
+languages = ["rust", "typescript", "python", "go", "java", "cpp"]
+
+[yupana.freshness]
+# Debounce for keystroke-driven tree-sitter updates (ms).
+debounce_ms = 300
+# (LSP tier — not yet read) When to compute LSP facts: "save" | "on_demand".
+lsp_on = "save"
+
+[yupana.tenancy]
+# Maximum concurrent per-tenant overlays over one base. A new overlay past the
+# cap evicts one per `overlay_eviction` (logged, never silent).
+max_overlays = 32
+# Symbols whose direct fan-in exceeds this get a bounded frontier cascade
+# (clipped to one hop) so a widely-referenced signature edit cannot blow the
+# recompute budget (§14.2). The bounding is logged.
+high_fanin_threshold = 200
+# Overlay eviction at the cap: "lru" (evict least-recently-used) or
+# "on_session_close" (evict on close; oldest-created is the cap backstop).
+overlay_eviction = "on_session_close"
+
+[yupana.serve]
+bind_address = "127.0.0.1"
+# Distinct from Bobbin's server and Quipu's 3030.
+mcp_http_port = 3040
+# Write guard: when true, yupana REFUSES mutating operations (promotion) with a
+# distinguishable error. The served MCP/HTTP surface is read-only regardless
+# today; this guards the write path and any future served write.
+read_only = false
+# When true, the hook and MCP graph tools consult the resident daemon at
+# bind_address:mcp_http_port (see Resident Daemon) and fall back to the
+# transient build when it is unusable. The guard's fallback is LOUD.
+use_daemon = false
+
+# (Phase 4) Quipu promotion. `promote_on` and `shapes_path` are not yet read.
+[yupana.quipu]
+enabled = false
+# "commit" | "merge" | "manual".
+promote_on = "merge"
+# "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback).
+branch_model = "named_graph"
+shapes_path = "shapes/"
+
+[yupana.policy]
+# "off" (inert) | "advise" (report only) | "enforce" (deny).
+mode = "off"
+# Wall-clock budget for the whole pre-edit guard (ms). Expiry =&gt; allow.
+deadline_ms = 100
+# Warn the user, once per session, when the guard fails open.
+notify_on_fail_open = true
+# How far to follow the call graph when sizing an edit.
+max_hops = 5
+
+# Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
+# is unconstrained. See "Pre-Edit Policy Guard" for the full contract.
+[yupana.policy.scopes.polecat-3]
+allow_paths = ["src/**", "tests/**"]   # empty = any path
+deny_paths = ["src/config.rs"]         # beats allow_paths
+max_impacted_symbols = 25
+max_impacted_files = 10
+
+# Structural (tree-sitter-tier) rules — checks a linter finds hard or slow.
+# Unlike scopes, rules are NOT per-tenant: they govern the code an edit
+# introduces, for everyone. Each rule pairs a Selector (a tree-sitter .scm
+# capture query) with a Predicate (a regex + a match_type). Evaluated against
+# the text the edit ADDS, Mode-staged, fail-open. Use TOML literal (single-
+# quote) strings so regex backslashes are not doubled.
+[[yupana.policy.rules]]
+name = "no-ticket-in-comment"
+language = "rust"                      # the grammar the query targets
+query = '(line_comment) @c'            # Selector: which nodes
+match_type = "must-not-match"          # must-match | must-not-match | must-exist
+pattern = '\b[A-Z]+-[0-9]+\b'          # Predicate: the regex
+# gate = '\bTODO\b'                    # optional: only test captures matching this
+# applies_to = ["src/**"]              # optional path globs; empty = any path
+# message = "keep ticket refs in commits, not comments"  # optional override
+
+# What the usage spool records about each guard decision.
+[yupana.metrics]
+# "off" (default) | "relative" (repo-relative) | "absolute".
+record_paths = "off"
+</code></pre>
+<p>An unrecognized <code>mode</code> is a config <strong>error</strong>, not a silently inert guard.</p>
+<h2 id="auditing-guard-decisions-yupanametrics"><a class="header" href="#auditing-guard-decisions-yupanametrics">Auditing guard decisions (<code>[yupana.metrics]</code>)</a></h2>
+<p>A guard record carries <code>result</code>, <code>mode</code>, <code>ext</code>, <code>agent</code>, <code>tenant</code> and <code>ts</code>. That
+is enough to count denies and not enough to review one: a record without a
+subject cannot confirm a rule is scoped correctly, cannot show a false positive,
+and cannot support an incident timeline. <code>ext</code> is a lossy proxy — six denies on
+<code>.json</code> tells an operator nothing actionable.</p>
+<p><code>record_paths</code> adds the subject:</p>
+<div class="table-wrapper"><table><thead><tr><th>Value</th><th>Records</th><th>Use when</th></tr></thead><tbody>
+<tr><td><code>off</code> (default)</td><td>no path</td><td>The deployment treats paths as sensitive.</td></tr>
+<tr><td><code>relative</code></td><td><code>src/auth.rs</code></td><td>The useful setting for a fleet — identifies the file without disclosing where the checkout lives.</td></tr>
+<tr><td><code>absolute</code></td><td><code>/srv/repo/src/auth.rs</code></td><td>One host, several checkouts, where a relative path is ambiguous.</td></tr>
+</tbody></table>
+</div>
+<p>It defaults to <code>off</code> because paths are more sensitive than extensions: a
+deployment opts <strong>in</strong>, and recording is never switched on beneath one.</p>
+<p>The <strong>rule id</strong> is recorded whatever <code>record_paths</code> says. It names what actually
+fired — the matching <code>deny_paths</code> glob, <code>allow_paths</code> when a path matched no
+allow pattern, the exceeded ceiling, or the governed rule's name — and it is the
+field that makes a false positive diagnosable, since a wrongly-scoped rule and a
+correctly-scoped one are otherwise indistinguishable. A rule id is a name the
+operator wrote, not user content, so it carries none of the sensitivity that
+argues for gating paths.</p>
+<p>Both fields are recorded for <strong>allow</strong> as well as deny, under the same knob.
+Scope that can only be inferred from the absence of denies cannot be verified at
+all; confirming a rule is scoped correctly needs what it let through as much as
+what it stopped.</p>
+<pre><code class="language-json">{"kind":"guard","result":"deny","mode":"enforce","ext":"yaml",
+ "path":".beads/config.yaml","rule":"deny_paths:.beads/**",
+ "agent":"mathis","tenant":"worker","ts":1785544543}
+</code></pre>
+<p>Both fields are <strong>omitted</strong> rather than blanked when they have nothing to say
+(recording off, or a clean allow with no deciding rule), so a reader never has to
+tell "recorded as empty" from "not recorded".</p>
+<p><code>yupana status</code> reports the setting in force, so an operator can confirm from
+outside the process that recording is actually on — a control believed active and
+silently inert reads exactly like a quiet week.</p>
+<pre><code class="language-console">$ yupana status
+  audit       : record_paths=relative
+</code></pre>
+<h2 id="projected-governed-policy-phase-4-quipu-feature"><a class="header" href="#projected-governed-policy-phase-4-quipu-feature">Projected governed policy (Phase 4, <code>quipu</code> feature)</a></h2>
+<p>With the <code>quipu</code> feature and <code>[yupana.quipu] enabled = true</code> plus an <code>endpoint</code>,
+the guard also fetches quipu's <code>boundary:"action"</code> structural policies and
+evaluates them like any rule — a governed <code>deny</code> policy blocks under
+<code>mode = "enforce"</code>. An unreachable quipu fails open loudly; the verdict declares
+whether the projection was fresh. Yupana never defines a governed policy — it only
+projects quipu's. See the design note "Policy edit hooks — the yupana side".</p>
+<p><strong><code>endpoint</code> is a READ capability, not a write one.</strong> It is what the guard fetches
+the rule catalogue from, and that is all it grants: <code>yupana promote</code> will not write
+to a merely-configured endpoint, because setting this key deployment-wide is how
+every checkout in its scope came to be one bare command away from a live,
+un-undoable graph write (aegis-o2h97). A promotion must name its target with
+<code>--to</code>. See "<code>yupana promote</code> — what authorizes the write" in the CLI reference.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../reference/cli.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../reference/mcp-tools.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../reference/cli.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../reference/mcp-tools.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

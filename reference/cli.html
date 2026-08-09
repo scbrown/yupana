@@ -1,0 +1,515 @@
+<!DOCTYPE HTML>
+<html lang="en" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>CLI Commands - Yupana — Live Code Structure</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="In-memory, multi-tenant code-analysis engine for the Bobbin × Quipu stack">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Yupana — Live Code Structure</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/cli.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="cli-commands"><a class="header" href="#cli-commands">CLI Commands</a></h1>
+<pre><code class="language-text">USAGE:
+    yupana &lt;COMMAND&gt;
+
+COMMANDS:
+    serve       Run the MCP server (stdio; --http for streamable-HTTP)
+    daemon      Run the resident-graph daemon (FR-31; see Resident Daemon)
+    analyze     Build the base graph for a path and print a summary
+    refs        Find the definition sites of a symbol by name
+    callers     Direct callers and callees of a symbol
+    communities Densely-connected symbol clusters (deterministic Louvain, FR-9)
+    impact      Blast radius; --cochange reconciles against history (FR-11)
+    dataflow    Intra-procedural data dependence within a function
+    export      Emit the referential structure as Turtle (bobbin: ontology)
+    hook        Harness hook adapter (post-edit advisory / pre-edit guard)
+    verify      Verdict on a proposed edit buffer (FR-23/FR-24)
+    promote     Promote a commit's structural facts into Quipu    [Phase 4]
+    verifier    Show the verdict-signing public key to register  [quipu feature]
+    verdicts    Drain the local signed-verdict spool into quipu  [quipu feature]
+    status      Show base commit, tiers, and configuration
+    completions Generate shell completions
+    help        Print help
+
+GLOBAL FLAGS:
+    --json      Machine-readable output
+    --quiet     Suppress non-essential output
+    --verbose   Raise the default log level to debug (RUST_LOG still wins)
+    --tenant    Tenant/session id (default: single-tenant)
+    --config    Path to config file (replaces discovery; must exist)
+</code></pre>
+<p><code>--config &lt;path&gt;</code> <strong>replaces</strong> config discovery rather than adding to it: it
+loads exactly that file over the compiled defaults, and the ambient
+<code>.bobbin/config.toml</code> is not consulted (FR-29 ranks a flag above project and
+user config). A <code>--config</code> path that does not exist is a loud error, never a
+silent fall-back to discovery — so pointing the pre-edit guard at a scope file
+with a mistyped path fails visibly instead of quietly enforcing the wrong scope.</p>
+<p><code>--verbose</code> raises the default tracing level from <code>info</code> to <code>debug</code>. <code>RUST_LOG</code>,
+when set, still wins and can target individual modules, so the precedence is
+<code>RUST_LOG</code> &gt; <code>--verbose</code> &gt; the <code>info</code> default.</p>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<pre><code class="language-bash">yupana analyze src
+yupana analyze src --at main     # structure of the tree at a baseline commit (FR-13)
+yupana refs authenticate src --json
+yupana status                    # resolves base_ref to a commit SHA (in a git repo)
+yupana impact authenticate src --hops 5   # lookup is by bare symbol name, not file::symbol
+yupana communities src --json         # symbol clusters, largest-first
+yupana verify --file src/auth.rs --buffer /tmp/edited.rs
+yupana promote --dry-run                  # would this projection conform? writes nothing
+yupana promote --to $QUIPU --commit HEAD  # the write; --to is what authorizes it
+</code></pre>
+<h2 id="yupana-promote--what-authorizes-the-write"><a class="header" href="#yupana-promote--what-authorizes-the-write"><code>yupana promote</code> — what authorizes the write</a></h2>
+<p><strong><code>--to</code> is the only thing that authorizes a promotion.</strong> A configured
+<code>[yupana.quipu] endpoint</code> is deliberately <em>not</em> enough, and a bare <code>yupana promote</code>
+refuses even where one is set — naming the endpoint it found and both remedies:</p>
+<pre><code class="language-console">$ yupana promote
+Error: refusing to promote into a DISCOVERED endpoint: http://quipu.example
+  `[yupana.quipu] endpoint` is configured so the pre-edit guard can READ the rule
+  catalogue. It does not authorize a write, and a promotion is a live graph write
+  with no undo.
+  To write there, say so:        yupana promote --to http://quipu.example
+  To check it without writing:   yupana promote --dry-run
+</code></pre>
+<p>That asymmetry is the point. The endpoint key is set once, deployment-wide, so
+the <em>guard</em> can read the governed rule catalogue on every edit — a READ. Letting
+it double as a write target meant a bare <code>promote</code> from any checkout in scope of
+that config posted tens of thousands of triples into the live graph, and there is
+no undo (<code>/episode/retract</code> is episode-scoped and does not unwind a promotion).
+It was found by an operator who ran it expecting a dry run (aegis-o2h97). One
+config supplying both a read capability and a write capability is the defect;
+requiring the write to be spelled out on the command line is the fix.</p>
+<p>The MCP <code>yupana_promote</code> tool keeps its own fallback to the configured endpoint:
+there the target comes from a server an operator deliberately started and pointed
+somewhere, not from whatever config happens to be ambient in an agent's shell.</p>
+<h2 id="yupana-promote---dry-run--validate-without-writing"><a class="header" href="#yupana-promote---dry-run--validate-without-writing"><code>yupana promote --dry-run</code> — validate without writing</a></h2>
+<p><code>--dry-run</code> extracts the projection and runs the <strong>same</strong> SHACL gate a real
+promotion runs, then stops. It needs no target — validation is in-process — and
+reports the graph a real run <em>would</em> have written to:</p>
+<pre><code class="language-console">$ yupana promote --dry-run
+  DRY RUN — conforms. WROTE NOTHING.
+    would post: 4041881 bytes of Turtle in 4 chunk(s)
+    would target: http://quipu.example/knot
+</code></pre>
+<p>A non-conforming projection produces the identical refusal (and identical
+retained payload) that <code>promote</code> would produce, so a dry run cannot green-light
+something the write path would reject.</p>
+<h2 id="yupana-promote--diagnosing-a-refusal"><a class="header" href="#yupana-promote--diagnosing-a-refusal"><code>yupana promote</code> — diagnosing a refusal</a></h2>
+<p>A promotion is all-or-nothing: one SHACL violation refuses the whole commit and
+writes nothing. So the refusal has to say enough to act on, because the
+projection it refused is generated on the fly and would otherwise be gone.</p>
+<pre><code class="language-console">$ yupana promote --to $QUIPU
+  REFUSED — promotion did not pass SHACL, wrote nothing:
+    - MaxCount(1) not satisfied — on …/code/yupana/src%2Fmcp%2Fstate_tools.rs::StateIngestRequest (path …/symbolKind)
+    payload retained at: /tmp/yupana-promote-yupana-promote-yupana-45c7b660….ttl
+</code></pre>
+<p>Two things make that actionable, and both are load-bearing:</p>
+<ul>
+<li><strong>The violation names its focus node and property path.</strong> A bare
+<code>MaxCount(1) not satisfied</code> is true of every <code>maxCount</code> shape in the file and
+identifies nothing.</li>
+<li><strong>The refused projection is written to disk</strong>, so you can read the document
+that failed. Parse errors are positional (<code>line 8656</code>) and the line MOVES
+between runs because the content is regenerated — without the payload, the one
+fact the error gives you is unusable.</li>
+</ul>
+<p>The dump also lands on an invalid-Turtle failure and on a partial chunked write.
+It goes to <code>$YUPANA_PROMOTE_DUMP_DIR</code>, else the system temp dir.</p>
+<p>The name carries the repo and the resolved commit, so a scheduled promotion
+refusing the same commit hour after hour overwrites <strong>one</strong> file. A <em>different</em>
+failing commit gets its own dump — the SHA is what tells you which projection
+you are holding, and reusing one name would overwrite the payload you were still
+reading. So the bound is distinct failing commits, not runs.</p>
+<p>Retention is best-effort: a promotion that is already failing never fails
+<em>differently</em> because a dump could not be written.</p>
+<h2 id="yupana-status"><a class="header" href="#yupana-status"><code>yupana status</code></a></h2>
+<p>Reports the resolved baseline, the tiers this binary serves, and — the part a
+script gates on — <strong>the state of the policy rule plane</strong>.</p>
+<pre><code class="language-console">$ yupana status
+  policy      : mode=advise  scope=none for this tenant
+  mode source : ~/.config/bobbin/config.toml
+  tamper state: TAMPER-EVIDENT, NOT TAMPER-PROOF — a local agent can alter policy; a clean report is no evidence that tampering was prevented
+  rule set    : 7 projected from quipu (0 structural, 7 text) + 0 local
+  rule digest : sha256:3fb9f179b9229755 (unsigned)
+</code></pre>
+<p><code>rule digest</code> answers <em>which</em> rule set is live, not just how many rules there
+are: two hosts showing different digests are enforcing different policy, which
+the counts alone cannot reveal. It is computed over the fields that decide
+enforcement (rule identity, pattern, tier, exemptions), so a rationale typo does
+not churn it. It is <strong>not</strong> a version — there is no signed rule set yet, and
+<code>verification</code> reports <code>unsigned</code> to say so rather than implying provenance
+yupana does not have.</p>
+<p><code>mode source</code> identifies the layer that set the effective mode. If a
+workspace-writable <code>.bobbin/config.toml</code> lowers a user policy (for example,
+<code>enforce</code> to <code>off</code>), status calls it out as <strong>LOWERED</strong> and exits non-zero. This
+does not claim that a local agent was prevented from changing a local file: the
+surface is deliberately <strong>tamper-evident, not tamper-proof</strong>. Read a clean
+report as “no evidence of tampering”, never as proof it was prevented.</p>
+<h3 id="exit-codes"><a class="header" href="#exit-codes">Exit codes</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>0</code></td><td>Rule plane <code>loaded</code>, <code>empty</code>, or <code>off</code></td></tr>
+<tr><td><code>3</code></td><td>Rule plane <strong><code>degraded</code></strong> — the rules could not be projected</td></tr>
+<tr><td><code>4</code></td><td>Workspace config lowered the user's policy mode</td></tr>
+</tbody></table>
+</div>
+<p>Exit <code>3</code> is the one that matters. In that state the guard <strong>fails open</strong> on
+every edit: nothing is enforced, and before this had an exit code the condition
+printed in red and exited <code>0</code>, so nothing could gate on it and a human had to
+happen to look. <code>empty</code> and <code>off</code> deliberately exit <code>0</code> — a graph with no rules
+is a true, quiet answer, and failing on it would make the code useless in every
+tree that has no governed policy yet.</p>
+<p><code>status</code> retries the projection three times before declaring <code>degraded</code>
+(<code>attempts</code> is reported, so a flap stays visible). The pre-edit hook does <strong>not</strong>
+retry: it runs on every edit across the fleet and its latency ceiling is the
+reason it exists. A status surface that went red once in ten runs from a
+transient blip would be routed around, and then the real red would be invisible
+too.</p>
+<h2 id="yupana-refs"><a class="header" href="#yupana-refs"><code>yupana refs</code></a></h2>
+<p>Definition sites of a symbol, by name, from the same graph <code>callers</code>, <code>impact</code>
+and <code>communities</code> read — so every language this build has a grammar for is
+searched, not just Rust. (Grammars beyond Rust need the <code>langs-extra</code> feature;
+<code>yupana status</code> lists what a given binary can parse.)</p>
+<pre><code class="language-console">$ yupana refs derive_agents
+quipu.py:1 derive_agents (function) [TreeSitter]
+</code></pre>
+<p>A zero result says <strong>which</strong> kind of nothing it is, because the two are not the
+same fact:</p>
+<pre><code class="language-console">$ yupana refs no_such_symbol           # a populated graph, name genuinely absent
+no definition found for no_such_symbol (searched 412 symbol(s))
+
+$ yupana refs anything ./docs          # nothing here was parseable at all
+no definition found for anything (nothing parseable under ./docs — the graph is
+empty, so this is not evidence the symbol is absent)
+</code></pre>
+<p>Under <code>--json</code> the same distinction is <code>count</code> against <code>searched_symbols</code>, and
+the answer carries its <code>tier</code> whether or not it found anything (FR-3):</p>
+<pre><code class="language-json">{
+  "symbol": "derive_agents",
+  "count": 1,
+  "definitions": [
+    {
+      "file": "quipu.py",
+      "name": "derive_agents",
+      "kind": "function",
+      "start_line": 1,
+      "end_line": 2,
+      "tier": "treesitter"
+    }
+  ],
+  "searched_symbols": 412,
+  "tier": "treesitter"
+}
+</code></pre>
+<h3 id="resolving-by-position"><a class="header" href="#resolving-by-position">Resolving by position</a></h3>
+<p>Name lookup over-connects on common names — <code>build</code>, <code>new</code>, <code>write</code>. When you
+are reading code you know <em>where</em> you are, not which of the twelve it is, so
+point at it instead (FR-4):</p>
+<pre><code class="language-console">$ yupana refs build                 # by name: ambiguous
+a.rs:3 build (function) [TreeSitter]
+a.rs:7 build (function) [TreeSitter]
+
+$ yupana refs --at a.rs:7           # by position: the one you pointed at
+a.rs:7 build (function) [TreeSitter]
+</code></pre>
+<p><code>--at FILE:LINE</code> resolves to the <strong>innermost symbol enclosing that line</strong> and
+answers with that symbol alone — it does not re-expand to every symbol sharing
+its name, which would restore the ambiguity the position was given to remove.
+<code>FILE</code> is relative to the search path; with <code>--at</code>, the positional argument is
+the search path rather than a symbol name.</p>
+<p>A <strong>column is refused, not ignored</strong>:</p>
+<pre><code class="language-console">$ yupana refs --at a.rs:3:9
+error: --at takes FILE:LINE, not FILE:LINE:COL (got column `9`). The tree-sitter
+tier resolves to the innermost symbol on a LINE; column-precise resolution needs
+the LSP tier (FR-2), which is not built. Retry as `a.rs:3`.
+</code></pre>
+<p>Accepting the column and answering for the line would serve a line-precise
+answer to a column-precise question — an approximation presented as the finer
+tier, which FR-3 forbids. Two symbols on one line are not separable at the
+tree-sitter tier, and you are told so rather than handed a guess.</p>
+<p>A position that resolves to nothing explains which kind of nothing it is,
+rather than borrowing the vocabulary of "no such symbol":</p>
+<pre><code class="language-console">$ yupana refs --at a.rs:3
+no symbol encloses a.rs:3 — it falls between definitions (a blank line, an
+import, a top-level comment). `a.rs` defines: one:1-1, two:5-5
+</code></pre>
+<p><code>refs</code> answers "where is this <strong>defined</strong>". For "what <strong>reaches</strong> this", use
+<code>yupana callers</code>; for the transitive form, <code>yupana impact</code>.</p>
+<h2 id="yupana-verifier-and-yupana-verdicts"><a class="header" href="#yupana-verifier-and-yupana-verdicts"><code>yupana verifier</code> and <code>yupana verdicts</code></a></h2>
+<p>Both require the <code>quipu</code> feature. The guard signs a verdict the moment a
+constraint fires and appends it locally; these are the registration and the
+drain. Full field list and the reasoning in
+<a href="enforcement-trace.html">The Enforcement Trace</a>.</p>
+<pre><code class="language-bash">yupana verifier --key-path yupana-signing.pk8   # public key to register in quipu
+yupana verdicts --to http://localhost:7878    # drain the spool
+</code></pre>
+<p><code>yupana verifier</code> is the <strong>deliberate key-creation act</strong> — it mints the signing key
+if absent. The hook path never does: a signing identity materialising from an
+agent's edit is not something that should happen quietly.</p>
+<p><code>yupana verdicts</code> truncates the spool only when every verdict was accepted, so a
+partial drain leaves the remainder intact rather than losing it.</p>
+<h2 id="yupana-verify"><a class="header" href="#yupana-verify"><code>yupana verify</code></a></h2>
+<p>Checks a <em>proposed</em> buffer against the graph Yupana already holds and returns a
+boolean verdict plus violations (FR-23/FR-24). Exits <strong>non-zero</strong> when the buffer
+has violations, so scripts and CI can gate on it.</p>
+<pre><code class="language-console">$ yupana verify --file src/a.rs --buffer /tmp/proposed.rs
+violations src/a.rs [TreeSitter]
+  ghost:2 `ghost` is called here but is defined nowhere in this buffer or the
+          project graph, and is not brought into scope by a `use`.
+  takes_two:2 `takes_two` is called with 1 argument(s) but is defined at line 1
+          taking 2.
+</code></pre>
+<p>Only violations the edit <em>introduces</em> are reported: the file's current contents
+are the baseline, so pre-existing breakage is not blamed on this edit.</p>
+<p><strong>Read the <code>unchecked</code> list before trusting a clean verdict.</strong> At the tree-sitter
+tier there is no type information and no name resolution, so:</p>
+<div class="table-wrapper"><table><thead><tr><th>Violation (FR-23)</th><th>At this tier</th></tr></thead><tbody>
+<tr><td><code>identifier-does-not-exist</code></td><td>free calls only, and only ones the edit introduces</td></tr>
+<tr><td><code>wrong-arity</code></td><td>free calls resolving to exactly one known definition</td></tr>
+<tr><td><code>unresolved-import</code></td><td>bodiless <code>mod foo;</code> with no sibling file</td></tr>
+<tr><td><code>type-violation</code></td><td><strong>not checked</strong> — needs the LSP tier</td></tr>
+</tbody></table>
+</div>
+<p>The bias is against false positives throughout: method calls, path-qualified
+calls, imports, locals, closures, and function-typed parameters are all left
+alone rather than guessed at. <code>ok: true</code> means "nothing this tier can see is
+wrong", not "this compiles".</p>
+<p><code>yupana status</code> resolves the configured <code>base_ref</code> (default <code>main</code>) to a concrete
+commit via the system <code>git</code>; outside a git repository the base commit shows as
+unresolved and Yupana falls back to the working tree.</p>
+<p><code>yupana analyze --at &lt;ref&gt;</code> builds the summary from the <strong>git tree</strong> at a baseline
+commit (FR-13) rather than the working copy — the shared read-only base the
+Phase-3 resident graph will hold. It reads blob content at the ref (never the
+working tree), and degrades to an empty result outside a repo or for an
+unresolved ref.</p>
+<p><code>yupana communities</code> partitions the call graph into densely-connected symbol
+clusters using deterministic Louvain (FR-9) — the same partition on every run,
+no RNG. Communities are ordered largest-first; members carry a <code>tier</code> tag.
+Quipu runs community detection over <em>committed</em> facts; Yupana computes it live
+over the hot graph.</p>
+<p>Commands marked with a phase print a notice until their engine lands; see the
+<a href="../design/specification.html">Specification</a> §12.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../concepts/game-state.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../reference/config.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../concepts/game-state.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../reference/config.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
