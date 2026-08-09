@@ -24,7 +24,8 @@ pub(super) fn promote(
         // existing discard rather than becoming an `_server` in the signature.
         let _ = (req, server);
         Err(internal(crate::errors::Error::Config(
-            "yupana_promote needs the `quipu` feature; this server was built without it".to_string(),
+            "yupana_promote needs the `quipu` feature; this server was built without it"
+                .to_string(),
         )))
     }
     #[cfg(feature = "quipu")]

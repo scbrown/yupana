@@ -10,8 +10,8 @@
 //! and scoped to tests, so the lint stays live everywhere else rather than
 //! being switched off crate-wide (yupana #83).
 #![allow(non_snake_case)]
-use yupana::graph::{reachable_over, update_frontier, Base, Dir, TenantRegistry};
 use std::sync::Arc;
+use yupana::graph::{reachable_over, update_frontier, Base, Dir, TenantRegistry};
 
 /// A committed 3-hop chain (leaf ← mid ← top) plus `pad` files so `O(touched)`
 /// vs `O(repo)` is observable.

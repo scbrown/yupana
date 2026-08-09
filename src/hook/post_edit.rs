@@ -189,7 +189,9 @@ fn resident_feed(root: &Path, rel: &str, tenant: Option<&str>) -> Option<Externa
     let (host, port) = match expected_same_root_daemon(&config, root, DAEMON_TIMEOUT)? {
         Ok(addr) => addr,
         Err(reason) => {
-            eprintln!("yupana post-edit: daemon expected but unusable, transient fallback: {reason}");
+            eprintln!(
+                "yupana post-edit: daemon expected but unusable, transient fallback: {reason}"
+            );
             return None;
         }
     };

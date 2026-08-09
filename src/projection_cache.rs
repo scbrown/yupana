@@ -184,7 +184,9 @@ pub fn resolve_path(
 #[must_use]
 pub fn cache_path() -> Option<PathBuf> {
     resolve_path(
-        std::env::var("YUPANA_PROJECTION_CACHE_PATH").ok().as_deref(),
+        std::env::var("YUPANA_PROJECTION_CACHE_PATH")
+            .ok()
+            .as_deref(),
         std::env::var("XDG_STATE_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
     )
