@@ -5,27 +5,48 @@
       <stop offset="50%" style="stop-color:#F2CC8F"/>
       <stop offset="100%" style="stop-color:#81B29A"/>
     </linearGradient>
-    <linearGradient id="coilGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#3D85C6;stop-opacity:0.4"/>
+    <linearGradient id="boardGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3D85C6;stop-opacity:0.35"/>
       <stop offset="50%" style="stop-color:#9B72AA"/>
-      <stop offset="100%" style="stop-color:#3D85C6;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#3D85C6;stop-opacity:0.35"/>
     </linearGradient>
   </defs>
   <style>
     .title { font-family: 'Courier New', Courier, monospace; font-size: 76px; font-weight: bold; fill: url(#textGrad); }
     .sub { font-family: 'Courier New', Courier, monospace; font-size: 16px; fill: #81B29A; letter-spacing: 2px; }
-    .coil { stroke: url(#coilGrad); stroke-width: 2.5; fill: none; }
-    .dot { fill: #9B72AA; }
+    .rim { stroke: url(#boardGrad); stroke-width: 2.2; fill: none; }
+    .div { stroke: #9B72AA; stroke-width: 1.5; opacity: 0.6; }
+    .empty { fill: none; stroke: #9B72AA; stroke-opacity: 0.45; stroke-width: 1.2; }
   </style>
+
   <!-- YUPANA wordmark -->
   <text x="410" y="92" text-anchor="middle" class="title">YUPANA</text>
-  <!-- Coiled skein line under the wordmark -->
-  <path d="M 150 122 Q 230 104, 310 122 T 470 122 T 630 122 Q 690 122, 700 120" class="coil"/>
-  <path d="M 150 132 Q 230 150, 310 132 T 470 132 T 630 132 Q 690 132, 700 134" class="coil" opacity="0.5"/>
-  <circle cx="150" cy="122" r="3.5" class="dot"/>
-  <circle cx="410" cy="122" r="3.5" class="dot"/>
-  <circle cx="700" cy="120" r="3.5" class="dot"/>
+
+  <!-- Yupana board strip: compartments of decreasing capacity, some seeded -->
+  <rect x="190.0" y="112.0" width="440.0" height="28.0" rx="7" class="rim"/>
+  <g class="div" stroke-linecap="round">
+    <line x1="263.3" y1="115.0" x2="263.3" y2="137.0"/>
+    <line x1="336.7" y1="115.0" x2="336.7" y2="137.0"/>
+    <line x1="410.0" y1="115.0" x2="410.0" y2="137.0"/>
+    <line x1="483.3" y1="115.0" x2="483.3" y2="137.0"/>
+    <line x1="556.7" y1="115.0" x2="556.7" y2="137.0"/>
+  </g>
+  <g>
+    <circle cx="213.7" cy="126.0" r="3.6" fill="#E07A5F"/>
+    <circle cx="226.7" cy="126.0" r="3.6" fill="#E07A5F"/>
+    <circle cx="239.7" cy="126.0" r="3.3000000000000003" class="empty"/>
+    <circle cx="293.5" cy="126.0" r="3.6" fill="#F2CC8F"/>
+    <circle cx="306.5" cy="126.0" r="3.6" fill="#F2CC8F"/>
+    <circle cx="373.3" cy="126.0" r="3.6" fill="#81B29A"/>
+    <circle cx="433.7" cy="126.0" r="3.6" fill="#3D85C6"/>
+    <circle cx="446.7" cy="126.0" r="3.3000000000000003" class="empty"/>
+    <circle cx="459.7" cy="126.0" r="3.3000000000000003" class="empty"/>
+    <circle cx="513.5" cy="126.0" r="3.3000000000000003" class="empty"/>
+    <circle cx="526.5" cy="126.0" r="3.3000000000000003" class="empty"/>
+    <circle cx="593.3" cy="126.0" r="3.6" fill="#E07A5F"/>
+  </g>
+
   <!-- Taglines -->
-  <text x="410" y="168" text-anchor="middle" class="sub">structure · dataflow · blast radius</text>
-  <text x="410" y="190" text-anchor="middle" class="sub" opacity="0.7">live · per-tenant · in-memory</text>
+  <text x="410" y="170" text-anchor="middle" class="sub">structure · dataflow · blast radius</text>
+  <text x="410" y="192" text-anchor="middle" class="sub" opacity="0.7">live · per-tenant · in-memory</text>
 </svg>

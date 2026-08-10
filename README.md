@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" width="200" alt="Yupana logo — a coiled skein of yarn with graph nodes"/>
+  <img src="assets/logo.svg" width="200" alt="Yupana logo: an Incan counting board, five place-value rows of seeded and empty compartments"/>
 </p>
 
 <h1 align="center">yupana</h1>
