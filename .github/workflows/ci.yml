@@ -104,6 +104,47 @@ jobs:
   # /whatif surfaces plus the three MCP tools. The engine is pure in-memory —
   # no network, no fixtures — so both are self-contained.
 
+  # The browser target cannot ship dark either: same principle as the feature
+  # arms above, but keyed on TARGET rather than feature (the wasm boundary is
+  # a cfg(target_arch), which unlike a feature cannot be toggled into a lie).
+  # `just wasm check` builds the lib AND a linked cdylib (a bare --lib build
+  # never links, so it cannot check the properties embedders rely on), then a
+  # Node script instantiates it with an empty import object — asserting the
+  # module is self-contained — and drives a real extraction through it.
+  wasm:
+    name: WASM (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: default
+            features: ""
+          - name: langs-extra
+            features: "langs-extra"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # wasi-libc supplies the C headers tree-sitter compiles against and the
+      # libc.a its pure in-memory functions link from (see build.rs).
+      - run: sudo apt-get update && sudo apt-get install -y wasi-libc
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-${{ matrix.name }}-
+            ${{ runner.os }}-cargo-
+      - uses: extractions/setup-just@v2
+      - run: just wasm check "${{ matrix.features }}"
+
   build:
     name: Build
     runs-on: ubuntu-latest

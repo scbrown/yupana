@@ -15,7 +15,11 @@ pub mod action;
 pub mod attribution;
 pub mod audit;
 pub mod change;
+/// The clap CLI. Native-only: the serve command drives a tokio runtime, and a
+/// browser has no argv — wasm consumers call the library surface directly.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
+#[cfg(not(target_arch = "wasm32"))]
 mod cli_cmds;
 pub mod community;
 pub mod config;
@@ -52,6 +56,8 @@ pub mod projection_cache;
 #[cfg(feature = "quipu")]
 pub mod promote;
 pub mod reconcile;
+// Terminal rendering for the CLI — gated with it (its only consumer).
+#[cfg(not(target_arch = "wasm32"))]
 mod render;
 pub mod rules;
 /// The game-state harness (FR-35..FR-39): a generic in-memory fact graph, a
@@ -69,6 +75,13 @@ pub mod verdict;
 #[cfg(feature = "quipu")]
 pub mod verdict_spool;
 pub mod verify;
+/// C-runtime shims for `wasm32-unknown-unknown` (tree-sitter's libc surface).
+#[cfg(target_arch = "wasm32")]
+mod wasm_shim;
+/// File-watch (FR-17). Native-only: `notify` is an inotify/FSEvents adapter and
+/// has no wasm backend; in the browser, edits arrive as explicit overlay
+/// touches, not filesystem events.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod watch;
 
 pub use errors::{Error, Result};

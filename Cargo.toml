@@ -43,9 +43,6 @@ path = "src/main.rs"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 
-# Async runtime
-tokio = { version = "1", features = ["full"] }
-
 # Serialization / config
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -68,9 +65,6 @@ regex = "1"
 
 # In-memory graph
 petgraph = "0.7"
-
-# File-watch (incremental, event-driven overlays)
-notify = "6"
 
 # Logging
 tracing = "0.1"
@@ -120,6 +114,17 @@ ureq = { version = "2", optional = true }
 ring = { version = "0.17", optional = true }
 # quipu = { git = "https://github.com/scbrown/quipu", rev = "<pin-in-phase-4>", default-features = false, optional = true }
 
+# ── Native-only (absent on wasm32) ────────────────────────────────────
+# The analysis core (extract, graph, rules, types) is target-clean; what a
+# browser build genuinely cannot carry is the async runtime and the inotify
+# watcher, so those are conditional on the TARGET rather than on a feature —
+# a feature can be toggled into a lie, a target cfg cannot (aegis-qe5z
+# rationale). The modules they serve (`cli`, `daemon`, `watch`, `hook`) are
+# gated the same way in lib.rs. See docs/book wasm page for the build recipe.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["full"] }
+notify = "6"
+
 [features]
 default = []
 # Phase 1: MCP (stdio + streamable-HTTP) and the local HTTP API.
@@ -150,9 +155,25 @@ quipu = ["dep:oxrdf", "dep:oxttl", "dep:oxrdfio", "dep:rudof_lib", "dep:ureq", "
 game-state = []
 
 [dev-dependencies]
+# Re-listed for examples/wasm_smoke.rs, which drives tree-sitter directly to
+# prove the printf family linked (ts_node_string → snprintf). Same versions as
+# the real deps above, so nothing new enters the build graph.
+tree-sitter = "0.25"
+tree-sitter-rust = "0.24"
+
+# Native-only dev-deps: building ANY example for wasm32 builds the dev-dep
+# graph too, and wait-timeout (under assert_cmd) has no wasm32 port. The
+# tests that use these are all native-gated targets anyway.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
+
+# The linked-cdylib smoke artifact for the wasm32 build (see the example's
+# module docs and scripts/check-wasm-smoke.mjs).
+[[example]]
+name = "wasm_smoke"
+crate-type = ["cdylib"]
 
 [profile.release]
 lto = true

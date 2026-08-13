@@ -25,6 +25,7 @@
 - [Resident Daemon](reference/daemon.md)
 - [Pre-Edit Policy Guard](reference/policy-guard.md)
 - [The Enforcement Trace](reference/enforcement-trace.md)
+- [Browser / WASM Builds](reference/wasm.md)
 
 # Design
 

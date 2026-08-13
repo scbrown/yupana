@@ -46,6 +46,29 @@ fmt:
 run *args="":
     cargo run -- {{args}}
 
+# Browser/wasm32 build: just wasm <cmd>
+# Commands: build (lib + linked smoke cdylib), check (build + Node verifier)
+# Needs: `rustup target add wasm32-unknown-unknown` and the wasi-libc package
+# (headers + libc.a; override the lib dir with YUPANA_WASI_LIBC_DIR).
+
+wasm cmd="check" features="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export CFLAGS_wasm32_unknown_unknown="${CFLAGS_wasm32_unknown_unknown:--isystem /usr/include/wasm32-wasi -D__wasi__}"
+    feat=""
+    [ -n "{{features}}" ] && feat="--features {{features}}"
+    case "{{cmd}}" in
+        build)
+            cargo build --lib --target wasm32-unknown-unknown --release $feat
+            cargo build --example wasm_smoke --target wasm32-unknown-unknown --release $feat
+            ;;
+        check)
+            just wasm build "{{features}}"
+            node scripts/check-wasm-smoke.mjs
+            ;;
+        *) echo "Unknown: {{cmd}}. Try: build check" ;;
+    esac
+
 # Install `yupana` onto PATH; pass features e.g. `just install "mcp langs-extra"`
 install features="":
     #!/usr/bin/env bash
