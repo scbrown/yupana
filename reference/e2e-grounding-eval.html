@@ -249,10 +249,21 @@ phrase match, term overlap, provenance-only linkage, a single-term
 distractor that corroboration must prune, a hub-entity trap that the
 provenance rung's hub-degree cap must ignore, a crowded cluster larger
 than the briefing cap, and a no-neighbors probe where the only correct
-answer is silence. Hard classes (reported, not gated — the measured
-lexical frontier): multi-term collisions and a paraphrase miss, the two
-shapes only a semantic backend separates; configure quipu's embeddings
-and the same probes measure the gain.</p>
+answer is silence. Hard classes (reported, not gated — the lexical
+frontier): multi-term collisions and a paraphrase, the two shapes only a
+semantic backend separates.</p>
+<p>The semantic arm runs when the model bundle is provisioned, which
+<code>just e2e f1</code> does best-effort: the all-MiniLM-L6-v2 ONNX bundle from
+qdrant's fastembed mirror on <code>storage.googleapis.com</code> and the ONNX
+Runtime dylib extracted from the <code>onnxruntime</code> PyPI wheel
+(<code>scripts/e2e/extract_ort.py</code>, quipu's <code>ort</code> is <code>load-dynamic</code> via
+<code>$ORT_DYLIB_PATH</code>) — both hosts commonly allowed where HuggingFace's LFS
+CDN is not. With it, the briefing gains a fourth retrieval source (quipu
+<code>/search</code>, query embedded server-side, supporting hits within 80% of the
+query's top non-self score) and term probes retire — measured, they cost
+more precision on a semantic store than the recall they add. Measured
+macros: lexical overall 0.845; semantic overall 0.954, with the
+multi-term-FP and paraphrase classes both at 1.0.</p>
 <p>Each arm re-runs the shipped binary; ablations remove one retrieval source
 via <code>$YUPANA_BRIEF_ABLATE</code> — feature removal against the real code path,
 never a reimplementation. The gate fails the run unless the full arm's
