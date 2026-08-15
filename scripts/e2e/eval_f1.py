@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
-"""Retrieval eval for the work-item briefing: F1 with an ablation study.
+"""Retrieval eval for the work-item briefing: per-problem F1 + ablation.
 
-Builds a labeled corpus of work items in a fresh quipu store — two probe
-items, each with a relevance-judged cluster reachable through DIFFERENT
-retrieval mechanisms (whole-phrase match, distinctive-term probes,
-provenance co-occurrence) plus term-collision distractors that punish
-precision — then runs the SHIPPED `yupana hook session-start` binary per
-probe and scores the item ids the briefing surfaces against the judgments.
+Builds a labeled corpus of work items in a fresh quipu store, organized as
+PROBLEM CLASSES — each probe isolates one retrieval situation, so the
+report says not just how good the scores are but WHERE retrieval breaks:
 
-The ablation arms re-run the same binary with one retrieval source removed
-via `$YUPANA_BRIEF_ABLATE` (feature removal, not a reimplementation):
+  core classes (gated):
+    mixed             the original composite probe (phrase+term+provenance)
+    phrase-match      near-duplicate label phrasing
+    term-overlap      shares distinctive terms only
+    provenance-only   lexically disjoint, linked by touched entities
+    single-term-fp    a lone shared term must NOT retrieve (corroboration)
+    hub-entity-trap   co-occurrence through an everyone-touches-it file
+                      must NOT retrieve (hub-degree cap)
+    crowded-cluster   more relevant items than the briefing cap
+    no-neighbors      a genuinely novel item must retrieve NOTHING
 
-  full            all sources
-  -term-probes    /context queried with the full label only
-  -provenance     co-occurrence (related items) off
-  -context        the /context pipeline off entirely
+  hard classes (reported, not gated — the measured lexical frontier;
+  closing them is what quipu's embedding backend is for):
+    mixed-collision   composite probe with a multi-term lexical collision
+    multi-term-fp     a distractor corroborated by two shared terms
+    paraphrase-miss   relevant item in different words, no shared entity
 
-The gate: full-arm macro-F1 >= --min-f1 (default 0.85), and every ablation
-arm strictly below full — each feature has to EARN its place by measurably
-hurting when removed.
+Every arm runs the SHIPPED `yupana hook session-start` binary; ablation
+arms remove one retrieval source via `$YUPANA_BRIEF_ABLATE` (feature
+removal, never a reimplementation). Gates: core macro-F1 >= --min-f1
+(default 0.9) and every ablation's core macro strictly below full.
 
 Usage: scripts/e2e/eval_f1.py [--workdir DIR] [--profile release]
 Run via `just e2e f1`.
@@ -37,41 +44,107 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import YUPANA_ROOT, Rig, log, run  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# The labeled corpus. Ids share the `aegis-` prefix; entities carry filePath
-# so provenance also exercises the observed-scope plumbing.
-#
-# Probe 1 cluster (grounding): each relevant item is reachable by exactly the
-# mechanism named, so each ablation loses a known judgment:
-#   a2  phrase   label contains probe 1's label verbatim
-#   a3  term     shares distinctive terms (grounded/boundary), no phrase, no edge
-#   a4  prov     shares entity E1 with the probe, label lexically disjoint
-#   b1  --       DISTRACTOR for probe 1 ("boundary" collision), relevant to probe 2
-# Probe 2 cluster (weaving) mirrors it: b3 phrase, b1+b2 term, b4 prov,
-# a5 distractor ("pattern"/"cache" collision).
+# The corpus: id -> (label, outcome, [entities]). Entities become CodeModule
+# nodes with a filePath plus a GitCommit implements/modifies chain, so the
+# provenance rung and the observed-scope plumbing are both exercised.
+# Term collisions are DESIGNED (a distinctive term appearing in exactly the
+# labels the probe's class needs) — comments mark each one.
 # ---------------------------------------------------------------------------
 
-PROBES = {
-    "aegis-p0001": {
-        "label": "prove the grounded edit boundary",
-        "agent": "eval-p1",
-        "relevant": {"aegis-a0002", "aegis-a0003", "aegis-a0004"},
-    },
-    "aegis-p0002": {
-        "label": "weave pattern cache for the loom",
-        "agent": "eval-p2",
-        "relevant": {"aegis-b0001", "aegis-b0002", "aegis-b0003", "aegis-b0004"},
-    },
+CORPUS: dict[str, tuple[str, str | None, list[str]]] = {
+    # -- mixed (legacy probe 1): each relevant item reachable one way only --
+    "aegis-p0001": ("prove the grounded edit boundary", None, ["ent_e1"]),
+    "aegis-a0002": ("prove the grounded edit boundary for tallies", "done", []),  # phrase
+    "aegis-a0003": ("extend grounded boundary checks to imports", "done", ["ent_e3"]),  # terms
+    "aegis-a0004": ("reject fabricated citations at the edit seam", None, ["ent_e1"]),  # prov
+    # -- mixed-collision (legacy probe 2, hard): a5 collides on 2 terms --
+    "aegis-p0002": ("weave pattern cache for the loom", None, ["ent_e2"]),
+    "aegis-b0001": ("boundary conditions for weave tension", None, ["ent_e2"]),
+    "aegis-b0002": ("cache the loom pattern weft", "done", []),
+    "aegis-b0003": ("weave pattern cache for the loom shuttle", "done", []),
+    "aegis-b0004": ("speed up shuttle threading", None, ["ent_e2"]),
+    # -- multi-term-fp probe (hard): a5 doubles as legacy p2's collision.
+    # No entities on purpose: the class isolates the LEXICAL failure mode,
+    # so no provenance edge may rescue or muddy it.
+    "aegis-a0005": ("pattern matching in the policy cache", None, []),
+    "aegis-pm001": ("policy cache pattern precedence rules", "done", []),  # relevant
+    "aegis-pc001": ("matching engine for pattern workloads", None, []),  # 2-term FP
+    # -- phrase-match --
+    "aegis-k0000": ("rotate the signing keys quarterly", None, ["ent_keys"]),
+    "aegis-k0001": ("rotate the signing keys quarterly for verifiers", "done", []),
+    # -- term-overlap --
+    "aegis-w0000": ("debounce watcher events on save", None, ["ent_watch"]),
+    "aegis-w0001": ("coalesce debounce intervals for the watcher", "done", []),
+    "aegis-w0002": ("watcher debounce regression on large trees", None, []),
+    # -- provenance-only: labels avoid the probe's terms entirely --
+    "aegis-c0000": ("make the cold boot path faster", None, ["ent_boot"]),
+    "aegis-c0001": ("lazy-load grammars at process launch", "done", ["ent_boot"]),
+    "aegis-c0002": ("profile allocations during init", None, ["ent_boot"]),
+    # -- single-term-fp: d1 shares only "invalidation" and must be pruned --
+    "aegis-o0000": ("cache invalidation for the overlay plane", None, ["ent_ovl"]),
+    "aegis-o0001": ("overlay plane cache eviction on session close", "done", []),
+    "aegis-d0001": ("invalidation of stale metric results", None, []),
+    # -- paraphrase-miss (hard): same intent, zero lexical or graph overlap --
+    "aegis-f0000": ("make the gate quicker when busy", None, ["ent_load"]),
+    "aegis-f0001": ("reduce pre-edit hook latency", "done", ["ent_lat"]),
+    # -- hub-entity-trap: t1..t5 share only the hub with the probe --
+    "aegis-m0000": ("tighten markdown lint conventions", None, ["ent_hub", "ent_docs"]),
+    "aegis-m0001": ("fix markdownlint violations in the book", "done", ["ent_hub", "ent_docs"]),
+    "aegis-t0001": ("bump the toolchain pin", None, ["ent_hub"]),
+    "aegis-t0002": ("add release automation recipe", None, ["ent_hub"]),
+    "aegis-t0003": ("quiet recipe output by default", None, ["ent_hub"]),
+    "aegis-t0004": ("install pre-commit dependencies", None, ["ent_hub"]),
+    "aegis-t0005": ("rename build recipes for clarity", None, ["ent_hub"]),
+    # -- crowded-cluster: seven relevant, briefing caps at five --
+    "aegis-u0000": ("unify error envelope shapes across services", None, ["ent_env"]),
+    "aegis-u0001": ("normalize the error envelope in auth services", None, []),
+    "aegis-u0002": ("error envelope for gateway services", "done", []),
+    "aegis-u0003": ("consistent envelope fields across worker services", None, []),
+    "aegis-u0004": ("envelope version negotiation between services", None, []),
+    "aegis-u0005": ("error envelope for the billing services", "done", []),
+    "aegis-u0006": ("envelope schema for legacy services", None, []),
+    "aegis-u0007": ("strict envelope validation in edge services", None, []),
+    # -- no-neighbors: novel work, nothing should come back --
+    "aegis-n0000": ("relicense the artwork attachments", None, ["ent_art"]),
 }
 
-ITEMS = {
-    "aegis-a0002": ("prove the grounded edit boundary for tallies", "done", None),
-    "aegis-a0003": ("extend grounded boundary checks to imports", "done", "ent_e3"),
-    "aegis-a0004": ("reject fabricated citations at the edit seam", None, "ent_e1"),
-    "aegis-a0005": ("pattern matching in the policy cache", None, "ent_e3"),
-    "aegis-b0001": ("boundary conditions for weave tension", None, "ent_e2"),
-    "aegis-b0002": ("cache the loom pattern weft", "done", None),
-    "aegis-b0003": ("weave pattern cache for the loom shuttle", "done", None),
-    "aegis-b0004": ("speed up shuttle threading", None, "ent_e2"),
+ENTITY_PATHS = {
+    "ent_e1": "src/lib.rs",
+    "ent_e2": "src/weave.rs",
+    "ent_e3": "src/other.rs",
+    "ent_keys": "src/keys.rs",
+    "ent_watch": "src/watch.rs",
+    "ent_boot": "src/boot.rs",
+    "ent_ovl": "src/overlay.rs",
+    "ent_load": "src/gate.rs",
+    "ent_lat": "src/hook.rs",
+    "ent_hub": "justfile",
+    "ent_docs": "docs/book.md",
+    "ent_env": "src/envelope.rs",
+    "ent_art": "assets/art.md",
+}
+
+# problem -> (probe id, gated?, relevant ids)
+PROBLEMS: dict[str, tuple[str, bool, set[str]]] = {
+    "mixed": ("aegis-p0001", True, {"aegis-a0002", "aegis-a0003", "aegis-a0004"}),
+    "phrase-match": ("aegis-k0000", True, {"aegis-k0001"}),
+    "term-overlap": ("aegis-w0000", True, {"aegis-w0001", "aegis-w0002"}),
+    "provenance-only": ("aegis-c0000", True, {"aegis-c0001", "aegis-c0002"}),
+    "single-term-fp": ("aegis-o0000", True, {"aegis-o0001"}),
+    "hub-entity-trap": ("aegis-m0000", True, {"aegis-m0001"}),
+    "crowded-cluster": (
+        "aegis-u0000",
+        True,
+        {f"aegis-u000{i}" for i in range(1, 8)},
+    ),
+    "no-neighbors": ("aegis-n0000", True, set()),
+    "mixed-collision": (
+        "aegis-p0002",
+        False,
+        {"aegis-b0001", "aegis-b0002", "aegis-b0003", "aegis-b0004"},
+    ),
+    "multi-term-fp": ("aegis-a0005", False, {"aegis-pm001"}),
+    "paraphrase-miss": ("aegis-f0000", False, {"aegis-f0001"}),
 }
 
 ARMS = {
@@ -87,25 +160,11 @@ def corpus_ttl() -> str:
         "@prefix aegis: <http://aegis.gastown.local/ontology/> .",
         "@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .",
         "",
-        'aegis:ent_e1 a aegis:CodeModule ; aegis:filePath "src/lib.rs" .',
-        'aegis:ent_e2 a aegis:CodeModule ; aegis:filePath "src/weave.rs" .',
-        'aegis:ent_e3 a aegis:CodeModule ; aegis:filePath "src/other.rs" .',
-        "",
     ]
-    probe_entity = {"aegis-p0001": "ent_e1", "aegis-p0002": "ent_e2"}
-    for pid, spec in PROBES.items():
-        node = pid.replace("-", "_")
-        lines += [
-            f"aegis:wi_{node} a aegis:WorkItem ;",
-            f'    rdfs:label "{spec["label"]}" ;',
-            f'    aegis:identifier "{pid}" ;',
-            '    aegis:sourceKind "declared" .',
-            f"aegis:c_{node} a aegis:GitCommit ;",
-            f"    aegis:implements aegis:wi_{node} ;",
-            f"    aegis:modifies aegis:{probe_entity[pid]} .",
-            "",
-        ]
-    for iid, (label, outcome, entity) in ITEMS.items():
+    for entity, path in ENTITY_PATHS.items():
+        lines.append(f'aegis:{entity} a aegis:CodeModule ; aegis:filePath "{path}" .')
+    lines.append("")
+    for iid, (label, outcome, entities) in CORPUS.items():
         node = iid.replace("-", "_")
         lines += [
             f"aegis:wi_{node} a aegis:WorkItem ;",
@@ -115,9 +174,9 @@ def corpus_ttl() -> str:
         if outcome:
             lines.append(f'    aegis:outcome "{outcome}" ;')
         lines.append('    aegis:sourceKind "declared" .')
-        if entity:
+        for i, entity in enumerate(entities):
             lines += [
-                f"aegis:c_{node} a aegis:GitCommit ;",
+                f"aegis:c_{node}_{i} a aegis:GitCommit ;",
                 f"    aegis:implements aegis:wi_{node} ;",
                 f"    aegis:modifies aegis:{entity} .",
             ]
@@ -142,18 +201,29 @@ def retrieved_ids(briefing: str, probe: str) -> set[str]:
 
 
 def prf1(retrieved: set[str], relevant: set[str]) -> tuple[float, float, float]:
+    if not relevant:
+        # A novel item's correct answer is silence: recall is vacuously
+        # perfect, and anything retrieved is pure false positive.
+        return (1.0, 1.0, 1.0) if not retrieved else (0.0, 1.0, 0.0)
     tp = len(retrieved & relevant)
     precision = tp / len(retrieved) if retrieved else 0.0
-    recall = tp / len(relevant) if relevant else 0.0
+    recall = tp / len(relevant)
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     return precision, recall, f1
+
+
+def macro(scores: list[tuple[float, float, float]]) -> tuple[float, float, float]:
+    if not scores:
+        return (0.0, 0.0, 0.0)
+    n = len(scores)
+    return tuple(round(sum(s[i] for s in scores) / n, 3) for i in range(3))  # type: ignore
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workdir", type=Path, default=None)
     ap.add_argument("--profile", choices=["release", "debug"], default="release")
-    ap.add_argument("--min-f1", type=float, default=0.85)
+    ap.add_argument("--min-f1", type=float, default=0.9, help="core macro-F1 floor")
     args = ap.parse_args()
 
     work = (args.workdir or YUPANA_ROOT / "target" / "e2e-f1").resolve()
@@ -169,63 +239,89 @@ def main() -> int:
     run([rig.quipu, "knot", str(corpus), "--db", str(rig.db)])
     rig.start_server()
 
-    rows = []
+    per_problem: list[dict] = []
+    arm_core: dict[str, tuple[float, float, float]] = {}
+    arm_hard: dict[str, tuple[float, float, float]] = {}
     try:
         for arm, ablate in ARMS.items():
             extra = {"YUPANA_BRIEF_ABLATE": ablate} if ablate else {}
-            scores = []
-            for probe, spec in PROBES.items():
-                rig.publish_plate(spec["agent"], probe)
-                # A fresh projection cache per invocation would hide nothing
-                # here, but a STALE one would: the scope map is projected per
-                # run and the corpus never changes mid-eval.
+            core_scores, hard_scores = [], []
+            for problem, (probe, gated, relevant) in PROBLEMS.items():
+                agent = f"eval-{probe}"
+                rig.publish_plate(agent, probe)
                 result = rig.session_start(
-                    f"f1-{arm}-{probe}", tenant=spec["agent"], agent=spec["agent"],
-                    extra_env=extra,
+                    f"f1-{arm}-{probe}", tenant=agent, agent=agent, extra_env=extra
                 )
                 got = retrieved_ids(result["reason"], probe)
-                p, r, f1 = prf1(got, spec["relevant"])
-                scores.append((p, r, f1))
-                log(
-                    f"  {arm:>13} {probe}: got {sorted(got)} "
-                    f"P={p:.2f} R={r:.2f} F1={f1:.2f}"
-                )
-            macro = [sum(s[i] for s in scores) / len(scores) for i in range(3)]
-            rows.append({
-                "arm": arm,
-                "precision": round(macro[0], 3),
-                "recall": round(macro[1], 3),
-                "f1": round(macro[2], 3),
-            })
+                p, r, f1 = prf1(got, relevant)
+                (core_scores if gated else hard_scores).append((p, r, f1))
+                per_problem.append({
+                    "arm": arm,
+                    "problem": problem,
+                    "gated": gated,
+                    "precision": round(p, 3),
+                    "recall": round(r, 3),
+                    "f1": round(f1, 3),
+                    "retrieved": sorted(got),
+                })
+                if arm == "full":
+                    log(
+                        f"  {problem:>17}: P={p:.2f} R={r:.2f} F1={f1:.2f}  "
+                        f"got {sorted(got)}"
+                    )
+            arm_core[arm] = macro(core_scores)
+            arm_hard[arm] = macro(hard_scores)
+            log(
+                f"  {arm:>13}: core macro-F1 {arm_core[arm][2]}  "
+                f"hard macro-F1 {arm_hard[arm][2]}"
+            )
     finally:
         rig.stop_server()
 
-    full_f1 = next(r["f1"] for r in rows if r["arm"] == "full")
+    full_core = arm_core["full"][2]
     failures = []
-    if full_f1 < args.min_f1:
-        failures.append(f"full-arm macro-F1 {full_f1} < {args.min_f1}")
-    for r in rows:
-        if r["arm"] != "full" and r["f1"] >= full_f1:
+    if full_core < args.min_f1:
+        failures.append(f"core macro-F1 {full_core} < {args.min_f1}")
+    for arm, (_, _, f1) in arm_core.items():
+        if arm != "full" and f1 >= full_core:
             failures.append(
-                f"ablation `{r['arm']}` scored {r['f1']} >= full {full_f1} — "
+                f"ablation `{arm}` core macro-F1 {f1} >= full {full_core} — "
                 "the removed feature contributed nothing measurable"
             )
 
     lines = [
-        "# Work-item briefing retrieval — F1 and ablation",
+        "# Work-item briefing retrieval — per-problem F1 and ablation",
         "",
-        "Macro-averaged over the labeled probes; each ablation arm re-runs the",
-        "shipped binary with one retrieval source removed (`YUPANA_BRIEF_ABLATE`).",
+        "Core classes are gated; hard classes are the measured lexical",
+        "frontier (closing them is what quipu's embedding backend is for).",
         "",
-        "| arm | precision | recall | F1 |",
-        "| --- | --- | --- | --- |",
+        "## Per problem (full arm)",
+        "",
+        "| problem | gated | precision | recall | F1 |",
+        "| --- | --- | --- | --- | --- |",
     ]
-    for r in rows:
-        lines.append(f"| {r['arm']} | {r['precision']} | {r['recall']} | {r['f1']} |")
-    lines += ["", f"Gate: full >= {args.min_f1} and every ablation strictly below full."]
+    for row in per_problem:
+        if row["arm"] == "full":
+            lines.append(
+                f"| {row['problem']} | {'yes' if row['gated'] else 'no'} | "
+                f"{row['precision']} | {row['recall']} | {row['f1']} |"
+            )
+    lines += [
+        "",
+        "## Per arm (macro)",
+        "",
+        "| arm | core P | core R | core F1 | hard F1 |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for arm in ARMS:
+        p, r, f1 = arm_core[arm]
+        lines.append(f"| {arm} | {p} | {r} | {f1} | {arm_hard[arm][2]} |")
+    lines += ["", f"Gate: core full >= {args.min_f1}; every ablation strictly below full."]
     lines += ["", "**FAILED:** " + "; ".join(failures)] if failures else ["", "**PASSED.**"]
     (work / "f1-report.md").write_text("\n".join(lines) + "\n")
-    (work / "f1-report.json").write_text(json.dumps(rows, indent=2))
+    (work / "f1-report.json").write_text(
+        json.dumps({"per_problem": per_problem, "core": arm_core, "hard": arm_hard}, indent=2)
+    )
     log(f"report: {work / 'f1-report.md'}")
     for failure in failures:
         log(f"FAIL: {failure}")

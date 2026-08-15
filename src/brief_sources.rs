@@ -64,29 +64,63 @@ pub(crate) fn label_of(endpoint: &str, item: &str) -> Option<String> {
     .next()
 }
 
+/// Entities touched by more distinct work items than this are HUBS — the
+/// justfile-shaped files everyone's work brushes. Co-occurrence through a
+/// hub says "you both work in this repo", not "you work on the same thing",
+/// so hub entities contribute nothing to relatedness. Measured by the
+/// `hub-entity-trap` probe in `just e2e f1`.
+const HUB_DEGREE_CAP: usize = 5;
+
 /// Items co-occurring with `item` — sharing a touched entity through the
-/// commit-provenance chain (quipu shapes/provenance.ttl).
+/// commit-provenance chain (quipu shapes/provenance.ttl), excluding
+/// co-occurrence through hub entities (see [`HUB_DEGREE_CAP`]).
 pub(crate) fn related_items(endpoint: &str, item: &str) -> Vec<String> {
     if ablated("provenance") {
         return Vec::new();
     }
     let id = sanitized(item);
+    // `(entity, other)` pairs, SELF ROWS INCLUDED, so the per-entity degree
+    // count sees every tapper — a hub is a hub whether or not we're one of
+    // its five hundred visitors.
     let query = format!(
         "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
-         SELECT DISTINCT ?other WHERE {{ \
+         SELECT ?e ?other WHERE {{ \
          ?c1 aegis:implements ?w ; aegis:modifies ?e . \
          ?w aegis:identifier \"{id}\" . \
          ?c2 aegis:modifies ?e ; aegis:implements ?o . \
-         ?o aegis:identifier ?other . \
-         FILTER(?other != \"{id}\") }}"
+         ?o aegis:identifier ?other }}"
     );
-    let mut related = values(
-        &crate::project::query(endpoint, &query).unwrap_or_default(),
-        "other",
-    );
-    related.sort();
+    let body = crate::project::query(endpoint, &query).unwrap_or_default();
+    let mut per_entity: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+        std::collections::BTreeMap::new();
+    for (entity, other) in pair_values(&body, "e", "other") {
+        per_entity.entry(entity).or_default().insert(other);
+    }
+    let mut related: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for items in per_entity.into_values() {
+        if items.len() <= HUB_DEGREE_CAP {
+            related.extend(items.into_iter().filter(|other| *other != id));
+        }
+    }
+    let mut related: Vec<String> = related.into_iter().collect();
     related.truncate(8);
     related
+}
+
+/// Decode a two-variable SELECT into its value pairs; partial rows dropped.
+fn pair_values(sparql_json: &str, a: &str, b: &str) -> Vec<(String, String)> {
+    serde_json::from_str::<serde_json::Value>(sparql_json)
+        .ok()
+        .and_then(|v| v["results"]["bindings"].as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|row| {
+            Some((
+                row[a]["value"].as_str()?.to_string(),
+                row[b]["value"].as_str()?.to_string(),
+            ))
+        })
+        .collect()
 }
 
 /// The IRIs of entities the item's prior commits modified — the pagerank
