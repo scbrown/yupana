@@ -388,10 +388,26 @@ under advise" is not evidence that they saw the advisory; they did not. Only
 capability scope?</li>
 <li><strong>Blast radius</strong> (FR-12/FR-25) — do the symbols the edit touches transitively
 affect more symbols or files than the scope permits?</li>
+<li><strong>Buffer verification</strong> (FR-23, opt-in: <code>[yupana.policy] verify = true</code>) —
+does the proposed buffer introduce references that resolve to nothing?
+The same verifier <code>yupana verify</code> exposes, run at the blocking seam: a
+hallucinated identifier, a wrong-arity call, or an unresolved <code>mod</code> import
+denies under <code>enforce</code> and advises under <code>advise</code>. Rust-only today (the
+verifier is a tree-sitter-rust pass), scoped to what the edit <em>introduces</em>
+(pre-existing breakage is not this edit's business), and inside the same
+<code>deadline_ms</code> — a blown budget or unparseable buffer degrades to allow,
+never to a block.</li>
 </ol>
-<p>Both are computed at the <strong>tree-sitter tier</strong> against the <em>requesting tenant's</em>
+<p>All are computed at the <strong>tree-sitter tier</strong> against the <em>requesting tenant's</em>
 graph, and every verdict carries that tier tag (FR-3). A tree-sitter blast radius
 is an approximation; the ceilings should be set with that in mind.</p>
+<p>Alongside the checks, the guard runs a <strong>denied-edit recurrence advisory</strong>
+(stage 1 of the semantic-grounded ordering): the verdict spool retains denied
+edits as a similarity corpus, and an edit near a prior denial surfaces that
+verdict as context — before a refusal's own text, so the refusal arrives
+explained, or as a plain notice on an allow. Similarity <strong>never denies</strong>; the
+advisory seals its cosine score, threshold, embedding-model id and corpus
+watermark so it can be reproduced or falsified.</p>
 <h2 id="observing-the-guard--yupana-status"><a class="header" href="#observing-the-guard--yupana-status">Observing the guard — <code>yupana status</code></a></h2>
 <p>A guard you cannot observe is a guard you cannot trust: enforcement that has
 quietly stopped looks exactly like enforcement that found nothing wrong. So the

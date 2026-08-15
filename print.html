@@ -483,6 +483,21 @@ FR-7); not yet implemented or served.</em></li>
 <li><code>stale</code> — known to be behind a pending edit.</li>
 <li><code>recomputing</code> — a recompute is in flight.</li>
 </ul>
+<p>Freshness names <strong>two different questions</strong>, and Yupana keeps them apart:</p>
+<ul>
+<li><strong>Code-fact freshness</strong> — is this structural fact current with the file it
+came from? The watch path tracks it per file (<code>Recomputing → Fresh</code>
+transitions in <code>src/watch/overlay_refresh.rs</code>), but no query surface serves
+it yet: the on-demand serve path rebuilds per request, so no cached code fact
+can be stale. Query responses therefore <em>omit</em> <code>freshness</code> rather than stamp
+a constant <code>fresh</code> — the tag arrives with the Phase 3 resident-graph serve
+path.</li>
+<li><strong>Projection freshness</strong> — are the governed rules a verdict enforced still
+the current ones? This is <em>served today</em>: the pre-edit guard's rule verdicts
+state <code>fresh</code> / <code>stale</code> (with the cache age in seconds) / <code>recomputing</code>
+against the policy projection from Quipu, and promoted verdicts carry
+<code>aegis:freshness</code>. It describes the policy registry, never a code fact.</li>
+</ul>
 <p>Tree-sitter structure updates on save or debounced keystroke. Once the LSP and
 CPG tiers land, agents that need certainty will ask for <code>lsp</code>/<code>cpg</code> and agents
 that need breadth will take <code>treesitter</code> and know it — but today only
@@ -1027,6 +1042,21 @@ Quipu runs community detection over <em>committed</em> facts; Yupana computes it
 over the hot graph.</p>
 <p>Commands marked with a phase print a notice until their engine lands; see the
 <a href="reference/../design/specification.html">Specification</a> §12.</p>
+<h2 id="yupana-exemplar"><a class="header" href="#yupana-exemplar"><code>yupana exemplar</code></a></h2>
+<p>Drafts the raw material of a governed policy from an observed instance —
+policy-by-example, yupana's half. Point it at the offending text (with the file
+it appeared in, so the Selector can name the structural context), or at a
+verdict spool to read the newest denial:</p>
+<pre><code class="language-bash">yupana exemplar "ABC-123" --file src/a.rs
+yupana exemplar --spool ~/.local/state/yupana/verdicts.jsonl --policy no-ticket-in-comment
+</code></pre>
+<p>The output is JSON for quipu's drafting scaffold: a Selector draft (the
+enclosing node kind as a tree-sitter query) and predicate candidates at each
+viable tier — the exact token(s) for membership (the only hard-capable tier),
+a generated narrowing pattern <strong>offered for human approval</strong>, and the
+exemplar's embedding as a similarity anchor with a suggested threshold that
+quipu's backtest replaces. Nothing emitted is a policy; quipu's
+definition-time placement check remains the refusal authority.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h1>
 <p>Yupana reads the <code>[yupana]</code> table of <code>.bobbin/config.toml</code>. All keys are optional;
 unspecified keys fall back to the defaults shown below.</p>
@@ -1090,6 +1120,10 @@ deadline_ms = 100
 notify_on_fail_open = true
 # How far to follow the call graph when sizing an edit.
 max_hops = 5
+# Run the FR-23 buffer verifier as an arm of the guard: reject edits that
+# introduce references resolving to nothing (hallucinated identifiers, wrong
+# arity, unresolved `mod` imports). Opt-in; rides inside deadline_ms.
+verify = false
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.
@@ -1167,6 +1201,15 @@ evaluates them like any rule — a governed <code>deny</code> policy blocks unde
 <code>mode = "enforce"</code>. An unreachable quipu fails open loudly; the verdict declares
 whether the projection was fresh. Yupana never defines a governed policy — it only
 projects quipu's. See the design note "Policy edit hooks — the yupana side".</p>
+<p>The same projection also carries quipu's <strong>entity-grounded rules</strong> (the
+semantic-grounded-edit-policies design): the authoritative work-item id set is
+projected into the hot plane alongside the rules, and the tokens of the
+introduced text are checked by O(1) membership — no regex. Evaluation is
+three-outcome: <strong>grounded</strong> (the token names a real work item),
+<strong>unresolvable</strong> (id-shaped but resolves to nothing — a fabricated reference,
+its own violation class), or no candidate. A missing grounding projection
+renders those rules <em>unevaluated, loudly</em> — never "empty set, nothing grounds,
+allow".</p>
 <p><strong><code>endpoint</code> is a READ capability, not a write one.</strong> It is what the guard fetches
 the rule catalogue from, and that is all it grants: <code>yupana promote</code> will not write
 to a merely-configured endpoint, because setting this key deployment-wide is how
@@ -1290,7 +1333,7 @@ replies omit them rather than faking <code>fresh</code>.</p>
 <tr><td><code>/symbols</code></td><td>GET</td><td><code>file</code> (root-relative), <code>tenant?</code></td><td>that file's symbols, line order</td></tr>
 <tr><td><code>/dataflow</code></td><td>GET</td><td><code>function</code>, <code>path?</code>, <code>var?</code>, <code>forward?</code>, <code>hops?</code></td><td>intra-procedural data dependence</td></tr>
 <tr><td><code>/measure</code></td><td>POST</td><td><code>{file, rel, anchors[], max_hops?}</code></td><td>edit blast-radius sizing for the guard</td></tr>
-<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view). Omitted <code>content</code> is read from disk, root-confined.</td></tr>
+<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's <code>frontier</code> counts what it reached). Per-<code>(tenant, file)</code> code-fact freshness follows the watch path's discipline — <code>recomputing</code> from touch until the frontier is current, then <code>fresh</code> (tracked; served at Phase 3). Omitted <code>content</code> is read from disk, root-confined.</td></tr>
 </tbody></table>
 </div>
 <h2 id="the-tenant-layer-yupana-2"><a class="header" href="#the-tenant-layer-yupana-2">The tenant layer (yupana #2)</a></h2>
@@ -1547,10 +1590,26 @@ under advise" is not evidence that they saw the advisory; they did not. Only
 capability scope?</li>
 <li><strong>Blast radius</strong> (FR-12/FR-25) — do the symbols the edit touches transitively
 affect more symbols or files than the scope permits?</li>
+<li><strong>Buffer verification</strong> (FR-23, opt-in: <code>[yupana.policy] verify = true</code>) —
+does the proposed buffer introduce references that resolve to nothing?
+The same verifier <code>yupana verify</code> exposes, run at the blocking seam: a
+hallucinated identifier, a wrong-arity call, or an unresolved <code>mod</code> import
+denies under <code>enforce</code> and advises under <code>advise</code>. Rust-only today (the
+verifier is a tree-sitter-rust pass), scoped to what the edit <em>introduces</em>
+(pre-existing breakage is not this edit's business), and inside the same
+<code>deadline_ms</code> — a blown budget or unparseable buffer degrades to allow,
+never to a block.</li>
 </ol>
-<p>Both are computed at the <strong>tree-sitter tier</strong> against the <em>requesting tenant's</em>
+<p>All are computed at the <strong>tree-sitter tier</strong> against the <em>requesting tenant's</em>
 graph, and every verdict carries that tier tag (FR-3). A tree-sitter blast radius
 is an approximation; the ceilings should be set with that in mind.</p>
+<p>Alongside the checks, the guard runs a <strong>denied-edit recurrence advisory</strong>
+(stage 1 of the semantic-grounded ordering): the verdict spool retains denied
+edits as a similarity corpus, and an edit near a prior denial surfaces that
+verdict as context — before a refusal's own text, so the refusal arrives
+explained, or as a plain notice on an allow. Similarity <strong>never denies</strong>; the
+advisory seals its cosine score, threshold, embedding-model id and corpus
+watermark so it can be reproduced or falsified.</p>
 <h2 id="observing-the-guard--yupana-status"><a class="header" href="#observing-the-guard--yupana-status">Observing the guard — <code>yupana status</code></a></h2>
 <p>A guard you cannot observe is a guard you cannot trust: enforcement that has
 quietly stopped looks exactly like enforcement that found nothing wrong. So the

@@ -233,7 +233,7 @@ replies omit them rather than faking <code>fresh</code>.</p>
 <tr><td><code>/symbols</code></td><td>GET</td><td><code>file</code> (root-relative), <code>tenant?</code></td><td>that file's symbols, line order</td></tr>
 <tr><td><code>/dataflow</code></td><td>GET</td><td><code>function</code>, <code>path?</code>, <code>var?</code>, <code>forward?</code>, <code>hops?</code></td><td>intra-procedural data dependence</td></tr>
 <tr><td><code>/measure</code></td><td>POST</td><td><code>{file, rel, anchors[], max_hops?}</code></td><td>edit blast-radius sizing for the guard</td></tr>
-<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view). Omitted <code>content</code> is read from disk, root-confined.</td></tr>
+<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's <code>frontier</code> counts what it reached). Per-<code>(tenant, file)</code> code-fact freshness follows the watch path's discipline — <code>recomputing</code> from touch until the frontier is current, then <code>fresh</code> (tracked; served at Phase 3). Omitted <code>content</code> is read from disk, root-confined.</td></tr>
 </tbody></table>
 </div>
 <h2 id="the-tenant-layer-yupana-2"><a class="header" href="#the-tenant-layer-yupana-2">The tenant layer (yupana #2)</a></h2>

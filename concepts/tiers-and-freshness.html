@@ -201,6 +201,21 @@ FR-7); not yet implemented or served.</em></li>
 <li><code>stale</code> — known to be behind a pending edit.</li>
 <li><code>recomputing</code> — a recompute is in flight.</li>
 </ul>
+<p>Freshness names <strong>two different questions</strong>, and Yupana keeps them apart:</p>
+<ul>
+<li><strong>Code-fact freshness</strong> — is this structural fact current with the file it
+came from? The watch path tracks it per file (<code>Recomputing → Fresh</code>
+transitions in <code>src/watch/overlay_refresh.rs</code>), but no query surface serves
+it yet: the on-demand serve path rebuilds per request, so no cached code fact
+can be stale. Query responses therefore <em>omit</em> <code>freshness</code> rather than stamp
+a constant <code>fresh</code> — the tag arrives with the Phase 3 resident-graph serve
+path.</li>
+<li><strong>Projection freshness</strong> — are the governed rules a verdict enforced still
+the current ones? This is <em>served today</em>: the pre-edit guard's rule verdicts
+state <code>fresh</code> / <code>stale</code> (with the cache age in seconds) / <code>recomputing</code>
+against the policy projection from Quipu, and promoted verdicts carry
+<code>aegis:freshness</code>. It describes the policy registry, never a code fact.</li>
+</ul>
 <p>Tree-sitter structure updates on save or debounced keystroke. Once the LSP and
 CPG tiers land, agents that need certainty will ask for <code>lsp</code>/<code>cpg</code> and agents
 that need breadth will take <code>treesitter</code> and know it — but today only

@@ -244,6 +244,10 @@ deadline_ms = 100
 notify_on_fail_open = true
 # How far to follow the call graph when sizing an edit.
 max_hops = 5
+# Run the FR-23 buffer verifier as an arm of the guard: reject edits that
+# introduce references resolving to nothing (hallucinated identifiers, wrong
+# arity, unresolved `mod` imports). Opt-in; rides inside deadline_ms.
+verify = false
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.
@@ -321,6 +325,15 @@ evaluates them like any rule — a governed <code>deny</code> policy blocks unde
 <code>mode = "enforce"</code>. An unreachable quipu fails open loudly; the verdict declares
 whether the projection was fresh. Yupana never defines a governed policy — it only
 projects quipu's. See the design note "Policy edit hooks — the yupana side".</p>
+<p>The same projection also carries quipu's <strong>entity-grounded rules</strong> (the
+semantic-grounded-edit-policies design): the authoritative work-item id set is
+projected into the hot plane alongside the rules, and the tokens of the
+introduced text are checked by O(1) membership — no regex. Evaluation is
+three-outcome: <strong>grounded</strong> (the token names a real work item),
+<strong>unresolvable</strong> (id-shaped but resolves to nothing — a fabricated reference,
+its own violation class), or no candidate. A missing grounding projection
+renders those rules <em>unevaluated, loudly</em> — never "empty set, nothing grounds,
+allow".</p>
 <p><strong><code>endpoint</code> is a READ capability, not a write one.</strong> It is what the guard fetches
 the rule catalogue from, and that is all it grants: <code>yupana promote</code> will not write
 to a merely-configured endpoint, because setting this key deployment-wide is how

@@ -460,6 +460,21 @@ Quipu runs community detection over <em>committed</em> facts; Yupana computes it
 over the hot graph.</p>
 <p>Commands marked with a phase print a notice until their engine lands; see the
 <a href="../design/specification.html">Specification</a> §12.</p>
+<h2 id="yupana-exemplar"><a class="header" href="#yupana-exemplar"><code>yupana exemplar</code></a></h2>
+<p>Drafts the raw material of a governed policy from an observed instance —
+policy-by-example, yupana's half. Point it at the offending text (with the file
+it appeared in, so the Selector can name the structural context), or at a
+verdict spool to read the newest denial:</p>
+<pre><code class="language-bash">yupana exemplar "ABC-123" --file src/a.rs
+yupana exemplar --spool ~/.local/state/yupana/verdicts.jsonl --policy no-ticket-in-comment
+</code></pre>
+<p>The output is JSON for quipu's drafting scaffold: a Selector draft (the
+enclosing node kind as a tree-sitter query) and predicate candidates at each
+viable tier — the exact token(s) for membership (the only hard-capable tier),
+a generated narrowing pattern <strong>offered for human approval</strong>, and the
+exemplar's embedding as a similarity anchor with a suggested threshold that
+quipu's backtest replaces. Nothing emitted is a policy; quipu's
+definition-time placement check remains the refusal authority.</p>
 
                     </main>
 
