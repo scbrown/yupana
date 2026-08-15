@@ -182,7 +182,7 @@ def main() -> int:
     args = ap.parse_args()
 
     levels = [int(x) for x in args.levels.split(",")]
-    work = args.workdir or YUPANA_ROOT / "target" / "e2e-bench"
+    work = (args.workdir or YUPANA_ROOT / "target" / "e2e-bench").resolve()
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)

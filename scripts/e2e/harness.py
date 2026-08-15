@@ -538,7 +538,8 @@ def main() -> int:
     ap.add_argument("--keep", action="store_true", help="keep the workdir on success")
     args = ap.parse_args()
 
-    work = args.workdir or YUPANA_ROOT / "target" / "e2e"
+    # Absolute, because every subprocess runs with the workdir as its cwd.
+    work = (args.workdir or YUPANA_ROOT / "target" / "e2e").resolve()
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
