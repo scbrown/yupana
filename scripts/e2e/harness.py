@@ -165,13 +165,16 @@ class Rig:
             sys.exit(f"camayoc policy pack not found at {pack}")
         items = self.work / "workitems.ttl"
         items.write_text(WORKITEMS_TTL)
-        run([self.quipu, "knot", str(pack), "--db", str(self.db)])
-        run([self.quipu, "knot", str(items), "--db", str(self.db)])
+        # cwd is always the workdir: some subcommands drop state (e.g. a
+        # default signing key) relative to their cwd, and that must never
+        # land in a checkout.
+        run([self.quipu, "knot", str(pack), "--db", str(self.db)], cwd=self.work)
+        run([self.quipu, "knot", str(items), "--db", str(self.db)], cwd=self.work)
 
         # Mint (or reuse) yupana's signing identity and register its public key
         # — the human act the VerifierRegistration deliberately leaves out.
         key = self.repo / "yupana-signing.pk8"
-        out = run([self.yupana, "verifier", "--key-path", str(key)]).stdout
+        out = run([self.yupana, "verifier", "--key-path", str(key)], cwd=self.work).stdout
         match = re.search(r"public_key:\s*([0-9a-f]+)", out)
         if not match:
             sys.exit(f"could not read public key from `yupana verifier`:\n{out}")
@@ -180,7 +183,7 @@ class Rig:
             "@prefix aegis: <http://aegis.gastown.local/ontology/> .\n"
             f'aegis:reg_yupana_grounding aegis:publicKey "{match.group(1)}" .\n'
         )
-        run([self.quipu, "knot", str(reg), "--db", str(self.db)])
+        run([self.quipu, "knot", str(reg), "--db", str(self.db)], cwd=self.work)
 
     # -- server lifecycle ----------------------------------------------------
 
