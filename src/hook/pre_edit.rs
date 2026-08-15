@@ -191,6 +191,21 @@ fn guard_recorded(
         fields.push(("throttled", (throttled as u64).into()));
     }
 
+    // STAGE 1 of the semantic-grounded ordering (bobbin-fjh): the nearest
+    // prior DENIAL as advisory context, riding BEFORE a refusal's own text so
+    // the refusal arrives explained, or alone as a notice on an allow.
+    // Similarity never denies. Gated with the guard: Mode::Off stays silent.
+    if config.as_ref().is_some_and(|c| c.policy.mode != Mode::Off) {
+        if let (Some(spool), Some(introduced)) = (
+            pre_edit_util::recurrence_spool(),
+            input.as_ref().and_then(introduced_text),
+        ) {
+            if pre_edit_util::apply_recurrence(&mut decision.outcome, &spool, &introduced) {
+                fields.push(("recurrence_advised", true.into()));
+            }
+        }
+    }
+
     // Sign and spool a verdict per evaluated constraint (SARC I3/I8). AFTER the
     // outcome is fixed, like the metrics emit above and for the same reason:
     // recording rides behind the decision and can never lean on it. Signing is
@@ -439,6 +454,9 @@ fn blast_reply(
 #[cfg(feature = "quipu")]
 #[path = "grounded_plane.rs"]
 mod grounded_plane;
+#[path = "pre_edit_util.rs"]
+mod pre_edit_util;
+use pre_edit_util::{decide, fail_open, introduced_text};
 #[path = "rule_planes.rs"]
 mod rule_planes;
 #[path = "verify_arm.rs"]
@@ -451,54 +469,8 @@ use rule_planes::rule_check;
 #[cfg(all(test, feature = "quipu"))]
 use rule_planes::text_plane;
 
-/// The text an edit INTRODUCES: the full `Write` content, else the `new_string`s
-/// of an `Edit`/`MultiEdit` joined by newlines. `None` when the payload adds no
-/// text (e.g. a pure deletion), in which case there is nothing for a rule to see.
-fn introduced_text(input: &HookInput) -> Option<String> {
-    if let Some(content) = &input.tool_input.content {
-        return Some(content.clone());
-    }
-    let mut parts: Vec<&str> = Vec::new();
-    if let Some(new) = input.tool_input.new_string.as_deref() {
-        parts.push(new);
-    }
-    for edit in &input.tool_input.edits {
-        if let Some(new) = edit.new_string.as_deref() {
-            parts.push(new);
-        }
-    }
-    if parts.is_empty() {
-        None
-    } else {
-        Some(parts.join("\n"))
-    }
-}
 
-/// Turn a violation into an outcome according to the enforcement mode.
-fn decide(mode: Mode, message: String) -> Outcome {
-    match mode {
-        Mode::Enforce => Outcome::Deny(message),
-        // Advise: report what would have been denied, but never block.
-        Mode::Advise => Outcome::Notify(format!("yupana (advise, not blocking): {message}")),
-        Mode::Off => Outcome::Allow,
-    }
-}
 
-/// Degrade to "allow", loudly. Writes the stderr line the contract requires and,
-/// once per session, a user-visible notice — because a hook's stderr is
-/// surfaced only on exit `2`, so stderr alone would be silent in practice.
-fn fail_open(input: &HookInput, kind: &str, reason: &str) -> Outcome {
-    eprintln!("yupana: policy guard failed open: {reason}");
-    // The metric that separates "allowed clean" from "allowed because the
-    // check could not run" — the two must never share a label (aegis-0nng).
-    crate::metrics::emit("fail_open", &[("fail_kind", kind.into())]);
-    if first_notice_for_session(input.session_id.as_deref(), kind) {
-        return Outcome::Notify(format!(
-            "yupana: policy guard failed open ({reason}) — edits are UNGUARDED this session."
-        ));
-    }
-    Outcome::Allow
-}
 
 #[cfg(test)]
 #[path = "pre_edit_test.rs"]

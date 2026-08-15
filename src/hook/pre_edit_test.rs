@@ -1050,3 +1050,72 @@ mod grounded_plane_seam {
         assert!(messages.is_empty() && !blocking && names.is_empty());
     }
 }
+
+// ---- Stage-1 recurrence advisory (bobbin-fjh) --------------------------------
+
+mod recurrence_stage {
+    use super::super::pre_edit_util::apply_recurrence;
+    use super::super::Outcome;
+
+    fn spool_with_denial() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("verdicts.jsonl");
+        std::fs::write(
+            &path,
+            format!(
+                "{}\n",
+                serde_json::json!({
+                    "ts": 1, "predicate_id": "no-hostname", "target_ref": "src/a.rs",
+                    "turtle": "…",
+                    "denied_excerpt": "// internal hostname db1.gastown.local leaked",
+                })
+            ),
+        )
+        .unwrap();
+        (dir, path)
+    }
+
+    #[test]
+    fn the_advisory_PRECEDES_a_refusals_own_text_so_it_arrives_explained() {
+        let (_dir, spool) = spool_with_denial();
+        let mut outcome = Outcome::Deny("blocked by policy".to_string());
+        assert!(apply_recurrence(
+            &mut outcome,
+            &spool,
+            "// internal hostname db1.gastown.local leaked again",
+        ));
+        let Outcome::Deny(reason) = outcome else {
+            panic!("similarity must never change a Deny into anything else");
+        };
+        let advisory_at = reason.find("similar edit was previously DENIED").unwrap();
+        let refusal_at = reason.find("blocked by policy").unwrap();
+        assert!(advisory_at < refusal_at, "inform BEFORE refusing: {reason}");
+    }
+
+    #[test]
+    fn on_an_allow_the_advisory_surfaces_as_a_notice_and_NEVER_denies() {
+        let (_dir, spool) = spool_with_denial();
+        let mut outcome = Outcome::Allow;
+        assert!(apply_recurrence(
+            &mut outcome,
+            &spool,
+            "// internal hostname db1.gastown.local leaked again",
+        ));
+        assert!(
+            matches!(outcome, Outcome::Notify(_)),
+            "similarity advises; only the exact policy tier denies: {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn an_unrelated_edit_leaves_the_outcome_untouched() {
+        let (_dir, spool) = spool_with_denial();
+        let mut outcome = Outcome::Allow;
+        assert!(!apply_recurrence(
+            &mut outcome,
+            &spool,
+            "fn wholly_unrelated() {}",
+        ));
+        assert_eq!(outcome, Outcome::Allow);
+    }
+}

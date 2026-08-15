@@ -210,3 +210,44 @@ fn the_spool_rotates_at_the_ceiling_instead_of_growing() {
     assert!(path.with_extension("jsonl.old").exists());
     assert_eq!(std::fs::read_to_string(&path).unwrap().lines().count(), 1);
 }
+
+#[test]
+fn a_denied_verdict_spools_its_excerpt_and_a_satisfied_one_does_not() {
+    // bobbin-fjh: the spool doubles as the denied-edit similarity corpus, so
+    // an UNSATISFIED verdict carries a capped excerpt of the judged text on
+    // its spool line (local only, never inside the signed Turtle) — and a
+    // satisfied one carries none, because a clean edit is not a denial to
+    // learn from.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("v.jsonl");
+    record_to(
+        &path,
+        &keypair(),
+        &[
+            fired("denied-rule"),
+            ConstraintEvaluation::new("clean-rule", Outcome::Satisfied, Response::Logged),
+        ],
+        "src/a.rs",
+        "// the judged text",
+        Freshness::Fresh,
+    );
+    let text = std::fs::read_to_string(&path).unwrap();
+    let lines: Vec<serde_json::Value> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    let denied = lines
+        .iter()
+        .find(|l| l["predicate_id"] == "denied-rule")
+        .unwrap();
+    assert_eq!(denied["denied_excerpt"], "// the judged text");
+    assert!(
+        !denied["turtle"].as_str().unwrap().contains("judged text"),
+        "the excerpt must never enter the signed Turtle"
+    );
+    let clean = lines
+        .iter()
+        .find(|l| l["predicate_id"] == "clean-rule")
+        .unwrap();
+    assert!(clean.get("denied_excerpt").is_none());
+}

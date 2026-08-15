@@ -149,7 +149,14 @@ pub fn record_to(
             evidence,
             freshness,
         );
-        if append(path, &evaluation.id, target_ref, &turtle) {
+        // An UNSATISFIED verdict also spools a capped excerpt of the judged
+        // text (bobbin-fjh): the spool doubles as the denied-edit similarity
+        // corpus, and a denial nobody can compare against teaches nothing.
+        // Local-only — the excerpt rides the spool line, never the signed
+        // Turtle, so the drain promotes exactly what was signed.
+        let excerpt: Option<String> =
+            (!satisfied).then(|| evidence.chars().take(512).collect());
+        if append(path, &evaluation.id, target_ref, &turtle, excerpt.as_deref()) {
             written += 1;
         }
     }
@@ -157,9 +164,15 @@ pub fn record_to(
 }
 
 /// Append one spooled verdict line. Swallows every error by contract.
-fn append(path: &Path, predicate_id: &str, target_ref: &str, turtle: &str) -> bool {
+fn append(
+    path: &Path,
+    predicate_id: &str,
+    target_ref: &str,
+    turtle: &str,
+    denied_excerpt: Option<&str>,
+) -> bool {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let line = serde_json::json!({
+        let mut line = serde_json::json!({
             "ts": std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |d| d.as_secs()),
@@ -170,8 +183,11 @@ fn append(path: &Path, predicate_id: &str, target_ref: &str, turtle: &str) -> bo
             // derived from these values, and a drain that rebuilt the document
             // could change a byte and invalidate every verdict in the spool.
             "turtle": turtle,
-        })
-        .to_string();
+        });
+        if let Some(excerpt) = denied_excerpt {
+            line["denied_excerpt"] = excerpt.into();
+        }
+        let line = line.to_string();
 
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);

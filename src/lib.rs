@@ -60,6 +60,7 @@ pub mod projection_cache;
 #[cfg(feature = "quipu")]
 pub mod promote;
 pub mod reconcile;
+pub mod recurrence;
 mod render;
 pub mod rules;
 /// The game-state harness (FR-35..FR-39): a generic in-memory fact graph, a

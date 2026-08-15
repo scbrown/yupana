@@ -270,6 +270,14 @@ All are computed at the **tree-sitter tier** against the *requesting tenant's*
 graph, and every verdict carries that tier tag (FR-3). A tree-sitter blast radius
 is an approximation; the ceilings should be set with that in mind.
 
+Alongside the checks, the guard runs a **denied-edit recurrence advisory**
+(stage 1 of the semantic-grounded ordering): the verdict spool retains denied
+edits as a similarity corpus, and an edit near a prior denial surfaces that
+verdict as context — before a refusal's own text, so the refusal arrives
+explained, or as a plain notice on an allow. Similarity **never denies**; the
+advisory seals its cosine score, threshold, embedding-model id and corpus
+watermark so it can be reproduced or falsified.
+
 ## Observing the guard — `yupana status`
 
 A guard you cannot observe is a guard you cannot trust: enforcement that has
