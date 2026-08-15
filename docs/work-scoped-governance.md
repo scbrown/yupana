@@ -6,9 +6,11 @@ guard falls back from the declared scope table to an **observed** scope
 projected from the graph's commit-provenance chain (`src/hook/scope_arm.rs`,
 `src/project_scope.rs`), staged by `[yupana.policy] work_item_scope =
 off|advise|enforce` with the ambient mode as ceiling, and unknown scope
-advises once per session instead of allowing silently. The `declared` graph
-vocabulary (phase 4), derived scopes, and the trace/context consumers remain
-design intent.
+advises once per session instead of allowing silently. The CONTEXT consumer
+is live too: `yupana hook session-start` (`src/brief.rs`) injects the item's
+ground, central entities (quipu pagerank), similar past items with outcomes,
+and the rules in force at assignment time. The `declared` graph vocabulary
+(phase 4), derived scopes, and the trace consumer remain design intent.
 **Scope:** how yupana, Quipu and a work-item tracker combine to govern, trace, and
 contextualise what an autonomous agent does.
 

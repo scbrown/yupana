@@ -14,6 +14,7 @@
 
 mod base;
 mod blast;
+mod brief_view;
 mod community;
 mod lookup;
 mod overlay;

@@ -26,10 +26,14 @@ pub mod paa;
 mod post_edit;
 mod pre_bash;
 mod pre_edit;
+#[cfg(feature = "quipu")]
+mod session_start;
 
 pub use post_edit::{advisory_for, run_post_edit};
 pub use pre_bash::run_pre_bash;
 pub use pre_edit::{run_pre_edit, Outcome};
+#[cfg(feature = "quipu")]
+pub use session_start::run_session_start;
 // The resident-graph measurement path (FR-31): the daemon measures an edit against
 // its resident graph via `measure_with_graph`, returning the same `Sizing` the
 // transient path does. Crate-visible so `crate::daemon` can call it.

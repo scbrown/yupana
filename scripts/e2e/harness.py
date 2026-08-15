@@ -54,6 +54,7 @@ BIND = "127.0.0.1:3041"
 REAL_ITEM = "aegis-e2e01"
 REAL_ITEM_2 = "aegis-r34l"
 FAKE_ITEM = "aegis-zz999"  # id-shaped (shares the data-derived prefix), unreal
+PRIOR_ITEM = "aegis-pr10r"  # finished (outcome done), semantically similar
 
 WORKITEMS_TTL = f"""\
 @prefix aegis: <http://aegis.gastown.local/ontology/> .
@@ -69,6 +70,14 @@ aegis:wi_e2e_bench a aegis:WorkItem ;
     aegis:identifier "{REAL_ITEM_2}" ;
     aegis:sourceKind "declared" .
 
+# A finished item with a SIMILAR description — the reuse exemplar the
+# briefing must surface ("successful prior work: study and reuse").
+aegis:wi_e2e_prior a aegis:WorkItem ;
+    rdfs:label "prove the grounded edit boundary for tallies" ;
+    aegis:identifier "{PRIOR_ITEM}" ;
+    aegis:outcome "done" ;
+    aegis:sourceKind "declared" .
+
 # The provenance chain the OBSERVED scope rung projects
 # (Bead <-implements- Commit -modifies-> entity, quipu shapes/provenance.ttl):
 # prior work on {REAL_ITEM} touched exactly src/lib.rs.
@@ -78,6 +87,10 @@ aegis:ent_e2e_lib a aegis:CodeModule ;
 
 aegis:commit_e2e_1 a aegis:GitCommit ;
     aegis:implements aegis:wi_e2e_grounding ;
+    aegis:modifies aegis:ent_e2e_lib .
+
+aegis:commit_e2e_2 a aegis:GitCommit ;
+    aegis:implements aegis:wi_e2e_prior ;
     aegis:modifies aegis:ent_e2e_lib .
 """
 
@@ -198,6 +211,41 @@ class Rig:
         (self.repo / ".bobbin" / "config.toml").write_text(
             bobbin_config(work_item_scope, declared_scope)
         )
+
+    def session_start(self, name: str, tenant: str, agent: str) -> dict:
+        """Invoke `yupana hook session-start` — the assignment-time briefing."""
+        env = self.hook_env()
+        env["BOBBIN_ROLE"] = tenant
+        env["SHANTY_ROOT"] = str(self.work / "shanty")
+        env["SHANTY_AGENT"] = agent
+        payload = json.dumps({"session_id": f"{name}-{self.nonce}", "cwd": str(self.repo)})
+        started = time.time()
+        proc = subprocess.run(
+            [self.yupana, "hook", "session-start"],
+            input=payload,
+            capture_output=True,
+            text=True,
+            cwd=self.repo,
+            env=env,
+            timeout=120,
+        )
+        elapsed_ms = (time.time() - started) * 1000
+        (self.logs / f"{name}.stdout.json").write_text(proc.stdout)
+        (self.logs / f"{name}.stderr.log").write_text(proc.stderr)
+        context = ""
+        if proc.stdout.strip():
+            body = json.loads(proc.stdout)
+            hso = body.get("hookSpecificOutput", {})
+            if hso.get("hookEventName") == "SessionStart":
+                context = hso.get("additionalContext", "")
+        return {
+            "name": name,
+            "outcome": "briefing" if context else "silent",
+            "reason": context,
+            "stderr": proc.stderr,
+            "exit": proc.returncode,
+            "ms": round(elapsed_ms, 1),
+        }
 
     def publish_plate(self, agent: str, item: str) -> None:
         """Publish the tracker's plate: `agent` is working `item` right now."""
@@ -582,6 +630,23 @@ def scenarios(rig: Rig) -> list[dict]:
         "OBSERVED",
         "update your tracked item",
         aspect="21+: work_item_scope=enforce holds the item's boundary",
+    )
+
+    # S15 — the assignment-time briefing: before any edit, the agent is handed
+    # the item's ground, the reusable SUCCESSFUL similar item, the central
+    # entity, the enforce posture, and the citation rules — context BEFORE the
+    # first mistake, via the suite (scope projection, /context, /project).
+    check(
+        rig.session_start("s15-briefing", tenant="polecat-obs", agent="polecat-obs"),
+        "briefing",
+        REAL_ITEM,
+        "src/lib.rs",
+        "SUCCESSFUL prior work",
+        PRIOR_ITEM,
+        "Central entities",
+        "edit-cites-work-item",
+        "DENIED",
+        aspect="context: the graph briefs the agent at assignment time",
     )
 
     # S14 — and enforce does not over-block the item's own ground.

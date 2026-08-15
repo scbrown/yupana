@@ -40,6 +40,7 @@ observed scope projected from quipu's commit-provenance chain:
 | unknown scope | no rung answers → one advisory per session, never a silent allow |
 | observed enforce | `work_item_scope = "enforce"` denies outside the item's boundary |
 | enforce in-scope | the hard boundary does not over-block the item's own ground |
+| assignment briefing | `session-start` injects ground, central entities, similar successful work, and rules before the first edit |
 
 Everything observable is captured under the workdir (default `target/e2e`):
 per-scenario guard stdout/stderr with `RUST_LOG=debug`, the metrics spool,

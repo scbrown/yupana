@@ -25,6 +25,8 @@ mod cli_analyze;
 #[path = "cli_use.rs"]
 mod cli_use;
 use cli_use::deliberate_use_name;
+#[path = "cli_hook.rs"]
+mod cli_hook;
 #[path = "cli_promote.rs"]
 mod cli_promote;
 #[path = "cli_serve.rs"]
@@ -35,6 +37,7 @@ mod cli_status;
 mod cli_status_rules;
 #[path = "cli_tracing.rs"]
 mod cli_tracing;
+use cli_hook::HookEvent;
 
 pub use cli_tracing::init_tracing;
 
@@ -304,19 +307,6 @@ enum Commands {
     },
 }
 
-/// Supported agent-harness hook events.
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum HookEvent {
-    /// Claude Code `PostToolUse` on Edit/Write: advise on cross-file blast radius.
-    PostEdit,
-    /// Claude Code `PreToolUse` on Edit/Write: deny an edit that exceeds the
-    /// tenant's capability scope. Opt-in, and always fails open.
-    PreEdit,
-    /// Claude Code `PreToolUse` on Bash: RECORD the action (verb, target,
-    /// `target_class`) for the trace. Never denies, never prints, always exits 0.
-    PreBash,
-}
-
 /// Output formats for `yupana export`.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ExportFormat {
@@ -358,13 +348,9 @@ impl Cli {
             }
             Commands::Watch { path } => self.watch(path).await,
             Commands::Status => self.status(),
-            Commands::Hook { event } => match event {
-                HookEvent::PostEdit => crate::hook::run_post_edit(self.tenant.as_deref()),
-                HookEvent::PreBash => crate::hook::run_pre_bash(),
-                HookEvent::PreEdit => {
-                    crate::hook::run_pre_edit(self.tenant.as_deref(), self.config.as_deref())
-                }
-            },
+            Commands::Hook { event } => {
+                cli_hook::run(*event, self.tenant.as_deref(), self.config.as_deref())
+            }
             Commands::Completions { shell } => {
                 let mut cmd = Cli::command();
                 clap_complete::generate(*shell, &mut cmd, "yupana", &mut io::stdout());

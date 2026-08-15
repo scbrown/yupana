@@ -14,6 +14,13 @@
 pub mod action;
 pub mod attribution;
 pub mod audit;
+/// The work-item briefing — the CONTEXT consumer of the scope ladder. Gated
+/// with the projection it reads.
+#[cfg(feature = "quipu")]
+pub mod brief;
+/// The briefing's sources — each a reused surface of the suite.
+#[cfg(feature = "quipu")]
+pub mod brief_sources;
 pub mod change;
 pub mod cli;
 mod cli_cmds;

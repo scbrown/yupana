@@ -43,6 +43,31 @@ Impacted files: src/api/login.rs, src/api/session.rs
 The advisory is emitted only when there is cross-file impact, and the hook never
 fails the harness (no output = nothing to say).
 
+## Work-item briefing (available now, `quipu` feature)
+
+`yupana hook session-start` (`SessionStart`) injects the graph's knowledge of
+the agent's tracked work item into its context at assignment time — before the
+first edit, not at the first denial: the item's ground (paths prior work
+touched, with symbols and caller locality), the central entities around it
+(quipu pagerank), semantically similar past items with their outcomes so
+**successful work gets reused**, related in-flight items, the governed rules
+in force, and the scope posture. Silent when no plate or no quipu seam.
+
+```json
+{
+  "env": { "SHANTY_ROOT": "/gt", "SHANTY_AGENT": "polecat-3" },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "yupana hook session-start", "timeout": 15 }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## Pre-edit guard (available now)
 
 `yupana hook pre-edit` (`PreToolUse`) checks an edit *before* it lands against the
