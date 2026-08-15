@@ -98,6 +98,16 @@ pub struct PolicyConfig {
     /// identifiers, wrong arity, unresolved `mod` imports). Opt-in and off by
     /// default; rides inside `deadline_ms` and fails open like every other arm.
     pub verify: bool,
+    /// Enforcement level for the work-item (observed) scope rung — the ladder
+    /// fallback when a tenant has no `[yupana.policy.scopes.*]` entry. The
+    /// rung both influences and constrains: its message always says what the
+    /// right action is, and at `enforce` an out-of-scope edit is denied
+    /// rather than advised. Off by default (opt-in, like `verify`): arming it
+    /// also arms the unknown-scope advisory, and a deployment should choose
+    /// that noise deliberately. Stage `advise` before `enforce` — an observed
+    /// scope grows with use, and an incomplete one hard-denying legitimate
+    /// work is an outage. The ambient `mode` stays a ceiling on top.
+    pub work_item_scope: Mode,
 }
 
 impl Default for PolicyConfig {
@@ -110,6 +120,7 @@ impl Default for PolicyConfig {
             scopes: BTreeMap::new(),
             rules: Vec::new(),
             verify: false,
+            work_item_scope: Mode::Off,
         }
     }
 }
@@ -182,6 +193,76 @@ impl ScopeSummary {
             max_impacted_symbols: scope.max_impacted_symbols,
             max_impacted_files: scope.max_impacted_files,
         }
+    }
+}
+
+/// Where a capability scope came from — the work-scoped-governance trust
+/// ladder (docs/work-scoped-governance.md). The rung decides the ceiling: only
+/// a `Declared` scope may hard-deny; `Derived` and `Observed` scopes advise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScopeProvenance {
+    /// Explicit scope edges — today, the operator's static TOML table.
+    Declared,
+    /// Derived from labels, parent work, or the structural graph. (No
+    /// producer yet; named so records can carry it when one lands.)
+    Derived,
+    /// What prior sessions on the work item actually touched, projected from
+    /// the graph's commit-provenance chain. Grows with use; advises only.
+    Observed,
+}
+
+impl ScopeProvenance {
+    /// The lowercase rung name, for records and messages.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Declared => "declared",
+            Self::Derived => "derived",
+            Self::Observed => "observed",
+        }
+    }
+}
+
+/// The projected work-item scope map: item id → repo-relative paths that work
+/// on the item has touched. Pure data (this module's contract); the fetch
+/// lives in `project_scope` behind the `quipu` feature.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkItemScopes(BTreeMap<String, std::collections::BTreeSet<String>>);
+
+impl WorkItemScopes {
+    /// Build from projected `(item id, path)` rows.
+    #[must_use]
+    pub fn from_rows(rows: impl IntoIterator<Item = (String, String)>) -> Self {
+        let mut map: BTreeMap<String, std::collections::BTreeSet<String>> = BTreeMap::new();
+        for (id, path) in rows {
+            map.entry(id).or_default().insert(path);
+        }
+        Self(map)
+    }
+
+    /// The observed [`Scope`] for `item`: its touched paths as literal path
+    /// globs. `None` when the item has no observed paths — an UNKNOWN scope,
+    /// which advises; it is never an empty scope that denies everything.
+    #[must_use]
+    pub fn scope_for(&self, item: &str) -> Option<Scope> {
+        let paths = self.0.get(item)?;
+        Some(Scope {
+            allow_paths: paths.iter().cloned().collect(),
+            ..Scope::default()
+        })
+    }
+
+    /// How many work items carry an observed scope.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether no item carries an observed scope.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 

@@ -231,7 +231,13 @@ max_impacted_symbols = 25
 max_impacted_files = 10
 ```
 
-A tenant with no scope entry is unconstrained. `deny_paths` beats `allow_paths`.
+A tenant with no scope entry is unconstrained — unless the work-item scope
+rung is armed (`[yupana.policy] work_item_scope = "advise" | "enforce"`), in
+which case the guard falls back to the OBSERVED scope of the agent's tracked
+work item (the paths prior work on it touched, projected from quipu), and an
+unknown scope draws a once-per-session advisory instead of silence. See the
+Configuration Reference and `docs/work-scoped-governance.md`. `deny_paths`
+beats `allow_paths`.
 Path patterns are globs matched against the repo-relative path.
 
 With `mode = "advise"` the guard reports what it *would* have denied via

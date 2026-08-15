@@ -1,6 +1,14 @@
 # Work-scoped agent governance: one scope, three consumers
 
-**Status:** design. Nothing here is implemented yet.
+**Status:** partially implemented. The trace substrate (plate reader, action
+tuples, spool stamping) and the ladder's bottom rung are live: the pre-edit
+guard falls back from the declared scope table to an **observed** scope
+projected from the graph's commit-provenance chain (`src/hook/scope_arm.rs`,
+`src/project_scope.rs`), staged by `[yupana.policy] work_item_scope =
+off|advise|enforce` with the ambient mode as ceiling, and unknown scope
+advises once per session instead of allowing silently. The `declared` graph
+vocabulary (phase 4), derived scopes, and the trace/context consumers remain
+design intent.
 **Scope:** how yupana, Quipu and a work-item tracker combine to govern, trace, and
 contextualise what an autonomous agent does.
 

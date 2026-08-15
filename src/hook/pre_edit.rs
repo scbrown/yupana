@@ -272,8 +272,12 @@ fn guard_inner(
     // covers) and language-gated structural rules. Opt-in (quipu.enabled +
     // endpoint), and behind the `quipu` feature so a default build carries
     // none of it.
+    #[cfg(not(feature = "quipu"))]
+    let scope_plane: Option<scope_arm::ScopePlane> = None;
     #[cfg(feature = "quipu")]
-    if let Some(decision) = governed_check(&config, &input, &root, &rel) {
+    let mut scope_plane: Option<scope_arm::ScopePlane> = None;
+    #[cfg(feature = "quipu")]
+    if let Some(decision) = governed_check(&config, &input, &root, &rel, &mut scope_plane) {
         return decision;
     }
 
@@ -285,9 +289,18 @@ fn guard_inner(
         return decision;
     }
 
-    // No scope for this tenant — mode is off, or the tenant is unconstrained.
+    // No DECLARED scope for this tenant — fall through the trust ladder:
+    // the tracked work item's OBSERVED scope (advisory), else UNKNOWN scope,
+    // which advises once per session rather than allowing silently.
     let (Some(tenant), Some(scope)) = (tenant, config.policy.scope_for(tenant)) else {
-        return Outcome::Allow.into();
+        return scope_arm::ladder_fallback(
+            &config,
+            &input,
+            tenant,
+            &rel,
+            crate::plate::current().as_deref(),
+            scope_plane.as_ref(),
+        );
     };
 
     // A scope whose globs do not compile is misconfigured; say so rather than
@@ -460,6 +473,8 @@ mod pre_edit_util;
 use pre_edit_util::{decide, fail_open, introduced_text};
 #[path = "rule_planes.rs"]
 mod rule_planes;
+#[path = "scope_arm.rs"]
+mod scope_arm;
 #[path = "verify_arm.rs"]
 mod verify_arm;
 #[cfg(feature = "quipu")]

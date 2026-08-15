@@ -84,6 +84,11 @@ pub struct CachedProjection {
     /// set, so grounded rules are unevaluated (loud), never empty-satisfied.
     #[serde(default)]
     pub grounding: Option<crate::grounding::GroundingSet>,
+    /// The observed work-item scope map. Defaulted to `None` for older caches
+    /// — unknown scope, which advises; never an empty map that reads as
+    /// "nothing is in scope".
+    #[serde(default)]
+    pub work_item_scopes: Option<crate::policy::WorkItemScopes>,
 }
 
 /// Why a cache could not be served. Every variant is a REASON, carried into the

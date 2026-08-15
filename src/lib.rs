@@ -53,6 +53,10 @@ pub mod project_exposure;
 #[cfg(feature = "quipu")]
 pub mod project_grounding;
 pub mod project_queries;
+/// Observed work-item scope projection (work-scoped-governance ladder), split
+/// from `project` for size and gated with it.
+#[cfg(feature = "quipu")]
+pub mod project_scope;
 /// The DURABLE half of the projection cache — what lets a projection failure
 /// degrade to stale-but-enforcing instead of to unguarded (aegis-0upyu).
 #[cfg(feature = "quipu")]

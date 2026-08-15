@@ -194,6 +194,7 @@ pub(super) fn governed_check(
     input: &HookInput,
     root: &Path,
     rel: &str,
+    scope_plane: &mut Option<super::scope_arm::ScopePlane>,
 ) -> Option<Decision> {
     use crate::project::RepoExposure;
 
@@ -261,6 +262,13 @@ pub(super) fn governed_check(
             Some(*age_secs)
         }
     };
+    // Hand the scope arm its plane from THIS registry — the scope ladder must
+    // never add a projection round-trip of its own (work-scoped-governance:
+    // the guard's latency budget is why the plane rides the shared refresh).
+    *scope_plane = registry
+        .work_item_scopes()
+        .cloned()
+        .map(|scopes| super::scope_arm::ScopePlane { scopes, cache_age });
 
     // A projected rule set that does not compile is a broken sync; fail open
     // loudly — both planes, same discipline.

@@ -350,3 +350,15 @@ pub fn decode_grounding_ids(sparql_json: &str) -> Result<Vec<String>> {
         .filter_map(|b| binding_value(b, "id"))
         .collect())
 }
+
+/// Decode the observed work-item scope rows (`?id ?path` pairs). A row missing
+/// either binding is dropped rather than erroring — the map serves an
+/// advisory rung, and a partial map is honest data, not a broken sync.
+pub fn decode_work_item_scope_rows(sparql_json: &str) -> Result<Vec<(String, String)>> {
+    let value: serde_json::Value = serde_json::from_str(sparql_json)
+        .map_err(|e| Error::Projection(format!("results are not JSON: {e}")))?;
+    Ok(rows_of(&value)?
+        .iter()
+        .filter_map(|b| Some((binding_value(b, "id")?, binding_value(b, "path")?)))
+        .collect())
+}

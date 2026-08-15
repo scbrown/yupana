@@ -28,6 +28,19 @@ cluster disclosure:
 | quipu down, no cache | loud fail-open — never a silent allow |
 | verdict return | spooled verdicts land in quipu signed, with tier + freshness |
 
+A second group proves work-item scope isolation — the provenance ladder of
+`docs/work-scoped-governance.md`, driven by the tracker's plate and the
+observed scope projected from quipu's commit-provenance chain:
+
+| scenario | proves |
+| --- | --- |
+| declared deny | a static `[yupana.policy.scopes.*]` entry hard-denies outside itself |
+| observed in-scope | the item's own ground admits the edit silently |
+| observed advise | out-of-scope is named (rung, item, right move) without blocking |
+| unknown scope | no rung answers → one advisory per session, never a silent allow |
+| observed enforce | `work_item_scope = "enforce"` denies outside the item's boundary |
+| enforce in-scope | the hard boundary does not over-block the item's own ground |
+
 Everything observable is captured under the workdir (default `target/e2e`):
 per-scenario guard stdout/stderr with `RUST_LOG=debug`, the metrics spool,
 the verdict spool, quipu's Prometheus `/metrics` snapshots, and a scored

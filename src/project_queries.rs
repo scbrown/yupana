@@ -112,6 +112,21 @@ SELECT ?pred ?name ?label ?matchType ?tier ?rationale WHERE {
   OPTIONAL { ?pred rdfs:comment ?rationale }
 }";
 
+/// The OBSERVED work-item scope map (work-scoped-governance ladder, bottom
+/// rung): which paths prior work on each item actually touched, via the
+/// deterministic provenance chain quipu already aggregates
+/// (`Bead <-aegis:implements- Commit -aegis:modifies-> entity`, quipu
+/// shapes/provenance.ttl). Zero rows on a store with no promoted provenance —
+/// an empty map, not an error, like every other catalogue here.
+pub const WORK_ITEM_SCOPE_QUERY: &str = "\
+PREFIX aegis: <http://aegis.gastown.local/ontology/>
+SELECT ?id ?path WHERE {
+  ?c aegis:implements ?w ;
+     aegis:modifies ?e .
+  ?w aegis:identifier ?id .
+  ?e aegis:filePath ?path .
+}";
+
 /// The grounding query itself — the authoritative work-item id set, projected
 /// into the hot plane at refresh time so evaluation is O(1) membership per
 /// token, never SPARQL per keystroke.

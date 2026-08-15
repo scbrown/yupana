@@ -68,6 +68,17 @@ aegis:wi_e2e_bench a aegis:WorkItem ;
     rdfs:label "e2e: shared-yupana concurrency bench" ;
     aegis:identifier "{REAL_ITEM_2}" ;
     aegis:sourceKind "declared" .
+
+# The provenance chain the OBSERVED scope rung projects
+# (Bead <-implements- Commit -modifies-> entity, quipu shapes/provenance.ttl):
+# prior work on {REAL_ITEM} touched exactly src/lib.rs.
+aegis:ent_e2e_lib a aegis:CodeModule ;
+    rdfs:label "lib.rs" ;
+    aegis:filePath "src/lib.rs" .
+
+aegis:commit_e2e_1 a aegis:GitCommit ;
+    aegis:implements aegis:wi_e2e_grounding ;
+    aegis:modifies aegis:ent_e2e_lib .
 """
 
 FIXTURE_LIB = """\
@@ -88,7 +99,18 @@ pub fn caller() -> u32 {
 }
 """
 
-BOBBIN_CONFIG = f"""\
+FIXTURE_CONFIG_RS = """\
+//! e2e fixture: a second module, deliberately untouched by any prior work.
+
+pub const LIMIT: u32 = 10;
+"""
+
+FIXTURE_README = "# e2e fixture\n\nThe small, known world the guard verifies against.\n"
+
+
+def bobbin_config(work_item_scope: str | None = None, declared_scope: bool = False) -> str:
+    """The fixture repo's `.bobbin/config.toml`, staged per scenario group."""
+    text = f"""\
 [yupana]
 base_ref = "main"
 
@@ -96,7 +118,15 @@ base_ref = "main"
 mode = "enforce"
 deadline_ms = 15000
 verify = true
-
+"""
+    if work_item_scope:
+        text += f'work_item_scope = "{work_item_scope}"\n'
+    if declared_scope:
+        text += """
+[yupana.policy.scopes.polecat-declared]
+allow_paths = ["src/**"]
+"""
+    text += f"""
 [yupana.quipu]
 enabled = true
 endpoint = "{ENDPOINT}"
@@ -105,6 +135,7 @@ projection_cache_ttl_secs = 3600
 [yupana.metrics]
 record_paths = "relative"
 """
+    return text
 
 
 def log(msg: str) -> None:
@@ -115,6 +146,10 @@ class Rig:
     """The running pair: seeded quipu-server + a configured yupana workspace."""
 
     def __init__(self, work: Path, profile: str):
+        # Session ids are salted per run: the guard's once-per-session notices
+        # persist as marker files in the system temp dir, so a reused session
+        # id would swallow notices on the second harness run.
+        self.nonce = str(int(time.time()))
         self.work = work
         self.repo = work / "repo"
         self.state = work / "state"
@@ -145,16 +180,31 @@ class Rig:
         for d in (self.repo / "src", self.state, self.logs):
             d.mkdir(parents=True, exist_ok=True)
         (self.repo / "src" / "lib.rs").write_text(FIXTURE_LIB)
+        (self.repo / "src" / "config.rs").write_text(FIXTURE_CONFIG_RS)
+        (self.repo / "README.md").write_text(FIXTURE_README)
         (self.repo / "Cargo.toml").write_text(
             '[package]\nname = "e2e-fixture"\nversion = "0.1.0"\nedition = "2021"\n'
         )
         (self.repo / ".bobbin").mkdir(exist_ok=True)
-        (self.repo / ".bobbin" / "config.toml").write_text(BOBBIN_CONFIG)
+        self.write_config()
         run(["git", "init", "-q", "-b", "main"], cwd=self.repo)
         run(["git", "add", "-A"], cwd=self.repo)
         run(
             ["git", "-c", "user.email=e2e@local", "-c", "user.name=e2e", "commit", "-qm", "fixture"],
             cwd=self.repo,
+        )
+
+    def write_config(self, work_item_scope: str | None = None, declared_scope: bool = False) -> None:
+        (self.repo / ".bobbin" / "config.toml").write_text(
+            bobbin_config(work_item_scope, declared_scope)
+        )
+
+    def publish_plate(self, agent: str, item: str) -> None:
+        """Publish the tracker's plate: `agent` is working `item` right now."""
+        crew = self.work / "shanty" / "crew" / agent
+        crew.mkdir(parents=True, exist_ok=True)
+        (crew / "plate.json").write_text(
+            json.dumps({"item": item, "at": int(time.time()), "session": None})
         )
 
     def seed(self) -> None:
@@ -238,20 +288,46 @@ class Rig:
 
     # -- the guard -----------------------------------------------------------
 
-    def guard(self, name: str, old: str, new: str, session: str) -> dict:
-        """Invoke `yupana hook pre-edit` the way the agent harness would."""
+    def guard(
+        self,
+        name: str,
+        old: str,
+        new: str,
+        session: str,
+        file: str = "src/lib.rs",
+        tenant: str | None = None,
+        agent: str | None = None,
+        spool: str | None = None,
+    ) -> dict:
+        """Invoke `yupana hook pre-edit` the way the agent harness would.
+
+        `tenant` becomes `BOBBIN_ROLE` (the capability identity); `agent`
+        wires `SHANTY_ROOT`/`SHANTY_AGENT` so the guard can read the
+        tracker's plate for the work-item scope ladder.
+        """
         payload = json.dumps(
             {
-                "session_id": session,
+                "session_id": f"{session}-{self.nonce}",
                 "cwd": str(self.repo),
                 "tool_name": "Edit",
                 "tool_input": {
-                    "file_path": str(self.repo / "src" / "lib.rs"),
+                    "file_path": str(self.repo / file),
                     "old_string": old,
                     "new_string": new,
                 },
             }
         )
+        env = self.hook_env()
+        if tenant:
+            env["BOBBIN_ROLE"] = tenant
+        if agent:
+            env["SHANTY_ROOT"] = str(self.work / "shanty")
+            env["SHANTY_AGENT"] = agent
+        if spool:
+            # A scenario-private verdict spool: keeps the recurrence advisory
+            # (which mines the spool for similar DENIED edits) from coloring
+            # scenarios that assert on other planes.
+            env["YUPANA_VERDICT_PATH"] = str(self.state / f"verdicts-{spool}.jsonl")
         started = time.time()
         proc = subprocess.run(
             [self.yupana, "hook", "pre-edit"],
@@ -259,7 +335,7 @@ class Rig:
             capture_output=True,
             text=True,
             cwd=self.repo,
-            env=self.hook_env(),
+            env=env,
             timeout=120,
         )
         elapsed_ms = (time.time() - started) * 1000
@@ -397,6 +473,132 @@ def scenarios(rig: Rig) -> list[dict]:
         "verdict freshness: fresh",
         aspect="16/25: projection freshness declared, never fabricated",
     )
+
+    # ---- Work-item scope isolation (the provenance ladder) -----------------
+
+    # S9 — DECLARED rung: the static scope table hard-denies outside itself.
+    rig.write_config(declared_scope=True)
+    check(
+        rig.guard(
+            "s9-declared-deny",
+            "The small, known world",
+            f"The small, known world (see {REAL_ITEM})",
+            session="e2e-s9",
+            file="README.md",
+            tenant="polecat-declared",
+            spool="s9",
+        ),
+        "deny",
+        "outside the writable capability scope",
+        aspect="21: declared scope constrains — deny outside the boundary",
+    )
+
+    # S10 — OBSERVED rung, in scope: prior work on the item touched src/lib.rs,
+    # so the item's own ground admits the edit silently.
+    rig.write_config(work_item_scope="advise")
+    rig.publish_plate("polecat-obs", REAL_ITEM)
+    cited_clean = (
+        "pub fn caller() -> u32 {\n"
+        f"    // implements {REAL_ITEM}\n"
+        "    weave(\"warp\", \"weft\").len() as u32\n"
+        "}"
+    )
+    check(
+        rig.guard(
+            "s10-observed-in-scope",
+            ANCHOR,
+            cited_clean,
+            session="e2e-s10",
+            tenant="polecat-obs",
+            agent="polecat-obs",
+            spool="s10",
+        ),
+        "allow",
+        aspect="21: observed scope admits the item's own ground",
+    )
+
+    # S11 — OBSERVED rung, out of scope, at advise: the INFLUENCE half — the
+    # guard names the item, its paths, and the right move, without blocking.
+    check(
+        rig.guard(
+            "s11-observed-advise",
+            "pub const LIMIT: u32 = 10;",
+            f"// implements {REAL_ITEM}\npub const LIMIT: u32 = 11;",
+            session="e2e-s11",
+            file="src/config.rs",
+            tenant="polecat-obs",
+            agent="polecat-obs",
+            spool="s11",
+        ),
+        "notify",
+        "OBSERVED",
+        "update your tracked item",
+        aspect="21: observed scope advises — guidance without constraint",
+    )
+
+    # S12 — UNKNOWN scope: an identified tenant with no scope on any rung is
+    # told once per session, never silently read as within-scope.
+    check(
+        rig.guard(
+            "s12-unknown-scope",
+            ANCHOR,
+            cited_clean,
+            session="e2e-s12",
+            tenant="polecat-lost",
+            spool="s12",
+        ),
+        "notify",
+        "UNGUARDED by scope",
+        aspect="21: unknown scope advises rather than blocks",
+    )
+    check(
+        rig.guard(
+            "s12b-unknown-quiet",
+            ANCHOR,
+            cited_clean,
+            session="e2e-s12",
+            tenant="polecat-lost",
+            spool="s12",
+        ),
+        "allow",
+        aspect="21: the unknown-scope advisory fires once per session",
+    )
+
+    # S13 — OBSERVED rung at enforce: the CONSTRAINT half — the same boundary
+    # now denies, and the deny still teaches the right move.
+    rig.write_config(work_item_scope="enforce")
+    check(
+        rig.guard(
+            "s13-observed-enforce-deny",
+            "pub const LIMIT: u32 = 10;",
+            f"// implements {REAL_ITEM}\npub const LIMIT: u32 = 12;",
+            session="e2e-s13",
+            file="src/config.rs",
+            tenant="polecat-obs",
+            agent="polecat-obs",
+            spool="s13",
+        ),
+        "deny",
+        "OBSERVED",
+        "update your tracked item",
+        aspect="21+: work_item_scope=enforce holds the item's boundary",
+    )
+
+    # S14 — and enforce does not over-block the item's own ground.
+    check(
+        rig.guard(
+            "s14-observed-enforce-allow",
+            ANCHOR,
+            cited_clean,
+            session="e2e-s14",
+            tenant="polecat-obs",
+            agent="polecat-obs",
+            spool="s14",
+        ),
+        "allow",
+        aspect="21+: enforce admits in-boundary work",
+    )
+    rig.write_config()  # restore defaults for the store-down scenarios
 
     # S6 — quipu down, cache warm: still enforced, age declared.
     rig.scrape_metrics("before-down")

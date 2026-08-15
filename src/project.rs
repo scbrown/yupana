@@ -219,6 +219,10 @@ pub struct ProjectionRegistry {
     /// renders every grounded rule UNEVALUATED (loud), never satisfied-by-
     /// empty-set. A `Some` empty set is a real answer ("no work items").
     pub(crate) grounding: Option<crate::grounding::GroundingSet>,
+    /// The observed work-item scope map (work-scoped-governance ladder,
+    /// bottom rung). `None` when missing/failed — unknown scope, which the
+    /// guard reports as UNGUARDED-by-scope rather than silently in-scope.
+    pub(crate) work_item_scopes: Option<crate::policy::WorkItemScopes>,
     /// Whether the projected sets reflect a successful, current sync.
     freshness: Freshness,
 }
@@ -258,6 +262,7 @@ impl ProjectionRegistry {
             text_rules: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
+            work_item_scopes: None,
             freshness: Freshness::Stale,
         }
     }
@@ -315,6 +320,10 @@ impl ProjectionRegistry {
                     &self.endpoint,
                     &self.grounded_rules,
                 );
+                // Same contract as the grounding set: its failure disables
+                // only its own rung (unknown scope advises), never the guard.
+                self.work_item_scopes =
+                    crate::project_scope::fetch_work_item_scopes(&self.endpoint);
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
@@ -369,6 +378,7 @@ impl ProjectionRegistry {
                             text_rules: self.text_rules.clone(),
                             grounded_rules: self.grounded_rules.clone(),
                             grounding: self.grounding.clone(),
+                            work_item_scopes: self.work_item_scopes.clone(),
                         },
                     );
                 }
@@ -393,6 +403,8 @@ impl ProjectionRegistry {
                 // which is the honest answer: that cache never held a set, so
                 // grounded rules are unevaluated (loud), not empty-satisfied.
                 self.grounding = cached.grounding;
+                // Pre-scope caches restore `None` — unknown scope, honestly.
+                self.work_item_scopes = cached.work_item_scopes;
                 // STALE, never Fresh. The policies are real and worth
                 // enforcing; the claim that they are current is not ours to
                 // make, and every verdict computed against them says so.
