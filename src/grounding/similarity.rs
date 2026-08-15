@@ -161,6 +161,9 @@ fn cosine(a: &[f32], b: &[f32]) -> Option<f32> {
 }
 
 #[cfg(test)]
+// Test names shout the invariant they turn on (`UNEVALUATED`, `EMPTY`) — the
+// repo's emphasis convention, allowed here and scoped to tests (yupana #83).
+#[allow(non_snake_case)]
 mod tests {
     use super::*;
 

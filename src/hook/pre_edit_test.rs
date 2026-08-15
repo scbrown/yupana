@@ -1021,8 +1021,7 @@ mod grounded_plane_seam {
     #[test]
     fn a_grounded_id_produces_a_blocking_violation_by_name() {
         let set = GroundingSet::new(["bobbin-bnq".to_string()]);
-        let (messages, blocking, names) =
-            grounded_check(&registry(Some(set)), "// see bobbin-bnq");
+        let (messages, blocking, names) = grounded_check(&registry(Some(set)), "// see bobbin-bnq");
         assert!(blocking, "a Block-tier grounded violation blocks");
         assert_eq!(names, ["no-ticket-in-comment"]);
         assert!(messages[0].contains("bobbin-bnq"), "{messages:?}");
@@ -1030,14 +1029,12 @@ mod grounded_plane_seam {
 
     #[test]
     fn a_missing_set_is_a_LOUD_unevaluated_notice_never_a_silent_pass() {
-        let (messages, blocking, names) =
-            grounded_check(&registry(None), "// see bobbin-bnq");
+        let (messages, blocking, names) = grounded_check(&registry(None), "// see bobbin-bnq");
         assert!(!blocking, "an unevaluated rule must not block");
         assert!(names.is_empty(), "no violation was evaluated");
         assert_eq!(messages.len(), 1);
         assert!(
-            messages[0].contains("NOT EVALUATED")
-                && messages[0].contains("no-ticket-in-comment"),
+            messages[0].contains("NOT EVALUATED") && messages[0].contains("no-ticket-in-comment"),
             "{messages:?}"
         );
     }

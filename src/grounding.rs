@@ -282,6 +282,9 @@ fn join(items: &[String]) -> String {
 }
 
 #[cfg(test)]
+// Test names shout the invariant they turn on (`UNEVALUATED`, `EMPTY`) — the
+// repo's emphasis convention, allowed here and scoped to tests (yupana #83).
+#[allow(non_snake_case)]
 mod tests {
     use super::*;
     use crate::textrules::TextTier;
@@ -335,7 +338,11 @@ mod tests {
             "// see quipu-999",
         );
         assert_eq!(v.len(), 1);
-        assert!(v[0].rule.ends_with("#fabricated-reference"), "{}", v[0].rule);
+        assert!(
+            v[0].rule.ends_with("#fabricated-reference"),
+            "{}",
+            v[0].rule
+        );
         assert!(v[0].message.contains("FABRICATED"), "{}", v[0].message);
     }
 

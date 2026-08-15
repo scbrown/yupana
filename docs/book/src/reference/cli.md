@@ -359,9 +359,9 @@ policy-by-example, yupana's half. Point it at the offending text (with the file
 it appeared in, so the Selector can name the structural context), or at a
 verdict spool to read the newest denial:
 
-```console
-$ yupana exemplar "ABC-123" --file src/a.rs
-$ yupana exemplar --spool ~/.local/state/yupana/verdicts.jsonl --policy no-ticket-in-comment
+```bash
+yupana exemplar "ABC-123" --file src/a.rs
+yupana exemplar --spool ~/.local/state/yupana/verdicts.jsonl --policy no-ticket-in-comment
 ```
 
 The output is JSON for quipu's drafting scaffold: a Selector draft (the

@@ -36,9 +36,9 @@ pub fn fetch_grounding_set(endpoint: &str, rules: &[GroundedRule]) -> Option<Gro
     if rules.is_empty() {
         return None;
     }
-    match crate::project::query(endpoint, GROUNDING_SET_QUERY).and_then(|body| {
-        decode_grounding_ids(&body).map(|ids| GroundingSet::new(ids))
-    }) {
+    match crate::project::query(endpoint, GROUNDING_SET_QUERY)
+        .and_then(|body| decode_grounding_ids(&body).map(GroundingSet::new))
+    {
         Ok(set) => Some(set),
         Err(e) => {
             eprintln!(

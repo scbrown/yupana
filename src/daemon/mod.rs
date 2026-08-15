@@ -86,7 +86,8 @@ struct Engine {
     /// the recomputed overlay is queryable and its freshness is a fact this
     /// engine actually knows. Tracked, not yet stamped onto query DTOs — the
     /// serve half is Phase 3 (FR-3).
-    freshness: std::sync::Mutex<std::collections::HashMap<(String, String), crate::types::Freshness>>,
+    freshness:
+        std::sync::Mutex<std::collections::HashMap<(String, String), crate::types::Freshness>>,
 }
 
 impl ResidentEngine {

@@ -86,8 +86,7 @@ pub fn latest_denial(spool: &Path, policy: Option<&str>) -> Option<Denial> {
     read_denials(spool)?
         .0
         .into_iter()
-        .filter(|d| policy.is_none_or(|p| d.policy == p))
-        .next_back()
+        .rfind(|d| policy.is_none_or(|p| d.policy == p))
 }
 
 /// The stage-1 advisory for `introduced`, or `None` when no prior denial is
@@ -124,8 +123,7 @@ pub fn advisory(spool: &Path, introduced: &str) -> Option<String> {
          cosine = {:.2} ≥ threshold {:.2}, model {}, corpus {}. If this edit \
          repeats that one, expect the same refusal; if it is different, \
          proceed — only the exact policy tier can deny.",
-        denial.policy, denial.target, best.score, best.threshold, best.model,
-        best.corpus_watermark,
+        denial.policy, denial.target, best.score, best.threshold, best.model, best.corpus_watermark,
     ))
 }
 

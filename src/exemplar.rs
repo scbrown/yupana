@@ -6,19 +6,19 @@
 //! path + offending text — and wants "never do this again" turned into a
 //! governed rule without hand-authoring Turtle. Yupana's half is mechanical
 //! extraction: it already knows the structural context the offending text
-//! lived in (line_comment, string literal, identifier, …), so it emits
+//! lived in (`line_comment`, string literal, identifier, …), so it emits
 //!
 //! - the **Selector draft** — the enclosing node kind as a tree-sitter query
 //!   (`(line_comment) @c`), with its language;
 //! - **predicate candidates at each viable tier**, weakest authority to
 //!   strongest claim:
 //!   1. *exact* — the specific offending token(s), for membership checking
-//!     (`tree-sitter+graph`, the only hard-capable tier);
+//!      (`tree-sitter+graph`, the only hard-capable tier);
 //!   2. *lexical* — a generated narrowing pattern, OFFERED FOR HUMAN
-//!     APPROVAL and never self-asserted as authority;
+//!      APPROVAL and never self-asserted as authority;
 //!   3. *embedding* — the exemplar's embedding as a similarity anchor
-//!     (pinned model, suggested threshold; the real threshold comes from
-//!     quipu's backtest, and the candidate says so).
+//!      (pinned model, suggested threshold; the real threshold comes from
+//!      quipu's backtest, and the candidate says so).
 //!
 //! The output feeds quipu's drafting scaffold; quipu's definition-time
 //! placement check remains the refusal authority — nothing emitted here is a
@@ -86,11 +86,7 @@ pub struct ExemplarDraft {
 /// (when available) the `source` of the file it appeared in with its
 /// `language`, so the Selector can name the enclosing node.
 #[must_use]
-pub fn extract(
-    offending: &str,
-    source: Option<&str>,
-    language: Option<&str>,
-) -> ExemplarDraft {
+pub fn extract(offending: &str, source: Option<&str>, language: Option<&str>) -> ExemplarDraft {
     let selector = match (source, language) {
         (Some(source), Some(language)) => {
             crate::extract::query::enclosing_node_kind(source, language, offending)
@@ -200,10 +196,7 @@ fn regex_escape(c: char) -> impl Iterator<Item = char> {
         c,
         '\\' | '.' | '+' | '*' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|'
     );
-    needs
-        .then_some('\\')
-        .into_iter()
-        .chain(std::iter::once(c))
+    needs.then_some('\\').into_iter().chain(std::iter::once(c))
 }
 
 #[cfg(test)]

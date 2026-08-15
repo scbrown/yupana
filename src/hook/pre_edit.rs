@@ -470,9 +470,6 @@ use rule_planes::rule_check;
 #[cfg(all(test, feature = "quipu"))]
 use rule_planes::text_plane;
 
-
-
-
 #[cfg(test)]
 #[path = "pre_edit_test.rs"]
 mod pre_edit_test;

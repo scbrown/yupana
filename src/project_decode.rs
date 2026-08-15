@@ -328,8 +328,8 @@ pub fn decode_grounded_rules(sparql_json: &str) -> Result<Vec<crate::grounding::
         let iri = get("pred").ok_or_else(|| {
             Error::Projection(format!("grounded-rule row {i}: missing binding `pred`"))
         })?;
-        let name = get("name")
-            .unwrap_or_else(|| iri.rsplit('/').next().unwrap_or(&iri).to_string());
+        let name =
+            get("name").unwrap_or_else(|| iri.rsplit('/').next().unwrap_or(&iri).to_string());
         out.push(crate::grounding::GroundedRule {
             name,
             label: get("label"),

@@ -491,6 +491,9 @@ mod tests {
             tier: crate::types::Tier::TreeSitter.as_str().to_string(),
         })
         .unwrap();
-        assert_eq!(v["tier"], "treesitter", "PromoteResponse lost its tier: {v}");
+        assert_eq!(
+            v["tier"], "treesitter",
+            "PromoteResponse lost its tier: {v}"
+        );
     }
 }

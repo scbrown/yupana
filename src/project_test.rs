@@ -612,8 +612,7 @@ fn stub_quipu(serve: usize) -> String {
             // same distinction quipu itself makes.
             // Text-rule and grounded-predicate queries get empty catalogues;
             // the structural-policy query gets the canned one.
-            let body = if request.contains("aegis:TextRule")
-                || request.contains("candidateSource")
+            let body = if request.contains("aegis:TextRule") || request.contains("candidateSource")
             {
                 empty_results_json()
             } else {

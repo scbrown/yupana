@@ -347,7 +347,9 @@ impl Cli {
 impl super::Cli {
     /// `yupana exemplar` — draft policy raw material from an observed instance
     /// (bobbin-9k3). Always JSON: the output is a machine feed for quipu's
-    /// drafting scaffold, not a report.
+    /// drafting scaffold, not a report — hence no `--json`/quiet plumbing and
+    /// no use of `self` beyond the method position every command shares.
+    #[allow(clippy::unused_self)]
     pub(super) fn exemplar(
         &self,
         text: Option<&str>,
@@ -375,7 +377,9 @@ impl super::Cli {
         };
         // The Selector needs the file's source and grammar; both are optional
         // and their absence is honest (the text-tier candidates still stand).
-        let source = file.as_deref().and_then(|f| std::fs::read_to_string(f).ok());
+        let source = file
+            .as_deref()
+            .and_then(|f| std::fs::read_to_string(f).ok());
         let language = file
             .as_deref()
             .and_then(|f| f.extension())

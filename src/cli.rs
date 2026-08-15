@@ -444,7 +444,12 @@ impl Cli {
                 file,
                 spool,
                 policy,
-            } => self.exemplar(text.as_deref(), file.as_deref(), spool.as_deref(), policy.as_deref()),
+            } => self.exemplar(
+                text.as_deref(),
+                file.as_deref(),
+                spool.as_deref(),
+                policy.as_deref(),
+            ),
             Commands::Promote {
                 commit,
                 to,

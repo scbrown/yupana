@@ -154,9 +154,14 @@ pub fn record_to(
         // corpus, and a denial nobody can compare against teaches nothing.
         // Local-only — the excerpt rides the spool line, never the signed
         // Turtle, so the drain promotes exactly what was signed.
-        let excerpt: Option<String> =
-            (!satisfied).then(|| evidence.chars().take(512).collect());
-        if append(path, &evaluation.id, target_ref, &turtle, excerpt.as_deref()) {
+        let excerpt: Option<String> = (!satisfied).then(|| evidence.chars().take(512).collect());
+        if append(
+            path,
+            &evaluation.id,
+            target_ref,
+            &turtle,
+            excerpt.as_deref(),
+        ) {
             written += 1;
         }
     }
