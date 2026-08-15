@@ -3,8 +3,9 @@
 //! `/context` pipeline (the Bobbin-integration surface: ranked entities with
 //! facts), quipu's `/project` personalized pagerank (the central entities
 //! around the item's ground), plain SPARQL for labels/outcomes/provenance,
-//! yupana's own structural graph, and — when a binary and index are present —
-//! Bobbin's `context` bundle itself.
+//! and yupana's own structural graph. Bobbin itself is deliberately NOT
+//! called from here — its own hooks inject semantic code context, and
+//! nesting them would inject the same context twice (see `crate::brief`).
 //!
 //! Split from [`crate::brief`] for file size: that module owns what a
 //! briefing SAYS; this one owns where each fact CAME FROM.
@@ -66,6 +67,9 @@ pub(crate) fn label_of(endpoint: &str, item: &str) -> Option<String> {
 /// Items co-occurring with `item` — sharing a touched entity through the
 /// commit-provenance chain (quipu shapes/provenance.ttl).
 pub(crate) fn related_items(endpoint: &str, item: &str) -> Vec<String> {
+    if ablated("provenance") {
+        return Vec::new();
+    }
     let id = sanitized(item);
     let query = format!(
         "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
@@ -117,6 +121,9 @@ pub(crate) fn similar_items(
     // most distinctive terms — because the store's fallback matcher is a
     // whole-substring CONTAINS, under which two items about the same thing
     // in different words never meet.
+    if ablated("context") {
+        return Vec::new();
+    }
     let mut entities: Vec<serde_json::Value> = Vec::new();
     let mut seen: Vec<String> = Vec::new();
     for probe in probes(query_text) {
@@ -174,6 +181,9 @@ pub(crate) fn similar_items(
 /// (longest, non-stopword-ish) terms.
 fn probes(query_text: &str) -> Vec<String> {
     let mut probes = vec![query_text.to_string()];
+    if ablated("term-probes") {
+        return probes;
+    }
     let mut terms: Vec<&str> = query_text
         .split(|c: char| !c.is_ascii_alphanumeric())
         .filter(|t| t.len() >= 5)
@@ -204,6 +214,9 @@ fn identity_of(endpoint: &str, iri: &str) -> Option<(String, Option<String>)> {
 /// graph's own answer to "what does this neighborhood hang off" — reused,
 /// not recomputed here.
 pub(crate) fn central_entities(endpoint: &str, item: &str) -> Vec<(String, f64)> {
+    if ablated("pagerank") {
+        return Vec::new();
+    }
     let seeds = ground_entity_iris(endpoint, item);
     if seeds.is_empty() {
         return Vec::new();
@@ -259,39 +272,16 @@ pub(crate) fn ground_of(root: &Path, paths: &[String]) -> Vec<GroundPath> {
         .collect()
 }
 
-/// Bobbin's semantic bundle for the item, when a `bobbin` binary and a
-/// `.bobbin` index are both present. Strictly best-effort and bounded: a
-/// missing, broken, or slow bobbin yields `None`, never a stalled session.
-pub(crate) fn bobbin_bundle(root: &Path, query: &str) -> Option<String> {
-    if !root.join(".bobbin").is_dir() {
-        return None;
-    }
-    let mut child = std::process::Command::new("bobbin")
-        .args(["context", query, "--content", "none", "--limit", "5"])
-        .current_dir(root)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok()?;
-    // A session-start hook must not hang on enrichment: poll up to ~3s, then
-    // kill. std::process has no built-in timeout, hence the loop.
-    for _ in 0..60 {
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => {
-                let mut text = String::new();
-                use std::io::Read;
-                child.stdout.take()?.read_to_string(&mut text).ok()?;
-                let text = text.trim();
-                return (!text.is_empty())
-                    .then(|| text.lines().take(20).collect::<Vec<_>>().join("\n"));
-            }
-            Ok(Some(_)) => return None,
-            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
-            Err(_) => return None,
-        }
-    }
-    let _ = child.kill();
-    None
+/// Whether `feature` is ablated via `$YUPANA_BRIEF_ABLATE` (comma-separated:
+/// `term-probes`, `context`, `provenance`, `pagerank`).
+///
+/// AN EVAL SURFACE, not a config: the F1/ablation harness
+/// (`scripts/e2e/eval_f1.py`) removes one retrieval source at a time to
+/// measure what each contributes. It rides an env var so the ablated run is
+/// the SHIPPED binary with a feature off — never a reimplementation of the
+/// retrieval in the eval script, which would measure the copy.
+fn ablated(feature: &str) -> bool {
+    std::env::var("YUPANA_BRIEF_ABLATE").is_ok_and(|v| v.split(',').any(|f| f.trim() == feature))
 }
 
 /// Gather the briefing for the current plate item, or `None` when no item is
@@ -335,7 +325,6 @@ pub fn gather(config: &YupanaConfig, root: &Path) -> Option<Brief> {
         central: central_entities(&endpoint, &item),
         rules: crate::brief::rules_in_force(&registry),
         posture: crate::brief::posture_line(config),
-        bobbin: bobbin_bundle(root, &query_text),
         item,
         label,
         cache_age,

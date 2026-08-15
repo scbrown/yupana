@@ -212,12 +212,15 @@ class Rig:
             bobbin_config(work_item_scope, declared_scope)
         )
 
-    def session_start(self, name: str, tenant: str, agent: str) -> dict:
+    def session_start(
+        self, name: str, tenant: str, agent: str, extra_env: dict | None = None
+    ) -> dict:
         """Invoke `yupana hook session-start` — the assignment-time briefing."""
         env = self.hook_env()
         env["BOBBIN_ROLE"] = tenant
         env["SHANTY_ROOT"] = str(self.work / "shanty")
         env["SHANTY_AGENT"] = agent
+        env.update(extra_env or {})
         payload = json.dumps({"session_id": f"{name}-{self.nonce}", "cwd": str(self.repo)})
         started = time.time()
         proc = subprocess.run(

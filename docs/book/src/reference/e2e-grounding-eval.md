@@ -66,3 +66,17 @@ aggregate edits/second, and the projection serving split:
 The split is the honest capacity signal: the guard degrades live → cached →
 fail-open by design, so "how many agents fit" has two answers — how many
 keep fully-live projections, and how many stay enforced at all.
+
+## The retrieval eval (`just e2e f1`)
+
+`scripts/e2e/eval_f1.py` scores the briefing's similar/related-item
+retrieval against a labeled corpus: two probe items, each with a
+relevance-judged cluster reachable through different mechanisms
+(whole-phrase match, distinctive-term probes, provenance co-occurrence)
+plus term-collision distractors that punish precision. It reports
+macro-averaged precision/recall/F1 per arm and runs an **ablation study**:
+each arm re-runs the shipped binary with one retrieval source removed via
+`$YUPANA_BRIEF_ABLATE` — feature removal against the real code path, never
+a reimplementation. The gate fails the run unless the full arm's macro-F1
+clears the threshold (default 0.85) and every ablation scores strictly
+below it, so each retrieval source has to measurably earn its place.

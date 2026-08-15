@@ -53,6 +53,13 @@ touched, with symbols and caller locality), the central entities around it
 **successful work gets reused**, related in-flight items, the governed rules
 in force, and the scope posture. Silent when no plate or no quipu seam.
 
+Division of labor with Bobbin: Bobbin's own hooks (`bobbin hook install` —
+`inject-context` on UserPromptSubmit, `session-context`/`prime-context` on
+SessionStart) own *semantic code* context; this briefing owns the
+*governance/work-item* context. Wire both side by side — the briefing
+deliberately does not nest a bobbin call, so the same context is never
+injected twice.
+
 ```json
 {
   "env": { "SHANTY_ROOT": "/gt", "SHANTY_AGENT": "polecat-3" },

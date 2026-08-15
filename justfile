@@ -62,8 +62,9 @@ install features="":
 # The grounding-integration eval and the shared-yupana concurrency bench,
 # against a LIVE quipu-server seeded with the camayoc policy pack (siblings
 # ../quipu and ../camayoc must be checked out). See docs "E2E Grounding Eval".
-#   just e2e run                     # the 8-scenario hallucination-prevention eval
+#   just e2e run                     # the hallucination-prevention + isolation eval
 #   just e2e bench "--levels 1,2,4,8,16,32 --edits 10"
+#   just e2e f1                      # briefing retrieval F1 + ablation study
 e2e cmd="run" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -73,7 +74,8 @@ e2e cmd="run" *args="":
     case "{{cmd}}" in
         run)   python3 scripts/e2e/harness.py {{args}} ;;
         bench) python3 scripts/e2e/bench.py {{args}} ;;
-        *)     echo "Unknown: {{cmd}}. Try: run bench"; exit 1 ;;
+        f1)    python3 scripts/e2e/eval_f1.py {{args}} ;;
+        *)     echo "Unknown: {{cmd}}. Try: run bench f1"; exit 1 ;;
     esac
 
 # === Documentation ===

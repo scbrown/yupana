@@ -224,11 +224,14 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "docs/book/src/concepts/promotion.md",
         "docs/yupana-spec.md",
         "scripts/delegate-boundary-guard.py",
-        // The e2e harness seeds a live quipu with work items and queries the
-        // verdicts back — both in the deployed ontology namespace, the same
-        // data contract as src/project_queries.rs.
+        // The e2e harness and the F1 eval seed a live quipu with work items
+        // and query them back — both in the deployed ontology namespace, the
+        // same data contract as src/project_queries.rs. The briefing sources
+        // carry it for the same reason (label/provenance/centrality SPARQL).
+        "scripts/e2e/eval_f1.py",
         "scripts/e2e/harness.py",
         "shapes/code-edges.ttl",
+        "src/brief_sources.rs",
         "shapes/fixtures/conforming.ttl",
         "shapes/fixtures/violating.ttl",
         "src/export.rs",

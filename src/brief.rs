@@ -14,7 +14,16 @@
 //! same adapter fed by hand (`echo '{}' | yupana hook session-start`).
 //! Sources live in [`crate::brief_sources`] — each one a reused surface of
 //! the suite (quipu `/context`, `/project` pagerank, SPARQL, the shared
-//! policy projection, bobbin's own `context` bundle), never a reimplementation.
+//! policy projection), never a reimplementation.
+//!
+//! DIVISION OF LABOR, so the suite's tools never duplicate each other:
+//! Bobbin's own hooks (`bobbin hook install`: `inject-context` on
+//! UserPromptSubmit, `session-context`/`prime-context` on SessionStart) own
+//! SEMANTIC CODE context — query-driven, embedding/index-backed. This
+//! briefing owns the GOVERNANCE/WORK-ITEM context — plate-driven,
+//! graph-backed. A deployment wires both hooks side by side; this module
+//! deliberately does not shell out to bobbin, because nesting one tool's
+//! injection inside another's would inject the same context twice.
 
 use crate::config::YupanaConfig;
 
@@ -45,8 +54,6 @@ pub struct Brief {
     pub posture: String,
     /// `Some(age)` when the projection was served from the durable cache.
     pub cache_age: Option<u64>,
-    /// Bobbin's semantic context bundle, when a bobbin binary + index exist.
-    pub bobbin: Option<String>,
 }
 
 /// One path of the observed ground, with its structural neighborhood.
@@ -221,11 +228,6 @@ pub fn render(brief: &Brief) -> String {
         for rule in &brief.rules {
             out.push_str(&format!("- {rule}\n"));
         }
-    }
-    if let Some(bobbin) = &brief.bobbin {
-        out.push_str(&format!(
-            "\nBobbin semantic context (best-effort):\n{bobbin}\n"
-        ));
     }
     out
 }
