@@ -57,6 +57,25 @@ install features="":
     fi
     echo "Installed: $(command -v yupana)"
 
+# === End-to-end (Quipu integration) ===
+
+# The grounding-integration eval and the shared-yupana concurrency bench,
+# against a LIVE quipu-server seeded with the camayoc policy pack (siblings
+# ../quipu and ../camayoc must be checked out). See docs "E2E Grounding Eval".
+#   just e2e run                     # the 8-scenario hallucination-prevention eval
+#   just e2e bench "--levels 1,2,4,8,16,32 --edits 10"
+e2e cmd="run" *args="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --release --features quipu,mcp --quiet
+    (cd ../quipu && cargo build --release --features shacl,onnx,server \
+        --bin quipu --bin quipu-server --quiet)
+    case "{{cmd}}" in
+        run)   python3 scripts/e2e/harness.py {{args}} ;;
+        bench) python3 scripts/e2e/bench.py {{args}} ;;
+        *)     echo "Unknown: {{cmd}}. Try: run bench"; exit 1 ;;
+    esac
+
 # === Documentation ===
 
 # Documentation management: just docs <cmd>
