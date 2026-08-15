@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Specification - Yupana — Live Code Structure</title>
+        <title>E2E Grounding Eval - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/design/specification.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/e2e-grounding-eval.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,39 +181,62 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="specification"><a class="header" href="#specification">Specification</a></h1>
-<p>The full PRD-style build specification lives at the repository root:</p>
+                        <h1 id="e2e-grounding-eval"><a class="header" href="#e2e-grounding-eval">E2E Grounding Eval</a></h1>
+<p><code>just e2e</code> stands up the real pair — a <code>quipu-server</code> on a freshly seeded
+store, and this repo's <code>yupana</code> pre-edit guard pointed at it — and proves
+the grounding-integrity loop end to end: governed policy projected from
+Quipu, hallucinated references rejected in the agent's loop at a declared
+tier, and every verdict returned to Quipu as a signed fact.</p>
+<p>It needs the sibling checkouts <code>../quipu</code> (the governed store) and
+<code>../camayoc</code> (the policy pack <code>shapes/policies/edit-grounding.ttl</code> that the
+harness loads). Both sides are built in release automatically.</p>
+<h2 id="the-eval-just-e2e-run"><a class="header" href="#the-eval-just-e2e-run">The eval (<code>just e2e run</code>)</a></h2>
+<p><code>scripts/e2e/harness.py</code> seeds the store with the camayoc pack, two
+<code>aegis:WorkItem</code> records, and yupana's registered verifier key, then drives
+the guard through eight scenarios. Each maps to an aspect of the grounding
+cluster disclosure:</p>
+<div class="table-wrapper"><table><thead><tr><th>scenario</th><th>proves</th></tr></thead><tbody>
+<tr><td>clean, cited edit</td><td>a bounded pass — the guard does not cry wolf</td></tr>
+<tr><td>hallucinated call</td><td>a reference that exists nowhere is denied, tier declared</td></tr>
+<tr><td>fabricated work-item citation</td><td>id-shaped but resolving to nothing is its own violation class</td></tr>
+<tr><td>uncited edit</td><td>the <code>must-ground</code> discipline denies untracked work</td></tr>
+<tr><td>freshness declared</td><td>a live projection says <code>verdict freshness: fresh</code></td></tr>
+<tr><td>quipu down, cache warm</td><td>last-known policy still enforced, cache age named</td></tr>
+<tr><td>quipu down, no cache</td><td>loud fail-open — never a silent allow</td></tr>
+<tr><td>verdict return</td><td>spooled verdicts land in quipu signed, with tier + freshness</td></tr>
+</tbody></table>
+</div>
+<p>Everything observable is captured under the workdir (default <code>target/e2e</code>):
+per-scenario guard stdout/stderr with <code>RUST_LOG=debug</code>, the metrics spool,
+the verdict spool, quipu's Prometheus <code>/metrics</code> snapshots, and a scored
+<code>report.md</code>/<code>report.json</code>. The run exits nonzero if any check fails.</p>
+<h2 id="the-bench-just-e2e-bench"><a class="header" href="#the-bench-just-e2e-bench">The bench (<code>just e2e bench</code>)</a></h2>
+<p><code>scripts/e2e/bench.py</code> answers the capacity question: how many concurrent
+agents can share one Yupana against one Quipu? Each simulated agent is what
+a deployment actually runs — a <code>yupana hook pre-edit</code> process per edit,
+every guard projecting policy live from the single quipu-server — under its
+own tenant id.</p>
+<p>The sweep reports, per concurrency level, guard latency (p50/p95/max),
+aggregate edits/second, and the projection serving split:</p>
 <ul>
-<li><strong><a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md"><code>docs/yupana-spec.md</code></a></strong></li>
+<li><strong>live</strong> — projected from quipu on this guard</li>
+<li><strong>cached</strong> — quipu could not answer in time; the durable cache enforced
+last-known policy and the verdict declared its age</li>
+<li><strong>fail-open</strong> — no servable projection; the edit went unguarded, loudly</li>
 </ul>
-<p>It covers the problem statement and the three-tool split, personas and user
-stories, functional and non-functional requirements, the technical architecture
-and proposed source layout, the code ontology and bitemporal promotion into
-Quipu, the MCP/HTTP/CLI surface, technology choices (pinned to Bobbin and
-Quipu), phasing, risks, and open questions.</p>
-<h2 id="phasing-at-a-glance"><a class="header" href="#phasing-at-a-glance">Phasing at a glance</a></h2>
-<ul>
-<li><strong>Phase 1 — Yupana, single-tenant.</strong> Tree-sitter structure + LSP facts served
-over MCP; Bobbin fuses them.</li>
-<li><strong>Phase 2 — Dataflow &amp; blast radius.</strong> CPG/dataflow; blast radius as a served
-capability and the incremental-update primitive.</li>
-<li><strong>Phase 3 — Multi-tenancy.</strong> Shared base + copy-on-write overlays,
-content-hash sharing, frontier-bounded incremental updates.</li>
-<li><strong>Phase 4 — Promote to Quipu.</strong> Code ontology, SHACL-validated bitemporal
-promotion, branches as named graphs.</li>
-<li><strong>Phase 5 — Consumption &amp; guardrails.</strong> Per-tenant blast radius into the
-broker trust boundary; monitor-guided edit verification.</li>
-</ul>
+<p>The split is the honest capacity signal: the guard degrades live → cached →
+fail-open by design, so "how many agents fit" has two answers — how many
+keep fully-live projections, and how many stay enforced at all.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../reference/e2e-grounding-eval.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/enforcement-trace.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../design/vision.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../design/specification.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -223,11 +246,11 @@ broker trust boundary; monitor-guided edit verification.</li>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../reference/e2e-grounding-eval.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/enforcement-trace.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../design/vision.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../design/specification.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
