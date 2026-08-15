@@ -288,12 +288,13 @@ class Rig:
 
     # -- server lifecycle ----------------------------------------------------
 
-    def start_server(self) -> None:
+    def start_server(self, extra_args: list | None = None) -> None:
         log_file = open(self.logs / "quipu-server.log", "a")
-        # cwd matters: quipu-server mints its signing identity (.quipu/) in
-        # its cwd, and that state belongs in the workdir, not this checkout.
+        # cwd matters twice: quipu-server mints its signing identity (.quipu/)
+        # in its cwd, and it reads `.bobbin/config.toml` from there — which is
+        # how the F1 eval stages an [embedding] block for the semantic arm.
         self.server = subprocess.Popen(
-            [self.quipu_server, "--db", str(self.db), "--bind", BIND],
+            [self.quipu_server, "--db", str(self.db), "--bind", BIND, *(extra_args or [])],
             stdout=log_file,
             stderr=subprocess.STDOUT,
             cwd=self.work,

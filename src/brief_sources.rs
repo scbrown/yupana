@@ -164,10 +164,16 @@ pub(crate) fn similar_items(
     if ablated("context") {
         return Vec::new();
     }
+    // Semantic first, because its availability decides the lexical strategy:
+    // term probes exist to compensate the store's whole-substring fallback
+    // matcher, and on a semantic store they retire — measured by the F1
+    // ablations, the collisions they admit there cost more than the recall
+    // they add (the same mid-band inseparability that rules out a veto).
+    let hits = semantic_hits(endpoint, query_text);
     let mut entities: Vec<serde_json::Value> = Vec::new();
     let mut order: Vec<String> = Vec::new();
     let mut votes: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-    for (index, probe) in probes(query_text).iter().enumerate() {
+    for (index, probe) in probes(query_text, hits.is_empty()).iter().enumerate() {
         let Some(response) = post(
             endpoint,
             "/context",
@@ -185,19 +191,46 @@ pub(crate) fn similar_items(
             }
         }
     }
+    // The semantic source supports (2 votes) the hits standing clearly at
+    // the top of ITS OWN ranking for this query — which is how it introduces
+    // the paraphrased sibling no lexical probe can see. Self is excluded
+    // from setting the scale, or every probe would be its own ceiling.
+    let mut semantic: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    if !hits.is_empty() {
+        let self_iri = item_iri(endpoint, item).unwrap_or_default();
+        let top = hits
+            .iter()
+            .filter(|(iri, _)| *iri != self_iri)
+            .map(|(_, score)| *score)
+            .fold(0.0_f64, f64::max);
+        if top >= SEMANTIC_MIN_TOP {
+            for (iri, score) in &hits {
+                if *iri != self_iri && *score >= top * SEMANTIC_BAND {
+                    *votes.entry(iri.clone()).or_insert(0) += 2;
+                    if !order.contains(iri) {
+                        order.push(iri.clone());
+                        entities.push(serde_json::json!({ "iri": iri }));
+                    }
+                }
+                semantic.insert(iri.clone(), *score);
+            }
+        }
+    }
     let mut similar: Vec<(u32, SimilarItem)> = Vec::new();
     for entity in &entities {
+        let iri = entity["iri"].as_str().unwrap_or_default();
         let is_work_item = entity["types"].as_array().is_some_and(|t| {
             t.iter().any(|v| {
                 v.as_str()
                     .is_some_and(|s| s.ends_with("WorkItem") || s.ends_with("Bead"))
             })
         });
-        if !is_work_item {
+        // Semantic-only candidates carry no type facts; `identity_of` is the
+        // filter there — nothing without a tracker id gets through.
+        if !is_work_item && !semantic.contains_key(iri) {
             continue;
         }
-        let iri = entity["iri"].as_str().unwrap_or_default();
-        let Some((id, outcome)) = identity_of(endpoint, iri) else {
+        let Some((id, outcome, label)) = identity_of(endpoint, iri) else {
             continue;
         };
         if id == item {
@@ -207,6 +240,7 @@ pub(crate) fn similar_items(
         if related.contains(&id) {
             vote += 2;
         }
+        let context_score = entity["score"].as_f64().unwrap_or(0.0);
         similar.push((
             vote,
             SimilarItem {
@@ -215,9 +249,9 @@ pub(crate) fn similar_items(
                     .map(|scope| scope.allow_paths)
                     .unwrap_or_default(),
                 id,
-                label: entity["label"].as_str().map(str::to_string),
+                label: entity["label"].as_str().map(str::to_string).or(label),
                 outcome,
-                score: entity["score"].as_f64().unwrap_or(0.0),
+                score: context_score.max(semantic.get(iri).copied().unwrap_or(0.0)),
             },
         ));
     }
@@ -237,11 +271,12 @@ pub(crate) fn similar_items(
     similar.into_iter().map(|(_, item)| item).collect()
 }
 
-/// The probe set for similarity: the full text, then its most distinctive
-/// (longest, non-stopword-ish) terms.
-fn probes(query_text: &str) -> Vec<String> {
+/// The probe set for similarity: the full text, then — only on a store with
+/// no semantic surface (`with_terms`) — its most distinctive (longest,
+/// non-stopword-ish) terms.
+fn probes(query_text: &str, with_terms: bool) -> Vec<String> {
     let mut probes = vec![query_text.to_string()];
-    if ablated("term-probes") {
+    if !with_terms || ablated("term-probes") {
         return probes;
     }
     let mut terms: Vec<&str> = query_text
@@ -254,19 +289,83 @@ fn probes(query_text: &str) -> Vec<String> {
     probes
 }
 
-/// An entity's tracker id and declared outcome, when it has them.
-fn identity_of(endpoint: &str, iri: &str) -> Option<(String, Option<String>)> {
+/// An entity's tracker id, declared outcome, and label, when it has them.
+/// The id requirement doubles as the work-item filter: commits, classes and
+/// code entities carry no `aegis:identifier` and resolve to `None`.
+fn identity_of(endpoint: &str, iri: &str) -> Option<(String, Option<String>, Option<String>)> {
     if iri.contains(['<', '>', '"', ' ']) {
         return None;
     }
     let query = format!(
         "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
-         SELECT ?id ?outcome WHERE {{ <{iri}> aegis:identifier ?id . \
-         OPTIONAL {{ <{iri}> aegis:outcome ?outcome }} }}"
+         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \
+         SELECT ?id ?outcome ?label WHERE {{ <{iri}> aegis:identifier ?id . \
+         OPTIONAL {{ <{iri}> aegis:outcome ?outcome }} \
+         OPTIONAL {{ <{iri}> rdfs:label ?label }} }}"
     );
     let body = crate::project::query(endpoint, &query).ok()?;
     let id = values(&body, "id").into_iter().next()?;
-    Some((id, values(&body, "outcome").into_iter().next()))
+    Some((
+        id,
+        values(&body, "outcome").into_iter().next(),
+        values(&body, "label").into_iter().next(),
+    ))
+}
+
+/// The semantic scale is QUERY-RELATIVE, not absolute: on quipu's `/search`
+/// surface (bare query label against entity text with type/provenance
+/// boilerplate) even self-similarity ranges ~0.2–0.75 per query, so a fixed
+/// cosine floor misfires both ways — measured on the eval corpus before this
+/// design. A hit SUPPORTS (2 votes) when it scores within
+/// [`SEMANTIC_BAND`] of the query's top non-self hit and that top clears
+/// [`SEMANTIC_MIN_TOP`] (below it, "nearest" is just the least-far noise).
+/// There is deliberately NO veto: mid-band true and false positives measure
+/// indistinguishably on this surface (0.35 vs 0.38), so a low semantic
+/// score is not evidence against a lexically-corroborated candidate.
+const SEMANTIC_MIN_TOP: f64 = 0.40;
+
+/// Support band: a hit within this fraction of the top non-self score.
+const SEMANTIC_BAND: f64 = 0.8;
+
+/// The probe item's own IRI, so self-similarity never sets the scale.
+fn item_iri(endpoint: &str, item: &str) -> Option<String> {
+    let query = format!(
+        "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
+         SELECT ?w WHERE {{ ?w aegis:identifier \"{}\" }}",
+        sanitized(item)
+    );
+    values(&crate::project::query(endpoint, &query).ok()?, "w")
+        .into_iter()
+        .next()
+}
+
+/// SEMANTIC neighbors of the query text, via quipu `/search` — the endpoint
+/// embeds the query server-side when the store has an embedding provider,
+/// and errors when it does not, which lands here as an empty list: the
+/// semantic source simply contributes no votes on a lexical-only store.
+fn semantic_hits(endpoint: &str, query_text: &str) -> Vec<(String, f64)> {
+    if ablated("semantic") {
+        return Vec::new();
+    }
+    let Some(response) = post(
+        endpoint,
+        "/search",
+        &serde_json::json!({ "query": query_text, "limit": 10 }),
+    ) else {
+        return Vec::new();
+    };
+    response["results"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|r| {
+            Some((
+                r["entity"].as_str()?.to_string(),
+                r["score"].as_f64().unwrap_or(0.0),
+            ))
+        })
+        .collect()
 }
 
 /// CENTRAL entities around the item's ground: quipu's personalized pagerank
@@ -333,7 +432,7 @@ pub(crate) fn ground_of(root: &Path, paths: &[String]) -> Vec<GroundPath> {
 }
 
 /// Whether `feature` is ablated via `$YUPANA_BRIEF_ABLATE` (comma-separated:
-/// `term-probes`, `context`, `provenance`, `pagerank`).
+/// `term-probes`, `context`, `provenance`, `pagerank`, `semantic`).
 ///
 /// AN EVAL SURFACE, not a config: the F1/ablation harness
 /// (`scripts/e2e/eval_f1.py`) removes one retrieval source at a time to

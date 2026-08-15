@@ -74,7 +74,23 @@ e2e cmd="run" *args="":
     case "{{cmd}}" in
         run)   python3 scripts/e2e/harness.py {{args}} ;;
         bench) python3 scripts/e2e/bench.py {{args}} ;;
-        f1)    python3 scripts/e2e/eval_f1.py {{args}} ;;
+        f1)
+            # Best-effort semantic-arm provisioning: the all-MiniLM-L6-v2 ONNX
+            # bundle from qdrant's mirror (HuggingFace's LFS CDN is
+            # proxy-blocked in some sandboxes) and the ONNX Runtime dylib from
+            # the onnxruntime PyPI wheel (quipu's ort is load-dynamic). The
+            # eval runs lexical-only without them, and says so.
+            if [ ! -f target/models/fast-all-MiniLM-L6-v2/model.onnx ]; then
+                mkdir -p target/models
+                curl -sSL --fail --max-time 300 \
+                    https://storage.googleapis.com/qdrant-fastembed/sentence-transformers-all-MiniLM-L6-v2.tar.gz \
+                    | tar xz -C target/models 2>/dev/null || true
+            fi
+            if [ ! -f target/models/libonnxruntime.so ]; then
+                pip download onnxruntime --no-deps -q -d target/models/.ortwheel 2>/dev/null || true
+                python3 scripts/e2e/extract_ort.py || true
+            fi
+            python3 scripts/e2e/eval_f1.py {{args}} ;;
         *)     echo "Unknown: {{cmd}}. Try: run bench f1"; exit 1 ;;
     esac
 
