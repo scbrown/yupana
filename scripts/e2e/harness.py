@@ -189,10 +189,13 @@ class Rig:
 
     def start_server(self) -> None:
         log_file = open(self.logs / "quipu-server.log", "a")
+        # cwd matters: quipu-server mints its signing identity (.quipu/) in
+        # its cwd, and that state belongs in the workdir, not this checkout.
         self.server = subprocess.Popen(
             [self.quipu_server, "--db", str(self.db), "--bind", BIND],
             stdout=log_file,
             stderr=subprocess.STDOUT,
+            cwd=self.work,
         )
         deadline = time.time() + 30
         while time.time() < deadline:
