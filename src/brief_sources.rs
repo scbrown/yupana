@@ -115,18 +115,25 @@ pub(crate) fn similar_items(
     item: &str,
     query_text: &str,
     scopes: Option<&crate::policy::WorkItemScopes>,
+    related: &[String],
 ) -> Vec<SimilarItem> {
-    // One probe per angle, merged: the full label (exact-phrasing hits, and
-    // the semantic path when the store has embeddings/FTS) plus the label's
-    // most distinctive terms — because the store's fallback matcher is a
-    // whole-substring CONTAINS, under which two items about the same thing
-    // in different words never meet.
+    // One probe per angle, then CORROBORATION: the full label (exact-phrasing
+    // hits, and the semantic path when the store has embeddings/FTS) plus the
+    // label's most distinctive terms — because the store's fallback matcher
+    // is a whole-substring CONTAINS, under which two items about the same
+    // thing in different words never meet. Sources then VOTE: a phrase hit
+    // counts 2, each term hit 1, a provenance co-occurrence 2 — and only
+    // items with >= 2 votes survive when anything does, because a single
+    // shared term ("boundary", "cache") is how a lexical distractor sneaks
+    // in wearing a similar item's score. Measured by `just e2e f1`: the
+    // threshold trades no recall for the precision the FPs were costing.
     if ablated("context") {
         return Vec::new();
     }
     let mut entities: Vec<serde_json::Value> = Vec::new();
-    let mut seen: Vec<String> = Vec::new();
-    for probe in probes(query_text) {
+    let mut order: Vec<String> = Vec::new();
+    let mut votes: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for (index, probe) in probes(query_text).iter().enumerate() {
         let Some(response) = post(
             endpoint,
             "/context",
@@ -134,15 +141,17 @@ pub(crate) fn similar_items(
         ) else {
             continue;
         };
+        let weight = if index == 0 { 2 } else { 1 };
         for entity in response["entities"].as_array().cloned().unwrap_or_default() {
             let iri = entity["iri"].as_str().unwrap_or_default().to_string();
-            if !seen.contains(&iri) {
-                seen.push(iri);
+            *votes.entry(iri.clone()).or_insert(0) += weight;
+            if !order.contains(&iri) {
+                order.push(iri);
                 entities.push(entity);
             }
         }
     }
-    let mut similar: Vec<SimilarItem> = Vec::new();
+    let mut similar: Vec<(u32, SimilarItem)> = Vec::new();
     for entity in &entities {
         let is_work_item = entity["types"].as_array().is_some_and(|t| {
             t.iter().any(|v| {
@@ -160,21 +169,38 @@ pub(crate) fn similar_items(
         if id == item {
             continue;
         }
-        similar.push(SimilarItem {
-            ground: scopes
-                .and_then(|s| s.scope_for(&id))
-                .map(|scope| scope.allow_paths)
-                .unwrap_or_default(),
-            id,
-            label: entity["label"].as_str().map(str::to_string),
-            outcome,
-            score: entity["score"].as_f64().unwrap_or(0.0),
-        });
-        if similar.len() >= 5 {
-            break;
+        let mut vote = votes.get(iri).copied().unwrap_or(0);
+        if related.contains(&id) {
+            vote += 2;
         }
+        similar.push((
+            vote,
+            SimilarItem {
+                ground: scopes
+                    .and_then(|s| s.scope_for(&id))
+                    .map(|scope| scope.allow_paths)
+                    .unwrap_or_default(),
+                id,
+                label: entity["label"].as_str().map(str::to_string),
+                outcome,
+                score: entity["score"].as_f64().unwrap_or(0.0),
+            },
+        ));
     }
-    similar
+    // The threshold prunes, never blanks: when nothing is corroborated, the
+    // single-vote candidates are still the best available answer.
+    if similar.iter().any(|(vote, _)| *vote >= 2) {
+        similar.retain(|(vote, _)| *vote >= 2);
+    }
+    similar.sort_by(|a, b| {
+        b.0.cmp(&a.0).then(
+            b.1.score
+                .partial_cmp(&a.1.score)
+                .unwrap_or(std::cmp::Ordering::Equal),
+        )
+    });
+    similar.truncate(5);
+    similar.into_iter().map(|(_, item)| item).collect()
 }
 
 /// The probe set for similarity: the full text, then its most distinctive
@@ -318,10 +344,17 @@ pub fn gather(config: &YupanaConfig, root: &Path) -> Option<Brief> {
     let label = label_of(&endpoint, &item);
     let query_text = label.clone().unwrap_or_else(|| item.clone());
 
+    let related = related_items(&endpoint, &item);
     Some(Brief {
         ground: ground_of(root, &paths),
-        related: related_items(&endpoint, &item),
-        similar: similar_items(&endpoint, &item, &query_text, registry.work_item_scopes()),
+        similar: similar_items(
+            &endpoint,
+            &item,
+            &query_text,
+            registry.work_item_scopes(),
+            &related,
+        ),
+        related,
         central: central_entities(&endpoint, &item),
         rules: crate::brief::rules_in_force(&registry),
         posture: crate::brief::posture_line(config),

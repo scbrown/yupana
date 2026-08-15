@@ -80,3 +80,12 @@ each arm re-runs the shipped binary with one retrieval source removed via
 a reimplementation. The gate fails the run unless the full arm's macro-F1
 clears the threshold (default 0.85) and every ablation scores strictly
 below it, so each retrieval source has to measurably earn its place.
+
+Retrieval is corroboration-scored: sources vote (phrase hit 2, each term
+hit 1, provenance co-occurrence 2) and single-vote candidates are pruned
+whenever anything better exists — a lone shared term is how a lexical
+distractor sneaks in. Measured effect: full-arm macro-F1 0.87 → 0.94.
+The residual false-positive class is the multi-term lexical collision,
+which only a semantic backend separates: configure quipu's embeddings
+(`[embedding] model_path`/`tokenizer_path`, `--embed-backfill`) and the
+same probes ride the vector path with no yupana changes.
