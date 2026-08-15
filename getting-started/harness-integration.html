@@ -222,6 +222,12 @@ touched, with symbols and caller locality), the central entities around it
 (quipu pagerank), semantically similar past items with their outcomes so
 <strong>successful work gets reused</strong>, related in-flight items, the governed rules
 in force, and the scope posture. Silent when no plate or no quipu seam.</p>
+<p>Division of labor with Bobbin: Bobbin's own hooks (<code>bobbin hook install</code> —
+<code>inject-context</code> on UserPromptSubmit, <code>session-context</code>/<code>prime-context</code> on
+SessionStart) own <em>semantic code</em> context; this briefing owns the
+<em>governance/work-item</em> context. Wire both side by side — the briefing
+deliberately does not nest a bobbin call, so the same context is never
+injected twice.</p>
 <pre><code class="language-json">{
   "env": { "SHANTY_ROOT": "/gt", "SHANTY_AGENT": "polecat-3" },
   "hooks": {
