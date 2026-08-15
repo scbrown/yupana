@@ -475,3 +475,53 @@ fn parse_response(raw: &str) -> (u16, Option<serde_json::Value>) {
     };
     (status, parsed)
 }
+
+#[tokio::test]
+async fn edit_drives_the_frontier_recompute_on_the_QUERYABLE_graph() {
+    // bobbin-bnq: `update_frontier_bounded` used to have one production caller
+    // — the watch path, over an inline registry no server held — so the
+    // recomputed overlay was unqueryable. This pins the wire: an edit fed to
+    // the DAEMON recomputes the frontier on the daemon's own registry, tracks
+    // the watch path's freshness transitions, and the same process serves the
+    // recomputed truth.
+    let dir = committed_repo(); // leaf.rs; mid.rs calls leaf
+    let engine = ResidentEngine::build(dir.path(), None).unwrap();
+
+    // Never edited: nothing to claim freshness about.
+    assert_eq!(engine.freshness_of("a", "leaf.rs"), None);
+
+    let port = spawn(engine.clone()).await;
+    let (code, reply) = post_json(
+        port,
+        "/edit",
+        &serde_json::json!({
+            "tenant": "a", "rel": "leaf.rs", "content": "fn leaf() {}\nfn leaf2() {}\n"
+        })
+        .to_string(),
+    )
+    .await;
+    assert_eq!(code, 200);
+    let reply = reply.unwrap();
+
+    // The frontier reached leaf's caller (`mid`) — the recompute ran, and on
+    // this engine's registry, not a watch-path registry nobody can query.
+    assert!(
+        reply["frontier"].as_u64().unwrap() >= 1,
+        "the edit's frontier must include leaf's caller: {reply}"
+    );
+
+    // The watch path's freshness discipline, on the edit path: the frontier is
+    // current once /edit answers.
+    assert_eq!(
+        engine.freshness_of("a", "leaf.rs"),
+        Some(crate::types::Freshness::Fresh),
+        "an answered edit's frontier is current"
+    );
+    // ... and per-tenant: tenant b never edited anything.
+    assert_eq!(engine.freshness_of("b", "leaf.rs"), None);
+
+    // The recomputed overlay is queryable in the same process (the whole
+    // point): tenant a sees its new symbol.
+    let refs = get_json(port, "/references?symbol=leaf2&tenant=a").await;
+    assert_eq!(refs["found"], true, "recomputed overlay must be queryable");
+}

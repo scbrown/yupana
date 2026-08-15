@@ -107,8 +107,16 @@ impl ResidentEngine {
 
     /// The FR-30 feed-and-advise cycle: record `source` as `tenant`'s truth
     /// for `rel`, then compute the post-edit advisory — which of the file's
-    /// symbols have callers OUTSIDE it — from the FRESH composed view. `None`
-    /// when the tenant layer is absent.
+    /// symbols have callers OUTSIDE it — from the FRESH composed view, and
+    /// drive the FR-16 frontier recompute over that same view. `None` when the
+    /// tenant layer is absent.
+    ///
+    /// The frontier half is the bobbin-bnq wire: `update_frontier_bounded` used
+    /// to have exactly one production caller — the watch path, over a registry
+    /// no server held — so the recomputed overlay was unqueryable. Here the
+    /// recompute runs on the daemon's own registry, the one the query
+    /// endpoints read, with the watch path's freshness discipline
+    /// (`Recomputing` from touch until the frontier is current, then `Fresh`).
     #[must_use]
     pub fn edit(&self, tenant: &str, rel: &str, source: &str) -> Option<EditReply> {
         let lock = self.registry()?;
@@ -116,6 +124,8 @@ impl ResidentEngine {
             let mut reg = lock.write().ok()?;
             reg.touch(tenant, rel, source);
         }
+        // Overlay facts are current from here; the frontier is not, yet.
+        self.set_freshness(tenant, rel, crate::types::Freshness::Recomputing);
         let reg = lock.read().ok()?;
         let view = reg.view(tenant);
         // Read the edited file's symbols from the COMPOSED view, not the
@@ -140,14 +150,30 @@ impl ResidentEngine {
         }
         advised.sort_by(|a, b| a.symbol.cmp(&b.symbol));
         advised.dedup();
-        Some(EditReply {
+        // FR-16: recompute the frontier of the edited file's symbols over the
+        // composed view — the one FR-12 BFS, bounded by the §14.2 fan-in guard
+        // — so the blast of this edit is current on the graph the daemon
+        // serves. `O(edited + frontier)`, inside the same read lock the
+        // advisory used.
+        let seeds: Vec<&str> = names.iter().map(String::as_str).collect();
+        let frontier = crate::graph::update_frontier_bounded(
+            &view,
+            &seeds,
+            self.frontier_hops(),
+            reg.tenancy().high_fanin_threshold,
+        );
+        let reply = EditReply {
             tenant: tenant.to_string(),
             file: rel.to_string(),
             symbols: names.len(),
             advised,
             files: files.into_iter().collect(),
+            frontier: frontier.len(),
             tier: graph_tier(),
-        })
+        };
+        // The frontier is current for this file now.
+        self.set_freshness(tenant, rel, crate::types::Freshness::Fresh);
+        Some(reply)
     }
 
     /// The tenant registry, when the root is a repo.

@@ -79,6 +79,14 @@ struct Engine {
     /// rather than reported as clean (see [`crate::state`]).
     #[cfg(feature = "game-state")]
     board: RwLock<crate::state::StateRegistry>,
+    /// Per-`(tenant, file)` code-fact freshness, tracked on the edit path the
+    /// way the watch path tracks it (`Recomputing` while the frontier is behind
+    /// the touch, `Fresh` once recomputed). This is the bobbin-bnq wire: the
+    /// FR-16 recompute and the serving surface finally meet in one process, so
+    /// the recomputed overlay is queryable and its freshness is a fact this
+    /// engine actually knows. Tracked, not yet stamped onto query DTOs — the
+    /// serve half is Phase 3 (FR-3).
+    freshness: std::sync::Mutex<std::collections::HashMap<(String, String), crate::types::Freshness>>,
 }
 
 impl ResidentEngine {
@@ -109,8 +117,37 @@ impl ResidentEngine {
                 registry,
                 #[cfg(feature = "game-state")]
                 board: RwLock::new(crate::state::StateRegistry::new()),
+                freshness: std::sync::Mutex::new(std::collections::HashMap::new()),
             }),
         })
+    }
+
+    /// The code-fact freshness of `rel` for `tenant`, or `None` if this engine
+    /// never absorbed an edit for it. The query half of the tracking the edit
+    /// path maintains — the FR-3 serve wiring reads from here at Phase 3.
+    #[must_use]
+    pub fn freshness_of(&self, tenant: &str, rel: &str) -> Option<crate::types::Freshness> {
+        self.inner
+            .freshness
+            .lock()
+            .ok()?
+            .get(&(tenant.to_string(), rel.to_string()))
+            .copied()
+    }
+
+    /// Record `rel`'s freshness for `tenant`. Fail-silent like the watch path's
+    /// tracker: a poisoned map loses a freshness note, never an edit.
+    pub(crate) fn set_freshness(&self, tenant: &str, rel: &str, f: crate::types::Freshness) {
+        if let Ok(mut map) = self.inner.freshness.lock() {
+            map.insert((tenant.to_string(), rel.to_string()), f);
+        }
+    }
+
+    /// The frontier hop budget for the edit path — the same `policy.max_hops`
+    /// the watch path's `OverlayRefresh` is built with.
+    #[must_use]
+    pub(crate) fn frontier_hops(&self) -> u32 {
+        self.inner.config.policy.max_hops
     }
 
     /// The FR-39 board layer, for the `/ingest`, `/guard` and `/whatif`

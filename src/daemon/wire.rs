@@ -93,6 +93,12 @@ pub struct EditReply {
     pub advised: Vec<AdvisedSymbol>,
     /// Distinct files those external callers live in.
     pub files: Vec<String>,
+    /// Symbols the FR-16 frontier recompute reached from this edit — evidence
+    /// the recompute ran on the graph this daemon serves, not a fact about the
+    /// edit itself. Defaulted so a reply from a daemon predating the field
+    /// still parses (as 0, honestly: that daemon recomputed nothing).
+    #[serde(default)]
+    pub frontier: usize,
     /// Provenance tier of these facts.
     pub tier: String,
 }

@@ -59,7 +59,7 @@ replies omit them rather than faking `fresh`.
 | `/symbols` | GET | `file` (root-relative), `tenant?` | that file's symbols, line order |
 | `/dataflow` | GET | `function`, `path?`, `var?`, `forward?`, `hops?` | intra-procedural data dependence |
 | `/measure` | POST | `{file, rel, anchors[], max_hops?}` | edit blast-radius sizing for the guard |
-| `/edit` | POST | `{tenant, rel, content?}` | FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view). Omitted `content` is read from disk, root-confined. |
+| `/edit` | POST | `{tenant, rel, content?}` | FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's `frontier` counts what it reached). Per-`(tenant, file)` code-fact freshness follows the watch path's discipline — `recomputing` from touch until the frontier is current, then `fresh` (tracked; served at Phase 3). Omitted `content` is read from disk, root-confined. |
 
 ## The tenant layer (yupana #2)
 
