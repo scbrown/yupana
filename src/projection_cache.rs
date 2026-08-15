@@ -75,6 +75,15 @@ pub struct CachedProjection {
     pub policies: Vec<ProjectedPolicy>,
     /// Last-known governed text rules (the aegis-mqnl catalogue).
     pub text_rules: Vec<TextRule>,
+    /// Last-known entity-grounded rules (bobbin-tvn). Defaulted so a cache
+    /// written before grounding existed still loads.
+    #[serde(default)]
+    pub grounded_rules: Vec<crate::grounding::GroundedRule>,
+    /// The work-item id set those rules ground against. Defaulted to `None`
+    /// for pre-grounding caches — the honest restore: that cache never held a
+    /// set, so grounded rules are unevaluated (loud), never empty-satisfied.
+    #[serde(default)]
+    pub grounding: Option<crate::grounding::GroundingSet>,
 }
 
 /// Why a cache could not be served. Every variant is a REASON, carried into the

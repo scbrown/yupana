@@ -373,6 +373,12 @@ pub(super) fn governed_check(
         structural_violations = violations;
     }
 
+    // --- GROUNDED plane: membership against the projected work-item set ------
+    let (grounded_messages, grounded_blocking, grounded_names) =
+        super::grounded_plane::grounded_check(&registry, &introduced);
+    messages.extend(grounded_messages);
+    any_blocking |= grounded_blocking;
+
     if messages.is_empty() {
         return None;
     }
@@ -381,7 +387,9 @@ pub(super) fn governed_check(
     // names live only inside composed messages today).
     let rule_names: Vec<serde_json::Value> = text_violations
         .iter()
-        .map(|v| serde_json::Value::from(v.rule.clone()))
+        .map(|v| v.rule.clone())
+        .chain(grounded_names.iter().cloned())
+        .map(serde_json::Value::from)
         .collect();
     crate::metrics::emit(
         "governed",
@@ -417,7 +425,11 @@ pub(super) fn governed_check(
         ],
     );
     let blocks = config.policy.mode == Mode::Enforce && any_blocking;
-    let message = rule_verdict_message_from(&messages.join("\n"), registry.freshness(), cache_age);
+    let message = super::grounded_plane::rule_verdict_message_from(
+        &messages.join("\n"),
+        registry.freshness(),
+        cache_age,
+    );
     // The same rule names the `governed` line already reports, carried onto the
     // `guard` line too (yupana #77). Without this a governed deny is the one deny
     // an operator has to JOIN two spool lines to attribute — and the join is by
@@ -438,7 +450,10 @@ pub(super) fn governed_check(
     // the tiers are not the same vocabulary and mapping one onto the other would
     // assert a placement nobody declared.
     let mut evaluations = evaluations_for(
-        text_violations.iter().map(|v| v.rule.as_str()),
+        text_violations
+            .iter()
+            .map(|v| v.rule.as_str())
+            .chain(grounded_names.iter().map(String::as_str)),
         response,
         |_| None,
     );
@@ -529,39 +544,4 @@ pub(super) fn text_plane(
         )),
     }
     (messages, any_blocking)
-}
-
-/// Attach the FR-3 freshness declaration to an already-joined verdict body.
-///
-/// `cache_age_secs` is `Some` when the policies came from the durable cache
-/// rather than a live projection, and the AGE is stated rather than merely
-/// implied by "STALE". A reader who is told a verdict is stale can only guess
-/// whether that means seconds or a week, and those are opposite decisions:
-/// seconds-old is a slow quipu and the verdict stands, week-old means a retired
-/// rule may still be firing. Naming the number is what makes this cache
-/// falsifiable from the outside (aegis-0upyu).
-#[cfg(feature = "quipu")]
-fn rule_verdict_message_from(
-    body: &str,
-    freshness: Freshness,
-    cache_age_secs: Option<u64>,
-) -> String {
-    let note = match (freshness, cache_age_secs) {
-        (_, Some(age)) => format!(
-            "verdict freshness: STALE — quipu could not be projected, so this \
-             verdict was computed against the last-known governed policy, \
-             cached {age}s ago. The rules were ENFORCED; what is unconfirmed is \
-             whether they are still the current ones"
-        ),
-        (Freshness::Fresh, None) => {
-            "verdict freshness: fresh (governed policy projected from quipu)".to_string()
-        }
-        (Freshness::Stale, None) => "verdict freshness: STALE — the projected policy registry could \
-             not be refreshed from quipu, so this verdict may not reflect the latest governed policy"
-            .to_string(),
-        (Freshness::Recomputing, None) => {
-            "verdict freshness: recomputing — the policy registry is mid-refresh".to_string()
-        }
-    };
-    format!("{body}\n({note})")
 }

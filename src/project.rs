@@ -22,6 +22,7 @@ use crate::textrules::TextRule;
 use crate::types::Freshness;
 
 pub use crate::project_decode::{decode_policies, decode_text_rules};
+pub use crate::project_exposure::{fetch_repo_exposure, RepoExposure};
 pub use crate::project_queries::{EXPOSURE_POLICY_IRI, POLICY_QUERY, TEXT_POLICY_QUERY};
 
 /// A policy projected from quipu: the [`Rule`] Yupana evaluates, plus the governed
@@ -66,10 +67,10 @@ pub fn fetch_text_rules(endpoint: &str) -> Result<Vec<TextRule>> {
 /// round-trip and keeps the worst case (two queries + one exposure check)
 /// inside the harness's kill window — past it, the projection fails OPEN,
 /// loudly, like every other gap on this path.
-const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+pub(crate) const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// POST a SPARQL query to quipu's `/query`, returning the raw body.
-fn query(endpoint: &str, sparql: &str) -> Result<String> {
+pub(crate) fn query(endpoint: &str, sparql: &str) -> Result<String> {
     let url = format!("{}/query", endpoint.trim_end_matches('/'));
     let body = serde_json::json!({ "query": sparql }).to_string();
     let resp = ureq::post(&url)
@@ -80,62 +81,6 @@ fn query(endpoint: &str, sparql: &str) -> Result<String> {
         .map_err(|e| Error::Projection(format!("POST {url} failed: {e}")))?;
     resp.into_string()
         .map_err(|e| Error::Projection(format!("could not read /query response: {e}")))
-}
-
-/// How exposed is the repo an edit lands in? Three-valued BY DESIGN (the
-/// mqnl seam): collapsing "not in the graph" into either answer is the bug.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RepoExposure {
-    /// The graph says this repo has a public remote: block-tier rules block.
-    Public,
-    /// The graph knows this repo and it has no public remote: block-tier
-    /// rules DOWNGRADE to warnings — the token is not leaking anywhere, but
-    /// saying so keeps the habit honest.
-    Internal,
-    /// The graph does not know this repo (or could not be asked). Warn AND SAY
-    /// SO — never block on a guess, never stay silent on ignorance. Carries
-    /// the reason so the verdict can explain itself.
-    Unknown(String),
-}
-
-/// Ask quipu whether `repo` (by label) is public, via the governed policy's
-/// own `/policy/check` — the same signed-verdict seam every other consumer of
-/// rule #1 uses, so yupana and the pre-push gate can never disagree about what
-/// "public" means. NEVER errors: any failure IS the `Unknown` answer, with the
-/// reason carried.
-///
-/// `outcome` mapping (quipu's three-valued contract):
-///   satisfied   -> the repo has a public remote        -> Public
-///   unsatisfied -> known repo, no public remote        -> Internal
-///   unknown     -> the evidence probe found no repo    -> Unknown
-pub fn fetch_repo_exposure(endpoint: &str, repo: &str) -> RepoExposure {
-    let url = format!("{}/policy/check", endpoint.trim_end_matches('/'));
-    let target = format!("http://aegis.gastown.local/ontology/repo_{repo}");
-    let body = serde_json::json!({ "policy": EXPOSURE_POLICY_IRI, "target": target }).to_string();
-    let resp = match ureq::post(&url)
-        .timeout(HTTP_TIMEOUT)
-        .set("Content-Type", "application/json")
-        .send_string(&body)
-    {
-        Ok(r) => r,
-        Err(e) => return RepoExposure::Unknown(format!("POST {url} failed: {e}")),
-    };
-    let text = match resp.into_string() {
-        Ok(t) => t,
-        Err(e) => return RepoExposure::Unknown(format!("unreadable /policy/check reply: {e}")),
-    };
-    let value: serde_json::Value = match serde_json::from_str(&text) {
-        Ok(v) => v,
-        Err(e) => return RepoExposure::Unknown(format!("/policy/check reply is not JSON: {e}")),
-    };
-    match value.get("outcome").and_then(|o| o.as_str()) {
-        Some("satisfied") => RepoExposure::Public,
-        Some("unsatisfied") => RepoExposure::Internal,
-        Some("unknown") | None => RepoExposure::Unknown(format!(
-            "repo `{repo}` is not in the graph (no `repo_{repo}` entity with remote facts)"
-        )),
-        Some(other) => RepoExposure::Unknown(format!("unrecognised outcome `{other}`")),
-    }
 }
 
 /// A violation of a projected policy: the model-facing message plus whether the
@@ -267,6 +212,13 @@ pub struct ProjectionRegistry {
     policies: Vec<ProjectedPolicy>,
     /// Last-known governed text rules (aegis-mqnl catalogue).
     text_rules: Vec<TextRule>,
+    /// Last-known entity-grounded rules (bobbin-tvn; see [`crate::grounding`]).
+    pub(crate) grounded_rules: Vec<crate::grounding::GroundedRule>,
+    /// The projected work-item id set the grounded rules evaluate against.
+    /// `None` when the grounding projection is missing or failed — which
+    /// renders every grounded rule UNEVALUATED (loud), never satisfied-by-
+    /// empty-set. A `Some` empty set is a real answer ("no work items").
+    pub(crate) grounding: Option<crate::grounding::GroundingSet>,
     /// Whether the projected sets reflect a successful, current sync.
     freshness: Freshness,
 }
@@ -304,6 +256,8 @@ impl ProjectionRegistry {
             endpoint: endpoint.to_string(),
             policies: Vec::new(),
             text_rules: Vec::new(),
+            grounded_rules: Vec::new(),
+            grounding: None,
             freshness: Freshness::Stale,
         }
     }
@@ -341,8 +295,9 @@ impl ProjectionRegistry {
         match (
             fetch_policies(&self.endpoint),
             fetch_text_rules(&self.endpoint),
+            crate::project_grounding::fetch_grounded_rules(&self.endpoint),
         ) {
-            (Ok(policies), Ok(text_rules)) => {
+            (Ok(policies), Ok(text_rules), Ok(grounded_rules)) => {
                 // I6, at the seam where both halves are known at once: what the
                 // catalog CLAIMS about its hosting layer, against the layer that
                 // will actually evaluate it. Once per refresh rather than per
@@ -351,10 +306,19 @@ impl ProjectionRegistry {
                 report_overclaims(&policies);
                 self.policies = policies;
                 self.text_rules = text_rules;
+                self.grounded_rules = grounded_rules;
+                // The grounding SET is fetched apart from the catalogues: its
+                // failure must not disable the whole guard, and a grounded rule
+                // without its set is UNEVALUATED (loud) at the seam, never
+                // satisfied by an empty set (bobbin-tvn).
+                self.grounding = crate::project_grounding::fetch_grounding_set(
+                    &self.endpoint,
+                    &self.grounded_rules,
+                );
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
-            (Err(e), _) | (_, Err(e)) => {
+            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => {
                 self.freshness = Freshness::Stale;
                 Err(e)
             }
@@ -403,6 +367,8 @@ impl ProjectionRegistry {
                             endpoint: self.endpoint.clone(),
                             policies: self.policies.clone(),
                             text_rules: self.text_rules.clone(),
+                            grounded_rules: self.grounded_rules.clone(),
+                            grounding: self.grounding.clone(),
                         },
                     );
                 }
@@ -422,6 +388,11 @@ impl ProjectionRegistry {
                 let age_secs = cached.age_secs(now);
                 self.policies = cached.policies;
                 self.text_rules = cached.text_rules;
+                self.grounded_rules = cached.grounded_rules;
+                // A cache written before grounding existed restores `None`,
+                // which is the honest answer: that cache never held a set, so
+                // grounded rules are unevaluated (loud), not empty-satisfied.
+                self.grounding = cached.grounding;
                 // STALE, never Fresh. The policies are real and worth
                 // enforcing; the claim that they are current is not ours to
                 // make, and every verdict computed against them says so.

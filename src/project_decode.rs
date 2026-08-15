@@ -292,3 +292,61 @@ pub fn decode_policies(sparql_json: &str) -> Result<Vec<ProjectedPolicy>> {
     }
     Ok(out)
 }
+
+/// Decode the entity-grounded rule catalogue (bobbin-tvn) from
+/// `application/sparql-results+json`.
+pub fn decode_grounded_rules(sparql_json: &str) -> Result<Vec<crate::grounding::GroundedRule>> {
+    let value: serde_json::Value = serde_json::from_str(sparql_json)
+        .map_err(|e| Error::Projection(format!("results are not JSON: {e}")))?;
+    let bindings = rows_of(&value)?;
+
+    let mut out = Vec::with_capacity(bindings.len());
+    for (i, binding) in bindings.iter().enumerate() {
+        let get = |key: &str| -> Option<String> { binding_value(binding, key) };
+        let match_type = match get("matchType").as_deref() {
+            Some("must-ground") => crate::grounding::GroundMatch::MustGround,
+            Some("must-not-ground") => crate::grounding::GroundMatch::MustNotGround,
+            other => {
+                // A grounded decision this build cannot interpret is a
+                // projection error, surfaced loudly — never a silent skip.
+                return Err(Error::Projection(format!(
+                    "grounded-rule row {i}: unknown matchType {other:?}"
+                )));
+            }
+        };
+        let tier = match get("tier").as_deref() {
+            Some("block") => crate::textrules::TextTier::Block,
+            // Undeclared severity advises — the conservative direction in the
+            // blocking sense: nothing hard-denies without an explicit tier.
+            None | Some("warn") => crate::textrules::TextTier::Warn,
+            Some(other) => {
+                return Err(Error::Projection(format!(
+                    "grounded-rule row {i}: unknown enforcementTier `{other}`"
+                )));
+            }
+        };
+        let iri = get("pred").ok_or_else(|| {
+            Error::Projection(format!("grounded-rule row {i}: missing binding `pred`"))
+        })?;
+        let name = get("name")
+            .unwrap_or_else(|| iri.rsplit('/').next().unwrap_or(&iri).to_string());
+        out.push(crate::grounding::GroundedRule {
+            name,
+            label: get("label"),
+            match_type,
+            tier,
+            rationale: get("rationale"),
+        });
+    }
+    Ok(out)
+}
+
+/// Decode the projected work-item id set (the grounding query's rows).
+pub fn decode_grounding_ids(sparql_json: &str) -> Result<Vec<String>> {
+    let value: serde_json::Value = serde_json::from_str(sparql_json)
+        .map_err(|e| Error::Projection(format!("results are not JSON: {e}")))?;
+    Ok(rows_of(&value)?
+        .iter()
+        .filter_map(|b| binding_value(b, "id"))
+        .collect())
+}

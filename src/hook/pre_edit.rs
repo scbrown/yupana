@@ -436,6 +436,9 @@ fn blast_reply(
     }
 }
 
+#[cfg(feature = "quipu")]
+#[path = "grounded_plane.rs"]
+mod grounded_plane;
 #[path = "rule_planes.rs"]
 mod rule_planes;
 #[path = "verify_arm.rs"]

@@ -92,3 +92,29 @@ SELECT ?s ?label ?regex ?class ?tier ?exempt ?rationale WHERE {
 /// the `aegis:` prefix in the queries above: one namespace, one policy plane.
 pub const EXPOSURE_POLICY_IRI: &str =
     "http://aegis.gastown.local/ontology/policy_no-internal-ids-in-public-repos";
+
+/// The SPARQL SELECT that pulls the entity-grounded predicate catalogue
+/// (bobbin-tvn; quipu semantic-grounded-edit-policies Design A). A predicate
+/// qualifies by declaring `aegis:candidateSource "token"` — rev 2's no-regex
+/// contract: candidates are the tokens of the introduced text, truth is
+/// membership against the grounding query's projected id set.
+pub const GROUNDED_POLICY_QUERY: &str = "\
+PREFIX aegis: <http://aegis.gastown.local/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?pred ?name ?label ?matchType ?tier ?rationale WHERE {
+  ?pred a aegis:Predicate ;
+        aegis:candidateSource \"token\" ;
+        aegis:groundingQuery ?groundingQuery ;
+        aegis:matchType ?matchType .
+  OPTIONAL { ?pred aegis:name ?name }
+  OPTIONAL { ?pred rdfs:label ?label }
+  OPTIONAL { ?pred aegis:enforcementTier ?tier }
+  OPTIONAL { ?pred rdfs:comment ?rationale }
+}";
+
+/// The grounding query itself — the authoritative work-item id set, projected
+/// into the hot plane at refresh time so evaluation is O(1) membership per
+/// token, never SPARQL per keystroke.
+pub const GROUNDING_SET_QUERY: &str = "\
+PREFIX aegis: <http://aegis.gastown.local/ontology/>
+SELECT ?id WHERE { ?w a aegis:WorkItem ; aegis:identifier ?id }";

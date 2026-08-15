@@ -993,3 +993,60 @@ fn verify_arm_fails_open_on_an_unmatched_edit_anchor() {
     .to_string();
     assert_eq!(guard(&payload, dir.path(), None, None), Outcome::Allow);
 }
+
+// ---- The grounded plane (bobbin-tvn) ----------------------------------------
+
+#[cfg(feature = "quipu")]
+mod grounded_plane_seam {
+    use super::super::grounded_plane::grounded_check;
+    use crate::grounding::{GroundMatch, GroundedRule, GroundingSet};
+    use crate::project::ProjectionRegistry;
+    use crate::textrules::TextTier;
+
+    fn registry(set: Option<GroundingSet>) -> ProjectionRegistry {
+        let mut reg = ProjectionRegistry::new("http://127.0.0.1:1");
+        reg.set_grounding(
+            vec![GroundedRule {
+                name: "no-ticket-in-comment".to_string(),
+                label: None,
+                match_type: GroundMatch::MustNotGround,
+                tier: TextTier::Block,
+                rationale: None,
+            }],
+            set,
+        );
+        reg
+    }
+
+    #[test]
+    fn a_grounded_id_produces_a_blocking_violation_by_name() {
+        let set = GroundingSet::new(["bobbin-bnq".to_string()]);
+        let (messages, blocking, names) =
+            grounded_check(&registry(Some(set)), "// see bobbin-bnq");
+        assert!(blocking, "a Block-tier grounded violation blocks");
+        assert_eq!(names, ["no-ticket-in-comment"]);
+        assert!(messages[0].contains("bobbin-bnq"), "{messages:?}");
+    }
+
+    #[test]
+    fn a_missing_set_is_a_LOUD_unevaluated_notice_never_a_silent_pass() {
+        let (messages, blocking, names) =
+            grounded_check(&registry(None), "// see bobbin-bnq");
+        assert!(!blocking, "an unevaluated rule must not block");
+        assert!(names.is_empty(), "no violation was evaluated");
+        assert_eq!(messages.len(), 1);
+        assert!(
+            messages[0].contains("NOT EVALUATED")
+                && messages[0].contains("no-ticket-in-comment"),
+            "{messages:?}"
+        );
+    }
+
+    #[test]
+    fn no_grounded_rules_means_the_plane_is_silent() {
+        let mut reg = ProjectionRegistry::new("http://127.0.0.1:1");
+        reg.set_grounding(Vec::new(), None);
+        let (messages, blocking, names) = grounded_check(&reg, "// see bobbin-bnq");
+        assert!(messages.is_empty() && !blocking && names.is_empty());
+    }
+}

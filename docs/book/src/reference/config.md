@@ -161,6 +161,16 @@ evaluates them like any rule — a governed `deny` policy blocks under
 whether the projection was fresh. Yupana never defines a governed policy — it only
 projects quipu's. See the design note "Policy edit hooks — the yupana side".
 
+The same projection also carries quipu's **entity-grounded rules** (the
+semantic-grounded-edit-policies design): the authoritative work-item id set is
+projected into the hot plane alongside the rules, and the tokens of the
+introduced text are checked by O(1) membership — no regex. Evaluation is
+three-outcome: **grounded** (the token names a real work item),
+**unresolvable** (id-shaped but resolves to nothing — a fabricated reference,
+its own violation class), or no candidate. A missing grounding projection
+renders those rules *unevaluated, loudly* — never "empty set, nothing grounds,
+allow".
+
 **`endpoint` is a READ capability, not a write one.** It is what the guard fetches
 the rule catalogue from, and that is all it grants: `yupana promote` will not write
 to a merely-configured endpoint, because setting this key deployment-wide is how

@@ -28,6 +28,7 @@ pub mod export;
 pub mod extract;
 pub mod git;
 pub mod graph;
+pub mod grounding;
 pub mod hook;
 pub mod hosting;
 #[cfg(feature = "mcp")]
@@ -43,6 +44,13 @@ pub mod project;
 /// a `--features` matrix starts lying about what a binary can do.
 #[cfg(feature = "quipu")]
 pub mod project_decode;
+/// Repo-exposure resolution, split from `project` for size and gated with it.
+#[cfg(feature = "quipu")]
+pub mod project_exposure;
+/// Grounding projection (bobbin-tvn), split from `project` for size and gated
+/// with it.
+#[cfg(feature = "quipu")]
+pub mod project_grounding;
 pub mod project_queries;
 /// The DURABLE half of the projection cache — what lets a projection failure
 /// degrade to stale-but-enforcing instead of to unguarded (aegis-0upyu).
