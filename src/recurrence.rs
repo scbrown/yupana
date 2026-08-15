@@ -70,10 +70,24 @@ pub fn embed(text: &str) -> Vec<f32> {
 }
 
 /// One denied edit read back from the spool tail.
-struct Denial {
-    policy: String,
-    target: String,
-    excerpt: String,
+pub struct Denial {
+    /// The policy that denied it.
+    pub policy: String,
+    /// What it was evaluated against.
+    pub target: String,
+    /// The judged text, as spooled.
+    pub excerpt: String,
+}
+
+/// The NEWEST spooled denial (optionally under one policy) — the exemplar
+/// `yupana exemplar --spool` points at (bobbin-9k3).
+#[must_use]
+pub fn latest_denial(spool: &Path, policy: Option<&str>) -> Option<Denial> {
+    read_denials(spool)?
+        .0
+        .into_iter()
+        .filter(|d| policy.is_none_or(|p| d.policy == p))
+        .next_back()
 }
 
 /// The stage-1 advisory for `introduced`, or `None` when no prior denial is

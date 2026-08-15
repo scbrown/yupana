@@ -343,3 +343,46 @@ impl Cli {
         Ok(None)
     }
 }
+
+impl super::Cli {
+    /// `yupana exemplar` — draft policy raw material from an observed instance
+    /// (bobbin-9k3). Always JSON: the output is a machine feed for quipu's
+    /// drafting scaffold, not a report.
+    pub(super) fn exemplar(
+        &self,
+        text: Option<&str>,
+        file: Option<&Path>,
+        spool: Option<&Path>,
+        policy: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let (offending, file) = match (text, spool) {
+            (Some(text), _) => (text.to_string(), file.map(Path::to_path_buf)),
+            (None, Some(spool)) => {
+                let denial = crate::recurrence::latest_denial(spool, policy).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "no spooled denial{} in {} — nothing to draft from",
+                        policy.map(|p| format!(" under `{p}`")).unwrap_or_default(),
+                        spool.display()
+                    )
+                })?;
+                // The spooled target is the Selector context unless overridden.
+                let target = file
+                    .map(Path::to_path_buf)
+                    .or_else(|| Some(std::path::PathBuf::from(denial.target)));
+                (denial.excerpt, target)
+            }
+            (None, None) => anyhow::bail!("give the offending TEXT, or --spool to read a denial"),
+        };
+        // The Selector needs the file's source and grammar; both are optional
+        // and their absence is honest (the text-tier candidates still stand).
+        let source = file.as_deref().and_then(|f| std::fs::read_to_string(f).ok());
+        let language = file
+            .as_deref()
+            .and_then(|f| f.extension())
+            .and_then(std::ffi::OsStr::to_str)
+            .and_then(crate::extract::language_for_extension);
+        let draft = crate::exemplar::extract(&offending, source.as_deref(), language);
+        println!("{}", serde_json::to_string_pretty(&draft)?);
+        Ok(())
+    }
+}

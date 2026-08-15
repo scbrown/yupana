@@ -351,3 +351,23 @@ over the hot graph.
 
 Commands marked with a phase print a notice until their engine lands; see the
 [Specification](../design/specification.md) §12.
+
+## `yupana exemplar`
+
+Drafts the raw material of a governed policy from an observed instance —
+policy-by-example, yupana's half. Point it at the offending text (with the file
+it appeared in, so the Selector can name the structural context), or at a
+verdict spool to read the newest denial:
+
+```console
+$ yupana exemplar "ABC-123" --file src/a.rs
+$ yupana exemplar --spool ~/.local/state/yupana/verdicts.jsonl --policy no-ticket-in-comment
+```
+
+The output is JSON for quipu's drafting scaffold: a Selector draft (the
+enclosing node kind as a tree-sitter query) and predicate candidates at each
+viable tier — the exact token(s) for membership (the only hard-capable tier),
+a generated narrowing pattern **offered for human approval**, and the
+exemplar's embedding as a similarity anchor with a suggested threshold that
+quipu's backtest replaces. Nothing emitted is a policy; quipu's
+definition-time placement check remains the refusal authority.

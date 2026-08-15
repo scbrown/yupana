@@ -124,3 +124,33 @@ fn f() {}
         assert!(captures.is_empty());
     }
 }
+
+/// The kind of the smallest NAMED node whose span contains the first
+/// occurrence of `needle` in `source` — the structural context an offending
+/// text lived in (`line_comment`, `string_literal`, `identifier`, …), which is
+/// what an exemplar-drafted Selector matches on (bobbin-9k3).
+///
+/// `Ok(None)` when `needle` does not occur in `source`; errors mirror
+/// [`run_query`]'s: unsupported language or unparseable source.
+pub fn enclosing_node_kind(
+    source: &str,
+    language: &str,
+    needle: &str,
+) -> Result<Option<String>> {
+    let spec =
+        grammar_spec(language).ok_or_else(|| Error::UnsupportedLanguage(language.to_string()))?;
+    let mut parser = Parser::new();
+    parser
+        .set_language(&(spec.language)())
+        .map_err(|e| Error::Parse(e.to_string()))?;
+    let tree = parser
+        .parse(source, None)
+        .ok_or_else(|| Error::Parse("tree-sitter produced no tree".to_string()))?;
+    let Some(start) = source.find(needle) else {
+        return Ok(None);
+    };
+    Ok(tree
+        .root_node()
+        .named_descendant_for_byte_range(start, start + needle.len())
+        .map(|node| node.kind().to_string()))
+}

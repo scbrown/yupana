@@ -195,6 +195,7 @@ fn guard_recorded(
     // prior DENIAL as advisory context, riding BEFORE a refusal's own text so
     // the refusal arrives explained, or alone as a notice on an allow.
     // Similarity never denies. Gated with the guard: Mode::Off stays silent.
+    #[cfg(feature = "quipu")]
     if config.as_ref().is_some_and(|c| c.policy.mode != Mode::Off) {
         if let (Some(spool), Some(introduced)) = (
             pre_edit_util::recurrence_spool(),

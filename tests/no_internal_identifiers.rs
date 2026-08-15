@@ -228,7 +228,7 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "shapes/fixtures/conforming.ttl",
         "shapes/fixtures/violating.ttl",
         "src/export.rs",
-        "src/project.rs",
+        "src/project_exposure.rs",
         "src/project_queries.rs",
         "src/promote_test.rs",
         "src/verdict.rs",

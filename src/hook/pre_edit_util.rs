@@ -61,6 +61,7 @@ pub(super) fn fail_open(input: &HookInput, kind: &str, reason: &str) -> Outcome 
 /// arrives explained; on an allow it surfaces alone as a notice. Similarity
 /// never denies — this function can turn an Allow into a Notify and nothing
 /// stronger. Returns whether an advisory was attached.
+#[cfg_attr(not(feature = "quipu"), allow(dead_code))] // caller is quipu-gated; tests are not
 pub(super) fn apply_recurrence(outcome: &mut Outcome, spool: &Path, introduced: &str) -> bool {
     let Some(advisory) = crate::recurrence::advisory(spool, introduced) else {
         return false;
@@ -75,6 +76,9 @@ pub(super) fn apply_recurrence(outcome: &mut Outcome, spool: &Path, introduced: 
 
 /// The spool the recurrence corpus is read from — the same resolution the
 /// verdict writer uses, so the advisory reads exactly what denials wrote.
+/// Gated with the writer: without the `quipu` feature no denial is ever
+/// spooled, so there is no corpus to read.
+#[cfg(feature = "quipu")]
 pub(super) fn recurrence_spool() -> Option<PathBuf> {
     crate::verdict_spool::resolve_path(
         std::env::var("YUPANA_VERDICT_PATH").ok().as_deref(),

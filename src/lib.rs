@@ -24,6 +24,7 @@ pub mod daemon;
 pub mod dataflow;
 pub mod docref;
 pub mod errors;
+pub mod exemplar;
 pub mod export;
 pub mod extract;
 pub mod git;

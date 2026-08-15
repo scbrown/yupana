@@ -22,6 +22,9 @@ use crate::extract::extract_symbols;
 // limit (yupana #83); they are `impl Cli` blocks reaching `self` as before.
 #[path = "cli_analyze.rs"]
 mod cli_analyze;
+#[path = "cli_use.rs"]
+mod cli_use;
+use cli_use::deliberate_use_name;
 #[path = "cli_promote.rs"]
 mod cli_promote;
 #[path = "cli_serve.rs"]
@@ -208,6 +211,23 @@ enum Commands {
         #[arg(long)]
         buffer: PathBuf,
     },
+    /// Draft policy raw material from an exemplar: Selector + tiered
+    /// predicate candidates (policy-by-example, step 2). Output is JSON for
+    /// quipu's drafting scaffold; the placement check remains the refusal
+    /// authority.
+    Exemplar {
+        /// The offending text, verbatim. Omit to read a spooled denial.
+        text: Option<String>,
+        /// The file the text appeared in — names the Selector's context.
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Verdict-spool path to read the newest denial from instead of TEXT.
+        #[arg(long)]
+        spool: Option<PathBuf>,
+        /// With --spool: pick the newest denial under this predicate id.
+        #[arg(long)]
+        policy: Option<String>,
+    },
     /// Promote a commit's structural facts into Quipu (Phase 4).
     Promote {
         /// Commit-ish to promote.
@@ -302,36 +322,6 @@ enum HookEvent {
 enum ExportFormat {
     /// RDF Turtle in the `bobbin:` code ontology.
     Turtle,
-}
-
-/// The metric name for a DELIBERATELY-invoked command, or None for the two
-/// invocations that are not "use": the hook (the guard spools its own line)
-/// and shell completions. Exhaustive on purpose — a new command must decide
-/// its own answer here or fail to compile, so the leverage metric can never
-/// silently under-count a surface that grew.
-fn deliberate_use_name(cmd: &Commands) -> Option<&'static str> {
-    Some(match cmd {
-        Commands::Hook { .. } | Commands::Completions { .. } => return None,
-        Commands::Serve { .. } => "serve",
-        Commands::Daemon { .. } => "daemon",
-        Commands::Analyze { .. } => "analyze",
-        Commands::Refs { .. } => "refs",
-        Commands::Watch { .. } => "watch",
-        Commands::Status => "status",
-        Commands::Callers { .. } => "callers",
-        Commands::Communities { .. } => "communities",
-        Commands::Impact { .. } => "impact",
-        Commands::Dataflow { .. } => "dataflow",
-        Commands::Verify { .. } => "verify",
-        Commands::Changed { .. } => "changed",
-        Commands::Census { .. } => "census",
-        Commands::Export { .. } => "export",
-        Commands::Promote { .. } => "promote",
-        #[cfg(feature = "quipu")]
-        Commands::Verifier { .. } => "verifier",
-        #[cfg(feature = "quipu")]
-        Commands::Verdicts { .. } => "verdicts",
-    })
 }
 
 impl Cli {
@@ -449,6 +439,12 @@ impl Cli {
             Commands::Verify { file, buffer } => {
                 cli_cmds::verify(self.json, self.quiet, file, buffer)
             }
+            Commands::Exemplar {
+                text,
+                file,
+                spool,
+                policy,
+            } => self.exemplar(text.as_deref(), file.as_deref(), spool.as_deref(), policy.as_deref()),
             Commands::Promote {
                 commit,
                 to,
