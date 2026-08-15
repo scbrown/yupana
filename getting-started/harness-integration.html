@@ -214,6 +214,27 @@ Impacted files: src/api/login.rs, src/api/session.rs
 </code></pre>
 <p>The advisory is emitted only when there is cross-file impact, and the hook never
 fails the harness (no output = nothing to say).</p>
+<h2 id="work-item-briefing-available-now-quipu-feature"><a class="header" href="#work-item-briefing-available-now-quipu-feature">Work-item briefing (available now, <code>quipu</code> feature)</a></h2>
+<p><code>yupana hook session-start</code> (<code>SessionStart</code>) injects the graph's knowledge of
+the agent's tracked work item into its context at assignment time — before the
+first edit, not at the first denial: the item's ground (paths prior work
+touched, with symbols and caller locality), the central entities around it
+(quipu pagerank), semantically similar past items with their outcomes so
+<strong>successful work gets reused</strong>, related in-flight items, the governed rules
+in force, and the scope posture. Silent when no plate or no quipu seam.</p>
+<pre><code class="language-json">{
+  "env": { "SHANTY_ROOT": "/gt", "SHANTY_AGENT": "polecat-3" },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "yupana hook session-start", "timeout": 15 }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
 <h2 id="pre-edit-guard-available-now"><a class="header" href="#pre-edit-guard-available-now">Pre-edit guard (available now)</a></h2>
 <p><code>yupana hook pre-edit</code> (<code>PreToolUse</code>) checks an edit <em>before</em> it lands against the
 calling tenant's capability scope, and can <strong>deny</strong> it with a reason the model
