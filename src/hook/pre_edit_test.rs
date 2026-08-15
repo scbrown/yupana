@@ -851,3 +851,145 @@ fn a_clean_edit_declares_no_policy_freshness_either() {
     let line = guard_line(NO_TICKET_RULE, "fn leaf() {} // nothing to see");
     assert!(line.get("policy_freshness").is_none());
 }
+
+// ---- The verify arm (FR-23 at the blocking seam) ----------------------------
+
+/// A `Write` payload proposing `content` as the new `file`.
+fn write_payload(dir: &Path, file: &str, content: &str) -> String {
+    serde_json::json!({
+        "session_id": unique_session(),
+        "cwd": dir.to_str().unwrap(),
+        "tool_name": "Write",
+        "tool_input": {
+            "file_path": dir.join(file).to_str().unwrap(),
+            "content": content,
+        },
+    })
+    .to_string()
+}
+
+const VERIFY_ENFORCE: &str =
+    "[yupana.policy]\nmode = \"enforce\"\nverify = true\ndeadline_ms = 30000\n";
+
+#[test]
+fn verify_arm_is_OFF_by_default() {
+    let dir = wide_repo();
+    write_policy(dir.path(), "[yupana.policy]\nmode = \"enforce\"\n");
+    // `no_such_fn` resolves to nothing — but the verify arm is opt-in, so the
+    // guard must not block on it.
+    let payload = write_payload(dir.path(), "new.rs", "fn f() { no_such_fn(); }\n");
+    assert_eq!(guard(&payload, dir.path(), None, None), Outcome::Allow);
+}
+
+#[test]
+fn verify_arm_denies_a_hallucinated_reference_under_enforce() {
+    let dir = wide_repo();
+    write_policy(dir.path(), VERIFY_ENFORCE);
+    let payload = write_payload(dir.path(), "new.rs", "fn f() { no_such_fn(); }\n");
+    let Outcome::Deny(reason) = guard(&payload, dir.path(), None, None) else {
+        panic!("expected a deny");
+    };
+    assert!(reason.contains("no_such_fn"), "got: {reason}");
+    assert!(reason.contains("verify"), "got: {reason}");
+    // FR-3: the verdict names its tier, so a treesitter rejection is never
+    // over-read as LSP-precise.
+    assert!(reason.contains("treesitter"), "got: {reason}");
+}
+
+#[test]
+fn verify_arm_notifies_but_never_blocks_under_advise() {
+    let dir = wide_repo();
+    write_policy(
+        dir.path(),
+        "[yupana.policy]\nmode = \"advise\"\nverify = true\ndeadline_ms = 30000\n",
+    );
+    let payload = write_payload(dir.path(), "new.rs", "fn f() { no_such_fn(); }\n");
+    let Outcome::Notify(message) = guard(&payload, dir.path(), None, None) else {
+        panic!("expected an advisory, not a block");
+    };
+    assert!(message.contains("not blocking"), "got: {message}");
+}
+
+#[test]
+fn verify_arm_allows_a_clean_buffer() {
+    let dir = wide_repo();
+    write_policy(dir.path(), VERIFY_ENFORCE);
+    // `leaf` is defined in the repo graph, so the reference resolves.
+    let payload = write_payload(dir.path(), "new.rs", "fn f() { leaf(); }\n");
+    assert_eq!(guard(&payload, dir.path(), None, None), Outcome::Allow);
+}
+
+#[test]
+fn verify_arm_reconstructs_an_Edit_buffer_and_catches_what_it_introduces() {
+    let dir = wide_repo();
+    write_policy(dir.path(), VERIFY_ENFORCE);
+    let payload = serde_json::json!({
+        "session_id": unique_session(),
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Edit",
+        "tool_input": {
+            "file_path": dir.path().join("leaf.rs").to_str().unwrap(),
+            "old_string": "fn leaf() {}",
+            "new_string": "fn leaf() { fabricated(); }",
+        },
+    })
+    .to_string();
+    let Outcome::Deny(reason) = guard(&payload, dir.path(), None, None) else {
+        panic!("expected a deny");
+    };
+    assert!(reason.contains("fabricated"), "got: {reason}");
+}
+
+#[test]
+fn verify_arm_does_not_attribute_pre_existing_breakage_to_this_edit() {
+    let dir = wide_repo();
+    std::fs::write(
+        dir.path().join("broken.rs"),
+        "fn f() { already_broken(); }\n",
+    )
+    .unwrap();
+    write_policy(dir.path(), VERIFY_ENFORCE);
+    // The edit adds a VALID call beside a pre-existing bad one; only what the
+    // edit introduces is its business.
+    let payload = serde_json::json!({
+        "session_id": unique_session(),
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Edit",
+        "tool_input": {
+            "file_path": dir.path().join("broken.rs").to_str().unwrap(),
+            "old_string": "already_broken();",
+            "new_string": "already_broken(); leaf();",
+        },
+    })
+    .to_string();
+    assert_eq!(guard(&payload, dir.path(), None, None), Outcome::Allow);
+}
+
+#[test]
+fn verify_arm_leaves_non_rust_files_alone() {
+    let dir = wide_repo();
+    write_policy(dir.path(), VERIFY_ENFORCE);
+    let payload = write_payload(dir.path(), "notes.md", "call no_such_fn() often\n");
+    assert_eq!(guard(&payload, dir.path(), None, None), Outcome::Allow);
+}
+
+#[test]
+fn verify_arm_fails_open_on_an_unmatched_edit_anchor() {
+    let dir = wide_repo();
+    write_policy(dir.path(), VERIFY_ENFORCE);
+    // The anchor matches nothing, so the proposed buffer cannot be
+    // reconstructed; the harness will reject the tool call itself, and the
+    // guard must not block on a buffer that will never exist.
+    let payload = serde_json::json!({
+        "session_id": unique_session(),
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Edit",
+        "tool_input": {
+            "file_path": dir.path().join("leaf.rs").to_str().unwrap(),
+            "old_string": "text that is not in the file",
+            "new_string": "fn g() { fabricated(); }",
+        },
+    })
+    .to_string();
+    assert_eq!(guard(&payload, dir.path(), None, None), Outcome::Allow);
+}

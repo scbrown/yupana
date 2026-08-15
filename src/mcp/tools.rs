@@ -467,4 +467,30 @@ pub struct PromoteResponse {
     /// SHACL violations when refused — empty iff `wrote`. A refusal always carries
     /// at least one reason.
     pub violations: Vec<String>,
+    /// Provenance tier of the promoted facts (FR-3). The export is tree-sitter
+    /// derived, so this names the tier of what was (or would have been) written —
+    /// a write outcome still says what precision of fact it moved.
+    pub tier: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// FR-3's tier-on-every-envelope invariant: `PromoteResponse` was the one
+    /// served response without a `tier`. A write outcome still names the
+    /// precision of the facts it moved.
+    #[test]
+    fn promote_response_carries_tier() {
+        let v = serde_json::to_value(PromoteResponse {
+            wrote: true,
+            count: Some(1),
+            tx_id: Some(1),
+            chunks: Some(1),
+            violations: Vec::new(),
+            tier: crate::types::Tier::TreeSitter.as_str().to_string(),
+        })
+        .unwrap();
+        assert_eq!(v["tier"], "treesitter", "PromoteResponse lost its tier: {v}");
+    }
 }

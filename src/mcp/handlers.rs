@@ -79,6 +79,7 @@ pub(super) fn promote(
                     tx_id: k.tx_ids.last().copied(),
                     chunks: Some(k.chunks),
                     violations: Vec::new(),
+                    tier: crate::types::Tier::TreeSitter.as_str().to_string(),
                 },
                 crate::promote::Promotion::Refused {
                     mut violations,
@@ -96,6 +97,7 @@ pub(super) fn promote(
                         tx_id: None,
                         chunks: None,
                         violations,
+                        tier: crate::types::Tier::TreeSitter.as_str().to_string(),
                     }
                 }
                 // `promote` is the WRITING spelling — the dry run is a separate
@@ -111,6 +113,7 @@ pub(super) fn promote(
                     count: None,
                     tx_id: None,
                     chunks: Some(chunks),
+                    tier: crate::types::Tier::TreeSitter.as_str().to_string(),
                     violations: vec![format!(
                         "internal invariant broken: `promote` returned a dry-run result \
                          ({chunks} chunks, {bytes} bytes) instead of writing. NOTHING WAS \

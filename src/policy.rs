@@ -93,6 +93,11 @@ pub struct PolicyConfig {
     /// not per-tenant: a rule like "no ticket id in a comment" governs the code,
     /// not who wrote it. See [`crate::rules`].
     pub rules: Vec<crate::rules::Rule>,
+    /// Run the FR-23 buffer verifier as an arm of the pre-edit guard: reject
+    /// edits that introduce references resolving to nothing (hallucinated
+    /// identifiers, wrong arity, unresolved `mod` imports). Opt-in and off by
+    /// default; rides inside `deadline_ms` and fails open like every other arm.
+    pub verify: bool,
 }
 
 impl Default for PolicyConfig {
@@ -104,6 +109,7 @@ impl Default for PolicyConfig {
             max_hops: DEFAULT_MAX_HOPS,
             scopes: BTreeMap::new(),
             rules: Vec::new(),
+            verify: false,
         }
     }
 }

@@ -261,6 +261,14 @@ fn guard_inner(
         return decision;
     }
 
+    // FR-23 at the blocking seam: verify the proposed buffer against the base
+    // graph, opt-in (`policy.verify`) and inside the same deadline. Like the
+    // rule planes, not per-tenant — a hallucinated reference is wrong whoever
+    // writes it.
+    if let Some(decision) = verify_arm::verify_check(&config, &input, &root, &rel, started) {
+        return decision;
+    }
+
     // No scope for this tenant — mode is off, or the tenant is unconstrained.
     let (Some(tenant), Some(scope)) = (tenant, config.policy.scope_for(tenant)) else {
         return Outcome::Allow.into();
@@ -430,6 +438,8 @@ fn blast_reply(
 
 #[path = "rule_planes.rs"]
 mod rule_planes;
+#[path = "verify_arm.rs"]
+mod verify_arm;
 #[cfg(feature = "quipu")]
 use rule_planes::governed_check;
 use rule_planes::rule_check;

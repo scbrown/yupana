@@ -256,8 +256,17 @@ under advise" is not evidence that they saw the advisory; they did not. Only
    capability scope?
 2. **Blast radius** (FR-12/FR-25) — do the symbols the edit touches transitively
    affect more symbols or files than the scope permits?
+3. **Buffer verification** (FR-23, opt-in: `[yupana.policy] verify = true`) —
+   does the proposed buffer introduce references that resolve to nothing?
+   The same verifier `yupana verify` exposes, run at the blocking seam: a
+   hallucinated identifier, a wrong-arity call, or an unresolved `mod` import
+   denies under `enforce` and advises under `advise`. Rust-only today (the
+   verifier is a tree-sitter-rust pass), scoped to what the edit *introduces*
+   (pre-existing breakage is not this edit's business), and inside the same
+   `deadline_ms` — a blown budget or unparseable buffer degrades to allow,
+   never to a block.
 
-Both are computed at the **tree-sitter tier** against the *requesting tenant's*
+All are computed at the **tree-sitter tier** against the *requesting tenant's*
 graph, and every verdict carries that tier tag (FR-3). A tree-sitter blast radius
 is an approximation; the ceilings should be set with that in mind.
 

@@ -64,6 +64,10 @@ deadline_ms = 100
 notify_on_fail_open = true
 # How far to follow the call graph when sizing an edit.
 max_hops = 5
+# Run the FR-23 buffer verifier as an arm of the guard: reject edits that
+# introduce references resolving to nothing (hallucinated identifiers, wrong
+# arity, unresolved `mod` imports). Opt-in; rides inside deadline_ms.
+verify = false
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.

@@ -223,13 +223,24 @@ a numbered capability from the vision (§"The concrete capability set").
   `freshness` ∈ {`fresh`, `stale`, `recomputing`}. Agents must be able to tell a
   tree-sitter-fast-but-approximate fact from an LSP-precise one.
 - **Status (aegis-8yrn):** the `tier` half is served on every response.
-  **The `freshness` half is Phase 3**, not yet served: freshness state is a
-  property of the resident graph + file-watcher (FR-16/17, §12 Phase 3), and the
-  current serve path rebuilds on demand per request — no cached fact can be stale,
-  so there is nothing yet to tag. Until Phase 3 lands, a response omits
-  `freshness` rather than stamping a constant `fresh` that would imply a tracking
-  system that does not exist. `types::Fact`/`types::Freshness` are the defined but
-  not-yet-wired carrier.
+  **The `freshness` half splits in two, and only one half is Phase 3:**
+  - **Code-fact freshness** (is this structural fact current with the file it
+    came from?) is *tracked but not served*. The watch path maintains real
+    `Recomputing → Fresh` transitions per file
+    (`src/watch/overlay_refresh.rs::freshness_of`), but no query surface reads
+    them yet: the on-demand serve path rebuilds per request, so no cached code
+    fact can be stale. Until the Phase 3 resident-graph serve path wires the
+    tracked map into query responses, a response omits `freshness` rather than
+    stamping a constant `fresh` that would imply a tracking system the serve
+    path does not consult. `types::Fact`/`types::Freshness` are the defined
+    carrier.
+  - **Projection freshness** (are the governed rules this verdict enforced still
+    the current ones?) is *already served* on the verdict surface: the pre-edit
+    guard states `fresh` / `stale` (with the cache age in seconds) /
+    `recomputing` on every rule verdict (`src/hook/rule_planes.rs`), and
+    promoted verdicts carry `aegis:freshness` (`src/verdict.rs`). This is a
+    property of the policy projection from Quipu, not of any code fact — the
+    two must never be conflated.
 
 ### 5.2 Ground-truth reference & definition resolution *(multilspy → Yupana; cap. 1)*
 
@@ -1101,7 +1112,7 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
 
 - [x] Per-tenant blast radius wired into the broker/Aegis capability-scoping path (FR-25): `[yupana.policy.scopes.<tenant>]` gives each tenant writable-path globs and blast-radius ceilings, evaluated against that tenant's graph.
 - [x] `yupana_verify` monitor-guided edit verification as a direct surface (FR-23, FR-24): `yupana verify` + the `yupana_verify` MCP tool. Tree-sitter tier decides `identifier-does-not-exist`, `wrong-arity`, and `unresolved-import`; `type-violation` is reported as unchecked until the LSP tier lands.
-- [x] `yupana hook pre-edit` guard (FR-30): blocking `deny` opt-in for capability-scoped polecats, off by default, always fail-open. Contract pinned in `docs/book/src/reference/policy-guard.md`. (Proposed-buffer *verification* joins it when FR-23 lands.)
+- [x] `yupana hook pre-edit` guard (FR-30): blocking `deny` opt-in for capability-scoped polecats, off by default, always fail-open. Contract pinned in `docs/book/src/reference/policy-guard.md`. Proposed-buffer *verification* (FR-23) is now an opt-in arm of the guard (`[yupana.policy] verify = true`), inside the same deadline and fail-open contract.
 - [ ] Bobbin consumes verdicts to flag won't-compile retrieved code.
 - **Exit:** structure defines the polecat sandbox, per tenant; agents get a boolean guard on their own edits.
 

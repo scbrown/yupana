@@ -20,6 +20,21 @@ mistakes an approximation for ground truth.
 - `stale` — known to be behind a pending edit.
 - `recomputing` — a recompute is in flight.
 
+Freshness names **two different questions**, and Yupana keeps them apart:
+
+- **Code-fact freshness** — is this structural fact current with the file it
+  came from? The watch path tracks it per file (`Recomputing → Fresh`
+  transitions in `src/watch/overlay_refresh.rs`), but no query surface serves
+  it yet: the on-demand serve path rebuilds per request, so no cached code fact
+  can be stale. Query responses therefore *omit* `freshness` rather than stamp
+  a constant `fresh` — the tag arrives with the Phase 3 resident-graph serve
+  path.
+- **Projection freshness** — are the governed rules a verdict enforced still
+  the current ones? This is *served today*: the pre-edit guard's rule verdicts
+  state `fresh` / `stale` (with the cache age in seconds) / `recomputing`
+  against the policy projection from Quipu, and promoted verdicts carry
+  `aegis:freshness`. It describes the policy registry, never a code fact.
+
 Tree-sitter structure updates on save or debounced keystroke. Once the LSP and
 CPG tiers land, agents that need certainty will ask for `lsp`/`cpg` and agents
 that need breadth will take `treesitter` and know it — but today only

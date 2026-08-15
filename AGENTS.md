@@ -22,8 +22,13 @@ bitemporal graph). Keep Yupana's stack coherent with theirs.
   and fails at 500 (tests exempt). One responsibility per module (see the layout
   in `docs/yupana-spec.md` §7.2).
 - **Tag every fact.** Everything Yupana serves carries a `tier` (FR-3) — never
-  present a tree-sitter approximation as LSP-precise. (FR-3's `freshness` half is
-  Phase 3, not yet served; a response omits it rather than faking a `fresh` tag.)
+  present a tree-sitter approximation as LSP-precise. FR-3's `freshness` half
+  splits in two: **code-fact** freshness is tracked by the watch path
+  (`src/watch/overlay_refresh.rs`) but not yet served — a query response omits
+  it rather than faking a `fresh` tag until Phase 3 wires it through; the
+  verdict surface already serves **projection** freshness (how current the
+  projected policy registry is — `src/hook/rule_planes.rs`, `src/verdict.rs`).
+  Don't mistake one for the other.
 - **Don't let a feature ship dark.** When a phase wires a Cargo feature (`mcp`,
   `quipu`, `cpg`, `lsp`), add it to the CI matrix in the same change.
 
