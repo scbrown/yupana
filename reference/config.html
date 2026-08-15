@@ -248,6 +248,14 @@ max_hops = 5
 # introduce references resolving to nothing (hallucinated identifiers, wrong
 # arity, unresolved `mod` imports). Opt-in; rides inside deadline_ms.
 verify = false
+# The work-item scope rung (docs/work-scoped-governance.md), used when a
+# tenant has NO entry in [yupana.policy.scopes.*]: the paths prior work on
+# the agent's tracked item touched, projected from quipu's provenance chain.
+# "off" (default) | "advise" (report out-of-scope edits, and say once per
+# session when no scope applies at all) | "enforce" (deny out-of-scope
+# edits). `mode` stays a ceiling; needs [yupana.quipu] and a tracker plate
+# ($SHANTY_ROOT/crew/$SHANTY_AGENT/plate.json).
+work_item_scope = "off"
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.

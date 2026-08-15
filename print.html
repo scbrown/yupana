@@ -1124,6 +1124,14 @@ max_hops = 5
 # introduce references resolving to nothing (hallucinated identifiers, wrong
 # arity, unresolved `mod` imports). Opt-in; rides inside deadline_ms.
 verify = false
+# The work-item scope rung (docs/work-scoped-governance.md), used when a
+# tenant has NO entry in [yupana.policy.scopes.*]: the paths prior work on
+# the agent's tracked item touched, projected from quipu's provenance chain.
+# "off" (default) | "advise" (report out-of-scope edits, and say once per
+# session when no scope applies at all) | "enforce" (deny out-of-scope
+# edits). `mode` stays a ceiling; needs [yupana.quipu] and a tracker plate
+# ($SHANTY_ROOT/crew/$SHANTY_AGENT/plate.json).
+work_item_scope = "off"
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.
@@ -1569,7 +1577,13 @@ deny_paths = ["src/config.rs"]
 max_impacted_symbols = 25
 max_impacted_files = 10
 </code></pre>
-<p>A tenant with no scope entry is unconstrained. <code>deny_paths</code> beats <code>allow_paths</code>.
+<p>A tenant with no scope entry is unconstrained — unless the work-item scope
+rung is armed (<code>[yupana.policy] work_item_scope = "advise" | "enforce"</code>), in
+which case the guard falls back to the OBSERVED scope of the agent's tracked
+work item (the paths prior work on it touched, projected from quipu), and an
+unknown scope draws a once-per-session advisory instead of silence. See the
+Configuration Reference and <code>docs/work-scoped-governance.md</code>. <code>deny_paths</code>
+beats <code>allow_paths</code>.
 Path patterns are globs matched against the repo-relative path.</p>
 <p>With <code>mode = "advise"</code> the guard reports what it <em>would</em> have denied via
 <code>systemMessage</code> and never blocks — run a new scope in <code>advise</code> for a while
@@ -1825,6 +1839,18 @@ cluster disclosure:</p>
 <tr><td>quipu down, cache warm</td><td>last-known policy still enforced, cache age named</td></tr>
 <tr><td>quipu down, no cache</td><td>loud fail-open — never a silent allow</td></tr>
 <tr><td>verdict return</td><td>spooled verdicts land in quipu signed, with tier + freshness</td></tr>
+</tbody></table>
+</div>
+<p>A second group proves work-item scope isolation — the provenance ladder of
+<code>docs/work-scoped-governance.md</code>, driven by the tracker's plate and the
+observed scope projected from quipu's commit-provenance chain:</p>
+<div class="table-wrapper"><table><thead><tr><th>scenario</th><th>proves</th></tr></thead><tbody>
+<tr><td>declared deny</td><td>a static <code>[yupana.policy.scopes.*]</code> entry hard-denies outside itself</td></tr>
+<tr><td>observed in-scope</td><td>the item's own ground admits the edit silently</td></tr>
+<tr><td>observed advise</td><td>out-of-scope is named (rung, item, right move) without blocking</td></tr>
+<tr><td>unknown scope</td><td>no rung answers → one advisory per session, never a silent allow</td></tr>
+<tr><td>observed enforce</td><td><code>work_item_scope = "enforce"</code> denies outside the item's boundary</td></tr>
+<tr><td>enforce in-scope</td><td>the hard boundary does not over-block the item's own ground</td></tr>
 </tbody></table>
 </div>
 <p>Everything observable is captured under the workdir (default <code>target/e2e</code>):
