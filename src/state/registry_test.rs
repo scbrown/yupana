@@ -33,6 +33,7 @@ fn ingest(
             game_id: game.to_string(),
             faction_id: faction.to_string(),
             visibility,
+            replace: false,
             provenance: crate::state::graph::Provenance {
                 adapter: Some("test-adapter".to_string()),
                 turn: Some(1),
@@ -158,6 +159,7 @@ fn a_faction_stamped_SHARED_write_is_refused_and_the_registry_counts_it() {
             game_id: "g1".to_string(),
             faction_id: "gaians".to_string(),
             visibility: Visibility::Shared,
+            replace: false,
             provenance: crate::state::graph::Provenance {
                 adapter: Some("test-adapter".to_string()),
                 turn: Some(1),
@@ -208,6 +210,7 @@ fn the_tenant_cap_REFUSES_rather_than_evicting_private_intel() {
         game_id: "g1".to_string(),
         faction_id: "morgan".to_string(),
         visibility: Visibility::Private,
+        replace: false,
         provenance: crate::state::graph::Provenance::default(),
         entities: vec![entity("morgan_probe", "smac:UnitState")],
         edges: Vec::new(),
@@ -335,4 +338,109 @@ fn guard_and_whatif_run_against_the_TENANTS_OWN_board() {
         panic!("morgan has a board too — the shared map");
     };
     assert_eq!(theirs.unapplied.len(), 1);
+}
+
+/// `replace` makes an ingest the whole of the private layer, not a patch on it.
+///
+/// The failure it exists for: an adapter whose world view IS the board posts a complete set
+/// each turn. Without `replace`, a base razed twenty turns ago survives every later ingest that
+/// simply does not mention it, and goes on matching policy selectors forever — a stale second
+/// source of board state sitting behind a caller who believes it just stated the current one.
+#[test]
+fn replace_drops_private_nodes_the_new_ingest_does_not_mention() {
+    let mut r = StateRegistry::new();
+    ingest(
+        &mut r,
+        "g1",
+        "gaians",
+        Visibility::Private,
+        vec![
+            entity("base_1", "smac:BaseState"),
+            entity("base_2", "smac:BaseState"),
+        ],
+        vec![],
+    );
+
+    // base_2 has been lost. The new world view lists only base_1.
+    r.ingest(&IngestRequest {
+        game_id: "g1".to_string(),
+        faction_id: "gaians".to_string(),
+        visibility: Visibility::Private,
+        replace: true,
+        provenance: crate::state::graph::Provenance::default(),
+        entities: vec![entity("base_1", "smac:BaseState")],
+        edges: vec![],
+    })
+    .expect("within the tenant cap");
+
+    let view = r.view(&TenantKey::new("g1", "gaians"));
+    assert!(
+        view.node("base_1").is_some(),
+        "the base still held must survive"
+    );
+    assert!(
+        view.node("base_2").is_none(),
+        "the base no longer held must be gone"
+    );
+}
+
+/// The default stays additive, because every existing caller depends on it.
+#[test]
+fn without_replace_an_earlier_private_node_survives() {
+    let mut r = StateRegistry::new();
+    ingest(
+        &mut r,
+        "g1",
+        "gaians",
+        Visibility::Private,
+        vec![
+            entity("base_1", "smac:BaseState"),
+            entity("base_2", "smac:BaseState"),
+        ],
+        vec![],
+    );
+    ingest(
+        &mut r,
+        "g1",
+        "gaians",
+        Visibility::Private,
+        vec![entity("base_1", "smac:BaseState")],
+        vec![],
+    );
+
+    let view = r.view(&TenantKey::new("g1", "gaians"));
+    assert!(
+        view.node("base_2").is_some(),
+        "an additive ingest must not drop anything"
+    );
+}
+
+/// Private layer only: clearing one tenant's overlay must not touch common knowledge.
+#[test]
+fn replace_leaves_the_shared_base_alone() {
+    let mut r = StateRegistry::new();
+    ingest(
+        &mut r,
+        "g1",
+        "gaians",
+        Visibility::Shared,
+        vec![entity("tile_1", "smac:Tile")],
+        vec![],
+    );
+    r.ingest(&IngestRequest {
+        game_id: "g1".to_string(),
+        faction_id: "gaians".to_string(),
+        visibility: Visibility::Private,
+        replace: true,
+        provenance: crate::state::graph::Provenance::default(),
+        entities: vec![entity("base_1", "smac:BaseState")],
+        edges: vec![],
+    })
+    .expect("within the tenant cap");
+
+    let view = r.view(&TenantKey::new("g1", "gaians"));
+    assert!(
+        view.node("tile_1").is_some(),
+        "the shared map is not one tenant's to clear"
+    );
 }

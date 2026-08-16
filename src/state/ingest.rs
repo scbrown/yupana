@@ -79,6 +79,18 @@ pub struct IngestRequest {
     /// Where the facts came from.
     #[serde(default)]
     pub provenance: Provenance,
+    /// Treat this ingest as the WHOLE of the tenant's private layer rather than a patch on it.
+    ///
+    /// Default `false`, which is the additive behaviour every existing caller relies on. Set it
+    /// when the payload you are sending IS the board — an adapter posting a complete world view
+    /// each turn, say. Without it a node that has since left the board survives every later
+    /// ingest that does not mention it, and goes on matching policy selectors forever: a stale
+    /// second source of board state behind a caller who believes it just stated the current one.
+    ///
+    /// Clears the private overlay only. The shared base is common knowledge and not one
+    /// tenant's to drop.
+    #[serde(default)]
+    pub replace: bool,
     /// The entities.
     #[serde(default)]
     pub entities: Vec<EntitySpec>,

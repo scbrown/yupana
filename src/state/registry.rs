@@ -175,6 +175,18 @@ impl StateRegistry {
         }
         let base = self.games.entry(request.game_id.clone()).or_default();
         let overlay = self.overlays.entry(key).or_default();
+        // `replace` makes this ingest the WHOLE of the tenant's private layer, rather than a
+        // patch on top of whatever it held. An adapter whose world view IS the board needs
+        // this: without it a node that has since left the board — a base razed twenty turns
+        // ago — survives every later ingest that simply does not mention it, and goes on
+        // matching policy selectors forever. That is a second, stale source of board state
+        // sitting behind a caller who believes it just stated the current one.
+        //
+        // Private layer only, deliberately. The shared base is common knowledge and is not
+        // this tenant's to clear.
+        if request.replace {
+            *overlay = StateOverlay::default();
+        }
         let report = apply(request, base, overlay);
         self.fog_leaks_blocked += report.fog_leaks_blocked;
         Ok(report)
