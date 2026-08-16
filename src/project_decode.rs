@@ -239,7 +239,10 @@ pub fn decode_policies(sparql_json: &str) -> Result<Vec<ProjectedPolicy>> {
                 gate: optional("gate"),
                 match_type,
                 pattern,
-                applies_to: Vec::new(),
+                // One glob per row. A policy scoped to several returns several rows and
+                // they are MERGED in the collapse below, not treated as a conflict —
+                // multi-valued is what this predicate is for.
+                applies_to: optional("appliesTo").into_iter().collect(),
                 message: None,
                 class,
                 verification_point,
@@ -273,6 +276,11 @@ pub fn decode_policies(sparql_json: &str) -> Result<Vec<ProjectedPolicy>> {
                 // A DISAGREEING required field is not a duplicate to merge; it is
                 // two different policies wearing one identity. Refuse rather than
                 // pick, exactly as the text decoder does.
+                //
+                // `applies_to` is deliberately NOT in this list. It is the one
+                // genuinely multi-valued field, so its rows differing is the normal
+                // case rather than a contradiction — treating it as a conflict would
+                // refuse every policy scoped to more than one glob.
                 let existing = &out[at];
                 if existing.rule.pattern != policy.rule.pattern
                     || existing.rule.match_type != policy.rule.match_type
@@ -286,6 +294,18 @@ pub fn decode_policies(sparql_json: &str) -> Result<Vec<ProjectedPolicy>> {
                          or effect differ across its rows) — refusing to guess \
                          which one governs"
                     )));
+                }
+                // MERGE the scope instead of dropping it. Dropping later rows would
+                // narrow a policy to whichever glob the cross product happened to
+                // return first — enforcing something the graph never declared, and
+                // doing it differently run to run as the row order changed.
+                //
+                // Widening only ever ADDS a declared glob, so it cannot make a
+                // scoped rule apply somewhere the graph did not say.
+                for glob in policy.rule.applies_to {
+                    if !out[at].rule.applies_to.contains(&glob) {
+                        out[at].rule.applies_to.push(glob);
+                    }
                 }
             }
         }

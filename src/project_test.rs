@@ -793,3 +793,133 @@ fn a_cache_written_against_another_quipu_is_not_served_here() {
     assert!(err.contains("different quipu"), "{err}");
     assert!(registry.policies().is_empty());
 }
+
+/// A policy the graph scoped to one module must not arrive scoped to everything.
+///
+/// `applies_to` was hardcoded empty in the decoder while the query never asked for
+/// `aegis:appliesTo`, so every projected structural policy applied to EVERY file of its
+/// language. A policy quipu declared over one path fired repo-wide, and the projection
+/// enforced something broader than the graph ever said — silently, because a rule firing
+/// in more places looks like a rule that works.
+#[test]
+fn a_scoped_policy_keeps_its_scope() {
+    let body = serde_json::json!({
+        "head": { "vars": ["policy", "name", "language", "query", "pattern", "matchType",
+                           "appliesTo"] },
+        "results": { "bindings": [{
+            "policy": { "type": "uri", "value": "http://example.invalid/p/scoped" },
+            "name": { "type": "literal", "value": "scoped" },
+            "language": { "type": "literal", "value": "python" },
+            "query": { "type": "literal", "value": "(comparison_operator) @c" },
+            "pattern": { "type": "literal", "value": "engine\\s*==" },
+            "matchType": { "type": "literal", "value": "must-not-match" },
+            "appliesTo": { "type": "literal", "value": "orchestrator/src/**/orchestrator.py" }
+        }]}
+    })
+    .to_string();
+
+    let policies = decode_policies(&body).unwrap();
+    assert_eq!(policies.len(), 1);
+    assert_eq!(
+        policies[0].rule.applies_to,
+        vec!["orchestrator/src/**/orchestrator.py"],
+        "the declared scope must survive projection"
+    );
+}
+
+/// SPARQL returns the cross product of OPTIONALs, so a policy scoped to three globs comes
+/// back as three rows. They are one policy with three globs, and the collapse must ACCUMULATE
+/// them.
+///
+/// The failure this pins is the quiet one: dropping later rows narrows the policy to whichever
+/// glob the cross product happened to return first, so the rule enforces a scope nobody
+/// declared and does it differently run to run as row order changes.
+#[test]
+fn multiple_scopes_on_one_policy_merge_rather_than_collapse() {
+    let row = |glob: &str| {
+        serde_json::json!({
+            "policy": { "type": "uri", "value": "http://example.invalid/p/multi" },
+            "name": { "type": "literal", "value": "multi" },
+            "language": { "type": "literal", "value": "python" },
+            "query": { "type": "literal", "value": "(except_clause) @e" },
+            "pattern": { "type": "literal", "value": "pass" },
+            "matchType": { "type": "literal", "value": "must-not-match" },
+            "appliesTo": { "type": "literal", "value": glob }
+        })
+    };
+    let body = serde_json::json!({
+        "head": { "vars": ["policy", "name", "language", "query", "pattern", "matchType",
+                           "appliesTo"] },
+        "results": { "bindings": [row("a/**.py"), row("b/**.py"), row("a/**.py")] }
+    })
+    .to_string();
+
+    let policies = decode_policies(&body).unwrap();
+    assert_eq!(policies.len(), 1, "three rows are still one policy");
+    assert_eq!(
+        policies[0].rule.applies_to,
+        vec!["a/**.py", "b/**.py"],
+        "every declared glob survives, and a repeated one is not duplicated"
+    );
+}
+
+/// Differing scopes are the normal multi-valued case, NOT the conflicting-definitions case.
+///
+/// The collapse refuses a policy whose rows disagree on pattern, matchType, class,
+/// verificationPoint or effect, because those are one-valued and disagreement means two
+/// policies wearing one identity. Adding `applies_to` to that list would have refused every
+/// policy scoped to more than one glob — which is most of them.
+#[test]
+fn differing_scopes_are_not_a_conflicting_definition() {
+    let body = serde_json::json!({
+        "head": { "vars": ["policy", "name", "language", "query", "pattern", "matchType",
+                           "appliesTo"] },
+        "results": { "bindings": [
+            {
+                "policy": { "type": "uri", "value": "http://example.invalid/p/x" },
+                "name": { "type": "literal", "value": "x" },
+                "language": { "type": "literal", "value": "rust" },
+                "query": { "type": "literal", "value": "(line_comment) @c" },
+                "pattern": { "type": "literal", "value": "TODO" },
+                "matchType": { "type": "literal", "value": "must-not-match" },
+                "appliesTo": { "type": "literal", "value": "src/**" }
+            },
+            {
+                "policy": { "type": "uri", "value": "http://example.invalid/p/x" },
+                "name": { "type": "literal", "value": "x" },
+                "language": { "type": "literal", "value": "rust" },
+                "query": { "type": "literal", "value": "(line_comment) @c" },
+                "pattern": { "type": "literal", "value": "TODO" },
+                "matchType": { "type": "literal", "value": "must-not-match" },
+                "appliesTo": { "type": "literal", "value": "tests/**" }
+            }
+        ]}
+    })
+    .to_string();
+
+    let policies = decode_policies(&body).expect("two scopes are not a contradiction");
+    assert_eq!(policies[0].rule.applies_to, vec!["src/**", "tests/**"]);
+}
+
+/// A policy that declares no scope stays unscoped. Absent means "every file of this
+/// language", which is the correct reading — and it is what every projected policy did
+/// before `appliesTo` was asked for, so this is also the no-regression check for a quipu
+/// whose catalogue predates the predicate.
+#[test]
+fn a_policy_with_no_declared_scope_stays_unscoped() {
+    let policies = decode_policies(&catalog_json()).unwrap();
+    assert!(policies.iter().all(|p| p.rule.applies_to.is_empty()));
+}
+
+/// The wire query has to actually ask for it. The decoder reading `appliesTo` while the
+/// SELECT omits it would bind nothing and look exactly like a catalogue with no scopes —
+/// the both-sides-shipped-and-the-seam-went-silent failure this module has already paid for
+/// twice.
+#[test]
+fn the_wire_query_asks_for_the_scope() {
+    assert!(POLICY_QUERY.contains("?appliesTo"), "not in the SELECT");
+    assert!(
+        POLICY_QUERY.contains("aegis:appliesTo ?appliesTo"),
+        "not in the WHERE"
+    );
+}

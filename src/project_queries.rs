@@ -15,6 +15,15 @@
 /// Only policies that carry BOTH atoms and a selector language are returned — a
 /// committed-tier (SPARQL-`claim`-only) policy has no structural evidence to
 /// project and is left for quipu's own write gate.
+/// `aegis:appliesTo` carries the rule's PATH SCOPE, and it is the one OPTIONAL here
+/// that is genuinely multi-valued: a policy scoped to three globs returns three
+/// rows, which [`decode_policies`](crate::project::decode_policies) accumulates
+/// rather than collapsing. Before it was projected, every quipu-defined structural
+/// policy arrived with an empty `applies_to` and therefore applied to EVERY file of
+/// its language — so a policy the graph scoped to one module fired repo-wide, and
+/// the projection silently enforced something broader than what was declared.
+/// Absent still means unscoped, which is the correct reading of a policy that
+/// declares no scope.
 /// The SARC constraint metadata (quipu `Q-SARC-CLASS`) is pulled as OPTIONAL,
 /// deliberately. Requiring `?constraintClass` in the WHERE clause would return
 /// ZERO ROWS against any quipu whose catalog has not been backfilled — the
@@ -27,7 +36,7 @@ PREFIX aegis: <http://aegis.gastown.local/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT ?policy ?name ?language ?query ?pattern ?matchType ?gate ?effect
        ?constraintClass ?verificationPoint ?latencyBudgetMs ?backoffFormula
-       ?hostedAtLayer WHERE {
+       ?hostedAtLayer ?appliesTo WHERE {
   ?policy a aegis:Policy ;
           aegis:boundary \"action\" ;
           aegis:selector ?sel ;
@@ -38,6 +47,7 @@ SELECT ?policy ?name ?language ?query ?pattern ?matchType ?gate ?effect
   ?pred aegis:evidenceSource ?pattern ;
         aegis:matchType ?matchType .
   OPTIONAL { ?pred aegis:gate ?gate }
+  OPTIONAL { ?policy aegis:appliesTo ?appliesTo }
   OPTIONAL { ?policy rdfs:label ?name }
   OPTIONAL { ?policy aegis:effect ?effect }
   OPTIONAL { ?policy aegis:constraintClass ?constraintClass }

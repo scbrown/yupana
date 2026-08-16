@@ -56,6 +56,19 @@ over the text an edit **introduces**:
   governed policy — the projection is one-directional (quipu canonical → yupana
   cache), and a verdict declares the cache's freshness.
 
+Field-for-field congruence includes the **path scope**. A local rule scopes itself
+with `applies_to`; a governed one declares `aegis:appliesTo`, and the projection
+carries it across. This is worth stating because it was missing at first: the
+decoder hardcoded an empty scope, so every projected policy applied to *every* file
+of its language and a policy quipu had scoped to one module was enforced repo-wide.
+A rule firing in more places looks like a rule that works, which is why nothing
+caught it. `aegis:appliesTo` is genuinely multi-valued, so a policy scoped to three
+globs returns three SPARQL rows and the decoder accumulates them — it does not
+collapse to whichever row arrived first, and differing scopes across rows are not
+treated as the conflicting-definitions error that a differing `pattern` or `effect`
+is. A policy that declares no scope stays unscoped, which is both the correct
+reading and what a quipu predating the predicate projects.
+
 Both are `Mode`-staged (advise-first) and fail open: a rule set that will not
 compile, or a quipu that cannot be reached, is a LOUD allow, never a silent pass.
 

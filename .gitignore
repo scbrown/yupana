@@ -28,3 +28,4 @@ docs/book/book/
 __pycache__/
 state.json
 CLAUDE.local.md
+search-debug.json
