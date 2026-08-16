@@ -234,6 +234,18 @@ runs. Opt-in via <code>[yupana.quipu] enabled + endpoint</code>. Yupana never <e
 governed policy — the projection is one-directional (quipu canonical → yupana
 cache), and a verdict declares the cache's freshness.</li>
 </ul>
+<p>Field-for-field congruence includes the <strong>path scope</strong>. A local rule scopes itself
+with <code>applies_to</code>; a governed one declares <code>aegis:appliesTo</code>, and the projection
+carries it across. This is worth stating because it was missing at first: the
+decoder hardcoded an empty scope, so every projected policy applied to <em>every</em> file
+of its language and a policy quipu had scoped to one module was enforced repo-wide.
+A rule firing in more places looks like a rule that works, which is why nothing
+caught it. <code>aegis:appliesTo</code> is genuinely multi-valued, so a policy scoped to three
+globs returns three SPARQL rows and the decoder accumulates them — it does not
+collapse to whichever row arrived first, and differing scopes across rows are not
+treated as the conflicting-definitions error that a differing <code>pattern</code> or <code>effect</code>
+is. A policy that declares no scope stays unscoped, which is both the correct
+reading and what a quipu predating the predicate projects.</p>
 <p>Both are <code>Mode</code>-staged (advise-first) and fail open: a rule set that will not
 compile, or a quipu that cannot be reached, is a LOUD allow, never a silent pass.</p>
 <h2 id="what-ships-now-and-what-remains"><a class="header" href="#what-ships-now-and-what-remains">What ships now, and what remains</a></h2>
