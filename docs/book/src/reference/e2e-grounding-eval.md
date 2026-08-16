@@ -92,7 +92,10 @@ CDN is not. With it, the briefing gains a fourth retrieval source (quipu
 query's top non-self score) and term probes retire — measured, they cost
 more precision on a semantic store than the recall they add. Measured
 macros: lexical overall 0.845; semantic overall 0.954, with the
-multi-term-FP and paraphrase classes both at 1.0.
+multi-term-FP and paraphrase classes both at 1.0. The full write-up —
+per-problem tables, the no-veto and term-probe-retirement findings, and
+threats to validity — is the eval note at
+`docs/briefing-retrieval-eval.md` (repo root docs, outside this book).
 
 Each arm re-runs the shipped binary; ablations remove one retrieval source
 via `$YUPANA_BRIEF_ABLATE` — feature removal against the real code path,
