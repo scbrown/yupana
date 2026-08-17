@@ -117,6 +117,62 @@ which invariants resisted implementation there** has an external standard, an
 obvious related-work anchor, and a contribution that survives disagreement about
 our design taste. It makes the honest gaps into results rather than apologies.
 
+### 2.1 🪢 The camayoc boundary — agreed 2026-08-17
+
+**The store was not the only paper this one has to avoid re-claiming.** The
+third leg of the program, **camayoc**, governs *admission* — what may enter the
+graph at all — and it instantiates the same principle this paper's §4 is built
+on: *a check that cannot fail is not a check, and absence of a finding is not a
+finding of absence.* If both papers claim that principle, reviewers see one idea
+published twice and both weaken.
+
+Agreed split, mirrored verbatim in
+[`camayoc/docs/design/thesis-boundary.md`](https://github.com/scbrown/camayoc/blob/main/docs/design/thesis-boundary.md).
+**Neither paper claims the shared principle as a contribution** — it is older
+than both systems. Each contributes a *layer* and the mechanisms that layer
+required.
+
+| | **camayoc** | **yupana (this paper)** |
+|---|---|---|
+| Layer | Admission — what may enter the graph | Action — what a guard may report at the edit boundary |
+| Time | Write time | Action time |
+| Mechanism | Refusal at ingress (SHACL) | Typed verdicts from a hot projection |
+| Owns | Provenance-refusing ingress; falsifier-gated verification; the closed source-tier vocabulary; the 2026-08-06/07 incident corpus | **The non-answer taxonomy of §4** — `vacuous` ≠ pass, `unevaluated` ≠ skipped, `served_from_cache` ≠ `fail_open`, `unknown` ≠ `unsatisfied`, empty-board refusal, STALE-with-AGE |
+
+One line each: camayoc is *knowledge must earn its way in, and a verification
+that cannot fail has not earned anything*; yupana is *a guard that returns
+nothing must say which kind of nothing.*
+
+**§4 is safe and stays here in full.** That is the point of the split — the
+non-answer taxonomy is this paper's contribution, with per-distinction incident
+provenance camayoc cannot match.
+
+**Two corrections this forces on the current draft plan:**
+
+1. **§4's closing sentence gives away a camayoc mechanism.** It currently reads
+   "the installer proving each refusal gate with deliberately invalid probes
+   that each omit exactly one required property, so the arms discriminate."
+   That mechanism is camayoc's — `scripts/gate_probe.sh` and
+   `tests/test_gate_probe.py` live in that repo, and proving the arms actually
+   discriminate is an open bead there (`camayoc-104`). **Recast it as a
+   citation, not as an instance of our own discipline.** The idea is the same
+   one this paper calls non-vacuity, and camayoc is adopting that term rather
+   than minting a second, so the citation should read as a cross-layer instance
+   of non-vacuity applied to an admission gate.
+2. **`empty | none | partial | full` coverage is a convergence, not a clash.**
+   camayoc's `scripts/competency.py` reports ontology coverage as
+   `Empty | Partial | Full`. Neither paper claims the shape as novel, and the
+   objects differ — a dataset's population versus an ontology's reach — so both
+   keep it and **each cites the other as an independent instance.** Two systems
+   arriving at the same reporting shape from different directions is evidence
+   *for* the principle and is worth one sentence here saying so.
+
+**The three-paper statement, to be worded identically in both drafts:** quipu
+compiles SARC into the store (submitted); yupana compiles it into the action;
+camayoc governs admission. Camayoc's nearest external anchor is SARC-DQ, which
+quipu's related-work section describes as gating evidence quality — evidence
+quality being camayoc's territory rather than this paper's.
+
 ## 3. Contributions
 
 - **C1 — Evidence locality as a placement rule for SARC's constraint classes.**
@@ -357,7 +413,7 @@ Also in scope to state plainly:
 4. **🟡 A worked cross-domain example** — one constraint expressed over code and
    the analogous one over a board, side by side, showing the shared type. Cheap,
    and it sells C2 in prose even before step 3 lands.
-4. **🟡 Related work.** Much of it is already assembled in the Quipu paper's
+5. **🟡 Related work.** Much of it is already assembled in the Quipu paper's
    `sections/09-related.tex` — **reuse that bibliography rather than rebuilding
    it.** Anchors: SARC; the Quipu paper as companion; **SARC-DQ**, which gates
    evidence quality *at the point of action* and is therefore the closest
@@ -371,7 +427,7 @@ Also in scope to state plainly:
    control** (Kubernetes admission webhooks are a very close structural analogue,
    including the fail-open/fail-closed argument and the timeout-means-admit
    default), and runtime verification with monitor placement.
-5. **🟢 Draft.** After 1–2.
+6. **🟢 Draft.** After 1–2.
 
 ## 11. What this paper is not
 
