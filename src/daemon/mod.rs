@@ -251,6 +251,9 @@ impl ResidentEngine {
                 })
                 .collect(),
             tier: graph_tier(),
+            // The untenanted path has no tenant to key the freshness map by,
+            // so nothing is known here. Omitted rather than guessed.
+            freshness: None,
         }
     }
 

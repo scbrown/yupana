@@ -23,12 +23,16 @@ bitemporal graph). Keep Yupana's stack coherent with theirs.
   in `docs/yupana-spec.md` §7.2).
 - **Tag every fact.** Everything Yupana serves carries a `tier` (FR-3) — never
   present a tree-sitter approximation as LSP-precise. FR-3's `freshness` half
-  splits in two: **code-fact** freshness is tracked by the watch path
-  (`src/watch/overlay_refresh.rs`) but not yet served — a query response omits
-  it rather than faking a `fresh` tag until Phase 3 wires it through; the
-  verdict surface already serves **projection** freshness (how current the
-  projected policy registry is — `src/hook/rule_planes.rs`, `src/verdict.rs`).
-  Don't mistake one for the other.
+  splits in two. **Code-fact** freshness is tracked by the watch path
+  (`src/watch/overlay_refresh.rs`) and, since Phase 3 (bobbin-052), **served**
+  on the tenant-scoped `/symbols` reply. It is still *omitted rather than
+  faked* wherever it is unknown — an untenanted query has no tenant to key the
+  map by, and a tenant that never had an edit absorbed has no note to report;
+  in both cases the field is absent, never `"fresh"` and never `"unknown"`.
+  The **projection** freshness the verdict surface serves is a different
+  quantity (how current the projected policy registry is —
+  `src/hook/rule_planes.rs`, `src/verdict.rs`). They answer different questions
+  and can disagree; don't mistake one for the other.
 - **Don't let a feature ship dark.** When a phase wires a Cargo feature (`mcp`,
   `quipu`, `cpg`, `lsp`), add it to the CI matrix in the same change.
 

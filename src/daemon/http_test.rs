@@ -525,3 +525,59 @@ async fn edit_drives_the_frontier_recompute_on_the_QUERYABLE_graph() {
     let refs = get_json(port, "/references?symbol=leaf2&tenant=a").await;
     assert_eq!(refs["found"], true, "recomputed overlay must be queryable");
 }
+
+/// FR-3's code-fact half, now SERVED (bobbin-052).
+///
+/// The tracking already existed and had no query surface; `CLAUDE.md` said a
+/// response omits the tag rather than faking `fresh` until Phase 3 wires it
+/// through. This is that wiring, and the test pins both halves of the rule:
+/// the tag appears once an edit has been absorbed, and it is ABSENT — not
+/// `"fresh"`, not `"unknown"` — when the engine never saw one.
+#[tokio::test]
+async fn symbols_serve_code_fact_freshness_and_omit_it_when_unknown() {
+    let dir = committed_repo();
+    let engine = ResidentEngine::build(dir.path(), None).unwrap();
+    let port = spawn(engine.clone()).await;
+
+    // Never edited by this tenant: the field must be absent from the JSON.
+    let before = get_json(port, "/symbols?file=leaf.rs&tenant=a").await;
+    assert!(
+        before.get("freshness").is_none(),
+        "freshness must be OMITTED when no edit was ever absorbed — a tag here \
+         would be a claim the tracker never made: {before}"
+    );
+
+    let (code, _) = post_json(
+        port,
+        "/edit",
+        &serde_json::json!({
+            "tenant": "a", "rel": "leaf.rs", "content": "fn leaf() {}\nfn leaf2() {}\n"
+        })
+        .to_string(),
+    )
+    .await;
+    assert_eq!(code, 200);
+
+    // After an absorbed edit the tag is served, and it is the tracker's value.
+    let after = get_json(port, "/symbols?file=leaf.rs&tenant=a").await;
+    assert_eq!(
+        after["freshness"].as_str(),
+        Some("fresh"),
+        "an absorbed edit's symbols must carry the tracked freshness: {after}"
+    );
+
+    // Per-tenant, like the tracker itself: b never edited, so b gets no tag.
+    let other = get_json(port, "/symbols?file=leaf.rs&tenant=b").await;
+    assert!(
+        other.get("freshness").is_none(),
+        "freshness is per-tenant; b absorbed no edit: {other}"
+    );
+
+    // The untenanted surface has no tenant to key the map by, so it cannot
+    // answer — and says so by omission rather than by inventing a default.
+    let untenanted = get_json(port, "/symbols?file=leaf.rs").await;
+    assert!(
+        untenanted.get("freshness").is_none(),
+        "the untenanted path cannot know freshness: {untenanted}"
+    );
+}

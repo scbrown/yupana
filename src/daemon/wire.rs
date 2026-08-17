@@ -240,6 +240,21 @@ pub struct FileSymbols {
     pub symbols: Vec<FileSymbolItem>,
     /// Provenance tier of these facts.
     pub tier: String,
+    /// CODE-FACT freshness of this file: whether these symbols reflect the
+    /// latest edit the engine absorbed (FR-3's second half, wired at Phase 3 —
+    /// bobbin-052).
+    ///
+    /// **Omitted, never defaulted.** `None` means this engine never absorbed
+    /// an edit for the path, so its freshness is genuinely unknown — and
+    /// `"fresh"` in that position would be a claim the tracker never made.
+    /// Same rule `searched_symbols` follows on the MCP side: omit rather than
+    /// fake, because a fabricated tag is indistinguishable from a measured one.
+    ///
+    /// Note this is code-fact freshness, NOT the projection freshness the
+    /// verdict surface serves. `CLAUDE.md` warns against mistaking one for the
+    /// other; they answer different questions and can disagree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub freshness: Option<String>,
 }
 
 /// One reached variable in a `/dataflow` flow trace.

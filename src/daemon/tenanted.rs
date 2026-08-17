@@ -86,6 +86,12 @@ impl ResidentEngine {
     /// Tenant-scoped `/symbols`.
     #[must_use]
     pub fn symbols_for(&self, tenant: &str, rel: &str) -> Option<FileSymbols> {
+        // Read the freshness note BEFORE composing the view, so the tag
+        // describes the state these symbols came from rather than one that
+        // moved underneath the read (bobbin-052).
+        let freshness = self
+            .freshness_of(tenant, rel)
+            .map(|f| f.as_str().to_string());
         self.with_view(tenant, |view| {
             let symbols = view.file_symbols(rel);
             FileSymbols {
@@ -101,6 +107,7 @@ impl ResidentEngine {
                     })
                     .collect(),
                 tier: graph_tier(),
+                freshness: freshness.clone(),
             }
         })
     }
