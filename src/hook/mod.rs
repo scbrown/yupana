@@ -26,6 +26,7 @@ pub mod paa;
 mod post_edit;
 mod pre_bash;
 mod pre_edit;
+mod scope_notice;
 #[cfg(feature = "quipu")]
 mod session_start;
 

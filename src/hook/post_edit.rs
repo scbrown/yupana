@@ -54,6 +54,15 @@ pub fn run_post_edit(tenant: Option<&str>) -> anyhow::Result<()> {
     if let Some(audit) = super::paa::post_action_audit(&buf, &root) {
         sections.extend(audit);
     }
+    // The `advise` rung of the capability ladder, delivered where the agent can
+    // actually read it. `scope_arm` computes the same boundary at the gate, but
+    // at `advise` it speaks through `systemMessage`, which reaches the
+    // operator's pane and never the model — so the rung that exists to TELL an
+    // agent where its work ends was telling nobody who could act on it. See
+    // `scope_notice`.
+    if let Some(text) = super::scope_notice::for_payload(&buf, &root) {
+        sections.push(text);
+    }
     if let Some(text) = advisory_for(&buf, &root, tenant) {
         sections.push(text);
     }

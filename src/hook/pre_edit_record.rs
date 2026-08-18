@@ -14,6 +14,12 @@ use std::time::Instant;
 
 use super::super::HookInput;
 use super::guard_inner;
+#[cfg(feature = "quipu")]
+use super::pre_edit_util;
+#[cfg(feature = "quipu")]
+use super::pre_edit_util::introduced_text;
+#[cfg(feature = "quipu")]
+use super::verdicts;
 use super::Outcome;
 use crate::config::YupanaConfig;
 use crate::hook::measure::relative;
