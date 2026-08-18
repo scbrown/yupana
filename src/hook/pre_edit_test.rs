@@ -1116,3 +1116,103 @@ mod recurrence_stage {
         assert_eq!(outcome, Outcome::Allow);
     }
 }
+
+// --- Two-sided liveness: the record says whether it understood the payload ---
+
+/// The RED half. A payload whose shape yupana does not recognise must be
+/// distinguishable, in the record, from an edit it inspected and allowed.
+///
+/// Before `parsed`, these two produced identical rows — `result: allow` with an
+/// empty `ext` — and they need opposite fixes. A clean allow is the system
+/// working; an unrecognised payload is a harness whose contract moved under us,
+/// with the guard inspecting nothing while every settings file still reports it
+/// as wired. Reading the second as the first is the failure class this repo puts
+/// third in its incident list, and it is the one nobody tests because absence of
+/// output looks like success.
+///
+/// The control is the GREEN half below: without it, this assertion would also
+/// pass against a guard that stamped `parsed: false` on everything.
+#[test]
+fn an_unparseable_payload_is_NOT_recorded_as_a_clean_allow() {
+    let dir = wide_repo();
+    let (_, fields) = guard_recorded("not json at all", dir.path(), Some("t"), None);
+    let line: serde_json::Map<String, serde_json::Value> = fields
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+    assert_eq!(
+        line["parsed"], false,
+        "a payload the guard could not parse must say so: {line:?}"
+    );
+    assert_eq!(
+        line["result"], "allow",
+        "and it must still ALLOW — an unparseable payload is not a reason to block"
+    );
+}
+
+/// The GREEN half, and the control that makes the test above mean anything: a
+/// payload the guard DID understand records `parsed: true`.
+#[test]
+fn a_payload_the_guard_understood_records_parsed_true() {
+    let dir = wide_repo();
+    let payload = rule_edit_payload(dir.path(), "fn leaf() {}");
+    let (_, fields) = guard_recorded(&payload, dir.path(), Some("t"), None);
+    let line: serde_json::Map<String, serde_json::Value> = fields
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+    assert_eq!(
+        line["parsed"], true,
+        "the discriminator must actually discriminate: {line:?}"
+    );
+}
+
+/// `session` rides the record when the harness supplied one — the field a
+/// windowed rule ("this session has already done N of these") groups by, and
+/// which nothing in the spool carried before.
+#[test]
+fn the_record_carries_the_harness_session_when_there_is_one() {
+    let dir = wide_repo();
+    let payload = serde_json::json!({
+        "session_id": "sess-abc",
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Write",
+        "tool_input": {
+            "file_path": dir.path().join("leaf.rs").to_str().unwrap(),
+            "content": "fn leaf() {}\n",
+        },
+    })
+    .to_string();
+    let (_, fields) = guard_recorded(&payload, dir.path(), Some("t"), None);
+    let line: serde_json::Map<String, serde_json::Value> = fields
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+    assert_eq!(line["session"], "sess-abc");
+}
+
+/// OMITTED, NOT BLANKED. A payload with no session must leave the key absent
+/// rather than writing `""` or `"unknown"` — these rows are replayed to derive
+/// rules, and a placeholder replays as if it were a value. Same contract the
+/// spool already holds for `path`, `ext` and the tier fields.
+#[test]
+fn a_payload_with_no_session_omits_the_field_rather_than_blanking_it() {
+    let dir = wide_repo();
+    // Built here rather than via `rule_edit_payload`, which always stamps a
+    // unique session — the whole point of this test is the payload that has
+    // none, which is what a harness sending a leaner shape looks like.
+    let payload = serde_json::json!({
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Write",
+        "tool_input": {
+            "file_path": dir.path().join("leaf.rs").to_str().unwrap(),
+            "content": "fn leaf() {}\n",
+        },
+    })
+    .to_string();
+    let (_, fields) = guard_recorded(&payload, dir.path(), Some("t"), None);
+    assert!(
+        !fields.iter().any(|(k, _)| *k == "session"),
+        "an absent session must be absent, never an empty string"
+    );
+}

@@ -19,14 +19,30 @@
 //! quipu's own vocabulary on the quipu side, the guard's REAL Outcome enum on
 //! this side, and "allowed clean" vs "allowed because unguarded" never share
 //! a label):
-//!   guard     {result: allow|deny|notify, `duration_ms`, ext, mode,
-//!              path?, rule?}                                    every pre-edit
+//!   guard     {result: allow|deny|notify, parsed, `duration_ms`, ext, mode,
+//!              session?, item?, path?, rule?}                   every pre-edit
 //!   `fail_open` {`fail_kind`}              the guard degraded, and why-kind
 //!   governed  {rules: [...], structural: n, blocking, exposure,
 //!              repo}                                            a rule spoke
 //!   command   {cmd}                      DELIBERATE use — the leverage signal
 //! Every line also carries ts (unix secs), agent (`$SHANTY_AGENT`) and tenant
 //! (`$BOBBIN_ROLE`), the two identity envs every st launch exports.
+//!
+//! `session` and `item` are what make these records REPLAYABLE rather than
+//! merely auditable. A rule is a saved query over records, and the questions
+//! anyone actually asks are scoped: "which piece of work caused this" needs
+//! `item`, and "has this session already done N of these" needs `session` to
+//! group by. Both are OMITTED when unresolved — an unreadable or stale plate is
+//! UNKNOWN, and since these rows are replayed to DERIVE enforcement rules, a
+//! fabricated value manufactures evidence for a rule that then applies to
+//! everyone. An honest gap costs one row of coverage; a confident wrong answer
+//! costs the rule.
+//!
+//! `parsed` on `guard` is the two-sided half: the record fires on every
+//! invocation, so its absence means the hook never ran, and `parsed: false`
+//! means it ran against a payload shape it did not recognise. Without the flag
+//! that second case is indistinguishable from a clean allow, which is how a
+//! guard gets believed to be passing while it inspects nothing.
 
 use std::path::PathBuf;
 
