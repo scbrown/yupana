@@ -108,6 +108,17 @@ pub struct PolicyConfig {
     /// scope grows with use, and an incomplete one hard-denying legitimate
     /// work is an outage. The ambient `mode` stays a ceiling on top.
     pub work_item_scope: Mode,
+    /// Enforcement level for the ACTION scope — the `allow_targets` /
+    /// `deny_targets` halves of a declared scope, checked against the
+    /// `(class, target)` a shell command resolves to.
+    ///
+    /// Off by default and staged exactly like `work_item_scope`, for a sharper
+    /// reason: `pre-bash` has been RECORD-ONLY since it shipped, and a hook
+    /// that starts refusing because someone set a knob it did not know existed
+    /// is enforcement arriving without its gate. `advise` first, then `enforce`
+    /// once the spool says what it would have refused. The ambient `mode` is a
+    /// ceiling on top, as everywhere else.
+    pub action_scope: Mode,
 }
 
 impl Default for PolicyConfig {
@@ -121,6 +132,7 @@ impl Default for PolicyConfig {
             rules: Vec::new(),
             verify: false,
             work_item_scope: Mode::Off,
+            action_scope: Mode::Off,
         }
     }
 }
@@ -179,6 +191,10 @@ pub struct ScopeSummary {
     pub allow_paths: usize,
     /// Number of `deny_paths` globs.
     pub deny_paths: usize,
+    /// Number of `allow_targets` globs (0 = any action target permitted).
+    pub allow_targets: usize,
+    /// Number of `deny_targets` globs.
+    pub deny_targets: usize,
     /// The symbol blast-radius ceiling, if set.
     pub max_impacted_symbols: Option<usize>,
     /// The file blast-radius ceiling, if set.
@@ -190,6 +206,8 @@ impl ScopeSummary {
         Self {
             allow_paths: scope.allow_paths.len(),
             deny_paths: scope.deny_paths.len(),
+            allow_targets: scope.allow_targets.len(),
+            deny_targets: scope.deny_targets.len(),
             max_impacted_symbols: scope.max_impacted_symbols,
             max_impacted_files: scope.max_impacted_files,
         }
@@ -224,93 +242,11 @@ impl ScopeProvenance {
     }
 }
 
-/// The projected work-item scope map: item id → repo-relative paths that work
-/// on the item has touched. Pure data (this module's contract); the fetch
-/// lives in `project_scope` behind the `quipu` feature.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WorkItemScopes(BTreeMap<String, std::collections::BTreeSet<String>>);
-
-impl WorkItemScopes {
-    /// Build from projected `(item id, path)` rows.
-    #[must_use]
-    pub fn from_rows(rows: impl IntoIterator<Item = (String, String)>) -> Self {
-        let mut map: BTreeMap<String, std::collections::BTreeSet<String>> = BTreeMap::new();
-        for (id, path) in rows {
-            map.entry(id).or_default().insert(path);
-        }
-        Self(map)
-    }
-
-    /// The observed [`Scope`] for `item`: its touched paths as literal path
-    /// globs. `None` when the item has no observed paths — an UNKNOWN scope,
-    /// which advises; it is never an empty scope that denies everything.
-    #[must_use]
-    pub fn scope_for(&self, item: &str) -> Option<Scope> {
-        let paths = self.0.get(item)?;
-        Some(Scope {
-            allow_paths: paths.iter().cloned().collect(),
-            ..Scope::default()
-        })
-    }
-
-    /// How many work items carry an observed scope.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Whether no item carries an observed scope.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-/// Which work item each item hangs under — the DERIVED rung's raw material.
-///
-/// Deliberately a separate map from [`WorkItemScopes`] rather than a field on
-/// it: the two are projected by different queries and either can be absent
-/// while the other is present, and folding them together would make an absent
-/// parent map indistinguishable from an item with no parent. One is UNKNOWN,
-/// the other is a fact.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WorkItemParents(BTreeMap<String, String>);
-
-impl WorkItemParents {
-    /// Build from projected `(child id, parent id)` rows.
-    ///
-    /// An item with more than one parent keeps the FIRST seen and ignores the
-    /// rest. That is deterministic given a sorted projection and, more to the
-    /// point, honest about what a multi-parent item means here: there is no
-    /// principled way to pick one ground over another, so the rung declines to
-    /// invent a union that no single piece of work ever touched.
-    #[must_use]
-    pub fn from_rows(rows: impl IntoIterator<Item = (String, String)>) -> Self {
-        let mut map: BTreeMap<String, String> = BTreeMap::new();
-        for (child, parent) in rows {
-            map.entry(child).or_insert(parent);
-        }
-        Self(map)
-    }
-
-    /// The parent of `item`, if the graph records one.
-    #[must_use]
-    pub fn parent_of(&self, item: &str) -> Option<&str> {
-        self.0.get(item).map(String::as_str)
-    }
-
-    /// How many items carry a parent.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Whether no item carries a parent.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
+// The projected work-item maps live in `policy_items` (file-size ratchet), and
+// are re-exported here because `crate::policy::WorkItemScopes` is the path
+// every caller, cache field and test already names. Moving a type for size is
+// not a reason to make thirty call sites say where it sleeps.
+pub use crate::policy_items::{WorkItemParents, WorkItemScopes};
 
 /// One tenant's capability scope.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -324,6 +260,22 @@ pub struct Scope {
     pub max_impacted_symbols: Option<usize>,
     /// Most files a single edit may transitively affect.
     pub max_impacted_files: Option<usize>,
+    /// Globs of `class:target` this tenant may ACT on through a shell command
+    /// — `host:build-01`, `service:metrics`, `container:*`. Empty = any target.
+    ///
+    /// The action surface, unlike the path one, has no observed rung: nothing
+    /// in the graph records which hosts an item's prior work touched. So this
+    /// is `declared` and only `declared`, which is also the only provenance
+    /// the trust ladder permits to hard-deny (see [`ScopeProvenance`]).
+    ///
+    /// MATCHED ONLY WHEN THE RESOLVER RESOLVED. `crate::action` abstains on
+    /// anything whose target is not unambiguous from syntax, and an abstention
+    /// is never a violation: a scope that refused what it could not identify
+    /// would deny every pipeline and script on the host.
+    pub allow_targets: Vec<String>,
+    /// Globs of `class:target` this tenant may not act on. Beats
+    /// [`Scope::allow_targets`], the same precedence `deny_paths` has.
+    pub deny_targets: Vec<String>,
 }
 
 /// Why an edit was refused.
@@ -333,6 +285,8 @@ pub enum ViolationKind {
     PathOutOfScope,
     /// The edit reaches further than the scope permits.
     BlastRadiusExceeded,
+    /// The shell command acts on a target outside the tenant's scope.
+    TargetOutOfScope,
 }
 
 /// A single policy violation, with the text shown to the model.
@@ -359,6 +313,50 @@ pub struct BlastRadius {
 }
 
 impl Scope {
+    /// Check a resolved action target — `class:target`, e.g. `host:build-01` —
+    /// against this scope's target globs.
+    ///
+    /// Same precedence and same empty-means-any rule as [`Scope::check_path`],
+    /// so an operator who has learned one has learned both.
+    ///
+    /// THE CALLER MUST NOT PASS AN ABSTENTION. `crate::action` answers
+    /// `Unknown` for every command whose target is not unambiguous from syntax
+    /// — a pipeline, a shell function, a script that ssh's internally — and
+    /// those must reach here as "no check performed", never as a target named
+    /// "unknown" that a glob could match. A scope that refused what it could
+    /// not identify would refuse most of the shell.
+    #[must_use]
+    pub fn check_target(&self, class: &str, target: &str, tenant: &str) -> Option<Violation> {
+        let subject = format!("{class}:{target}");
+        if let Some(pattern) = self.deny_targets.iter().find(|p| glob_matches(p, &subject)) {
+            return Some(Violation {
+                kind: ViolationKind::TargetOutOfScope,
+                message: format!(
+                    "yupana: `{subject}` is explicitly denied to tenant `{tenant}` (matches \
+                     deny_targets pattern `{pattern}`). This target is outside your capability \
+                     scope — do not retry it; if the action genuinely belongs there, ask for a \
+                     wider scope."
+                ),
+                rule: format!("deny_targets:{pattern}"),
+            });
+        }
+        if self.allow_targets.is_empty()
+            || self.allow_targets.iter().any(|p| glob_matches(p, &subject))
+        {
+            return None;
+        }
+        Some(Violation {
+            kind: ViolationKind::TargetOutOfScope,
+            message: format!(
+                "yupana: `{subject}` is outside the capability scope of tenant `{tenant}` \
+                 (allow_targets: {}). Act on a target within that scope, or ask an operator to \
+                 widen it — do not retry this one unchanged.",
+                self.allow_targets.join(", ")
+            ),
+            rule: "allow_targets".to_string(),
+        })
+    }
+
     /// Check `rel` (a repo-relative path) against this scope's path globs.
     ///
     /// `deny_paths` wins over `allow_paths`; an empty `allow_paths` permits any

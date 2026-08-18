@@ -10,6 +10,7 @@ fn scope() -> Scope {
         deny_paths: vec!["src/config.rs".to_string()],
         max_impacted_symbols: Some(5),
         max_impacted_files: Some(2),
+        ..Scope::default()
     }
 }
 

@@ -53,6 +53,8 @@ pub mod mcp;
 pub mod metrics;
 pub mod plate;
 pub mod policy;
+/// The projected work-item maps behind the capability ladder's lower rungs.
+pub mod policy_items;
 /// Phase-4 projection: a hot, one-directional cache of quipu's structural policies.
 #[cfg(feature = "quipu")]
 pub mod project;

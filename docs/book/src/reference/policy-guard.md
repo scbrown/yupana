@@ -256,6 +256,41 @@ which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 `enforce` puts the reason in front of the model.
 
+## The action surface (`pre-bash`)
+
+`yupana hook pre-bash` is **record-only by default** and stays that way unless a
+deployment sets `[yupana.policy] action_scope`, which is `off` out of the box.
+
+```toml
+[yupana.policy]
+action_scope = "advise"          # off | advise | enforce; `mode` is a ceiling
+
+[yupana.policy.scopes.polecat-3]
+allow_targets = ["host:build-*", "service:metrics"]
+deny_targets  = ["service:etcd"]
+```
+
+Targets are matched as `class:target` against the `(verb, target, class)` a
+command resolves to — `host`, `service`, `repo`, `container`. Precedence and the
+empty rule match the path halves exactly: `deny_targets` beats `allow_targets`,
+and an empty `allow_targets` permits any target rather than none.
+
+**Declared only.** There is no observed rung here: nothing in the graph records
+which hosts an item's prior work touched, so there is no record to infer from —
+and `declared` is the one provenance the trust ladder permits to hard-deny.
+
+**An abstention is never a violation.** The resolver answers `unknown` for every
+command whose target is not unambiguous from syntax — a pipeline, a shell
+function, a script that ssh's internally, or a bare hostname with no dot. Those
+reach the check as *no check performed*. A guard that refused what it could not
+identify would refuse most of the shell, which is why the recognised set is
+deliberately small.
+
+**Stage `advise` first.** At `advise` the violation goes to stderr and the spool
+and nothing is refused; at `enforce` the command is denied. The spool's
+`action_scope` records say what would have been refused, which is what a
+deployment should read before arming the boundary.
+
 ## What the guard checks
 
 1. **Path scope** (FR-25) — is the edited file inside this tenant's writable

@@ -26,12 +26,28 @@
 //! wired into the settings THAT SESSION loads — which is a settings-scope
 //! question, not a yupana one.
 //!
-//! RECORD-ONLY. This never denies, never warns, and prints NOTHING — not even
-//! on a resolved dangerous-looking command. Enforcement on the action path is a
-//! later phase gated on evals, and a hook that started advising here would be
-//! enforcement arriving without the gate. It also shares the Bash matcher with
-//! the existing guard chain, so anything printed would interleave with a guard
-//! whose refusals are load-bearing.
+//! RECORD-ONLY BY DEFAULT, and that default is the contract. This prints
+//! NOTHING unless a deployment has explicitly set `[yupana.policy]
+//! action_scope`, which is `off` out of the box. Enforcement on the action path
+//! was always meant to be a later phase gated on evidence, and a hook that
+//! started advising the moment the code landed would be enforcement arriving
+//! without its gate.
+//!
+//! When it IS armed, the source is the DECLARED scope's `allow_targets` /
+//! `deny_targets` and nothing else. There is no observed rung here: nothing in
+//! the graph records which hosts an item's prior work touched, so there is no
+//! record to infer from — and `declared` is the one provenance the trust ladder
+//! permits to hard-deny anyway.
+//!
+//! ABSTENTIONS ARE NEVER VIOLATIONS. `crate::action` answers `Unknown` for
+//! every command whose target is not unambiguous from syntax, and those reach
+//! the scope check as "no check performed". A guard that refused what it could
+//! not identify would refuse most of the shell — which is the same reason the
+//! resolver's recognised set is deliberately small.
+//!
+//! It shares the Bash matcher with the deployment's guard chain, so it stays
+//! silent on every allow: anything printed would interleave with a guard whose
+//! refusals are load-bearing.
 //!
 //! ALWAYS EXIT 0. A bookkeeping hook that can fail a command is worse than no
 //! bookkeeping: it converts an observability feature into an outage. Every path
@@ -71,9 +87,73 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
     record_invocation(&buf, cmd.is_some());
 
     if let Some(cmd) = cmd {
-        record(&action::resolve(&cmd));
+        let resolved = action::resolve(&cmd);
+        record(&resolved);
+        // The scope check rides AFTER the record, deliberately: the trace is
+        // the product and must not depend on a policy decision succeeding.
+        if let Some(text) = scope_refusal(&buf, &resolved) {
+            println!("{}", super::deny_envelope(&text));
+        }
     }
     Ok(())
+}
+
+/// The action-scope verdict for a resolved command, or `None` for silence.
+///
+/// Returns the DENY text only at `enforce`. At `advise` it emits the record and
+/// a stderr line and returns `None` — the same staging the path rung uses, and
+/// for the same reason: a deployment arms the boundary once it has seen what it
+/// would have refused.
+///
+/// Every failure path here is silence. No config, no tenant, an unresolvable
+/// target, or a scope with no target globs all mean "no check performed", which
+/// is not the same as "permitted" and is recorded as neither.
+fn scope_refusal(payload: &str, resolved: &action::Action) -> Option<String> {
+    // An abstention is not a target. See the module note: `Unknown` must never
+    // reach a glob, or every pipeline on the host becomes a violation.
+    if resolved.target_class == action::TargetClass::Unknown {
+        return None;
+    }
+    let target = resolved.target.as_deref()?;
+
+    let input = super::HookInput::parse(payload)?;
+    let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let root = input.root(&root);
+    let config = crate::config::YupanaConfig::resolve(None, &root).ok()?;
+
+    let rung = if config.policy.action_scope.is_lower_than(config.policy.mode) {
+        config.policy.action_scope
+    } else {
+        config.policy.mode
+    };
+    if rung == crate::policy::Mode::Off {
+        return None;
+    }
+
+    // Tenant resolution matches the edit guard's: the explicit identity the
+    // launcher exports. No tenant means no declared scope to check against.
+    let tenant = std::env::var("BOBBIN_ROLE").ok()?;
+    let scope = config.policy.scopes.get(&tenant)?;
+    let violation = scope.check_target(resolved.target_class.as_str(), target, &tenant)?;
+
+    let denying = rung == crate::policy::Mode::Enforce;
+    crate::metrics::emit(
+        "action_scope",
+        &[
+            ("class", resolved.target_class.as_str().into()),
+            ("target", target.to_string().into()),
+            ("rule", violation.rule.clone().into()),
+            ("result", if denying { "deny" } else { "advise" }.into()),
+        ],
+    );
+    if !denying {
+        eprintln!(
+            "yupana: {} (advisory: action_scope is not \"enforce\")",
+            violation.message
+        );
+        return None;
+    }
+    Some(violation.message)
 }
 
 /// Emit ONE record per invocation, unconditionally, before anything can
@@ -290,5 +370,100 @@ mod liveness_tests {
         let f = invocation_fields("not json at all", false);
         assert_eq!(field(&f, "parsed"), Some(&serde_json::Value::Bool(false)));
         assert!(field(&f, "payload_keys").is_none());
+    }
+}
+
+#[cfg(test)]
+// Test names shout the invariant they turn on, the repo's emphasis convention.
+#[allow(non_snake_case)]
+mod scope_tests {
+    use super::*;
+    use crate::policy::Scope;
+
+    fn scope(allow: &[&str], deny: &[&str]) -> Scope {
+        Scope {
+            allow_targets: allow.iter().map(|s| (*s).to_string()).collect(),
+            deny_targets: deny.iter().map(|s| (*s).to_string()).collect(),
+            ..Scope::default()
+        }
+    }
+
+    /// RED. A target outside the declared scope is a violation, and the message
+    /// names both the subject and what would satisfy it — a refusal that does
+    /// not say the right move strands whoever reads it.
+    #[test]
+    fn a_target_outside_the_scope_is_refused() {
+        let v = scope(&["host:build-*"], &[])
+            .check_target("host", "prod-01", "polecat")
+            .expect("out-of-scope target must violate");
+        assert!(v.message.contains("host:prod-01"), "{}", v.message);
+        assert!(v.message.contains("build-*"), "{}", v.message);
+        assert_eq!(v.rule, "allow_targets");
+    }
+
+    /// GREEN, and the control. Without it the assertion above would pass
+    /// against a scope that refused everything.
+    #[test]
+    fn a_target_inside_the_scope_is_silent() {
+        assert!(scope(&["host:build-*"], &[])
+            .check_target("host", "build-01", "polecat")
+            .is_none());
+    }
+
+    /// deny beats allow, the same precedence `deny_paths` has — an operator who
+    /// has learned one has learned both.
+    #[test]
+    fn deny_targets_beats_allow_targets() {
+        let v = scope(&["service:*"], &["service:etcd"])
+            .check_target("service", "etcd", "polecat")
+            .expect("an explicit deny must win");
+        assert_eq!(v.rule, "deny_targets:service:etcd");
+    }
+
+    /// EMPTY MEANS ANY, matching `allow_paths`. A scope that named no targets
+    /// must not become a scope that permits none — that would turn adding the
+    /// first `deny_targets` entry into a fleet-wide refusal.
+    #[test]
+    fn an_empty_allow_list_permits_any_target() {
+        assert!(scope(&[], &[])
+            .check_target("host", "anything", "polecat")
+            .is_none());
+    }
+
+    /// AN ABSTENTION IS NOT A TARGET. The resolver answers Unknown for anything
+    /// whose target is not unambiguous from syntax — a pipeline, a shell
+    /// function, a script that ssh's internally. Those must reach the check as
+    /// "no check performed"; a scope that refused what it could not identify
+    /// would refuse most of the shell.
+    #[test]
+    fn an_unresolved_command_is_never_a_violation() {
+        let resolved = action::resolve("some_shell_function | tee /dev/null");
+        assert_eq!(resolved.target_class, action::TargetClass::Unknown);
+        assert!(
+            scope_refusal(r#"{"tool_name":"Bash"}"#, &resolved).is_none(),
+            "an abstention must not reach a glob"
+        );
+    }
+
+    /// RECORD-ONLY IS STILL THE DEFAULT. With no `action_scope` configured the
+    /// hook must stay silent even on a command it fully resolved — enforcement
+    /// must not arrive merely because the code shipped.
+    #[test]
+    fn a_resolved_command_is_silent_when_the_rung_is_OFF() {
+        // A DOTTED host, because the resolver deliberately abstains on a bare
+        // word: `ssh myhost` is real, but so is a stray flag value, and the
+        // recognised set is small on purpose. This fixture has to clear that
+        // bar or the test would pass for the wrong reason — an abstention is
+        // silent whatever the rung says.
+        let resolved = action::resolve("ssh prod-01.example uptime");
+        assert_eq!(resolved.target_class, action::TargetClass::Host);
+        assert!(
+            scope_refusal(
+                r#"{"tool_name":"Bash","cwd":"/nonexistent-root"}"#,
+                &resolved
+            )
+            .is_none(),
+            "the default posture must print nothing"
+        );
     }
 }
