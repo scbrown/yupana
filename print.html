@@ -1625,6 +1625,33 @@ advise run, so the violation counts you collect are the <em>uncorrected</em> rat
 which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 <code>enforce</code> puts the reason in front of the model.</p>
+<h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
+<p><code>yupana hook pre-bash</code> is <strong>record-only by default</strong> and stays that way unless a
+deployment sets <code>[yupana.policy] action_scope</code>, which is <code>off</code> out of the box.</p>
+<pre><code class="language-toml">[yupana.policy]
+action_scope = "advise"          # off | advise | enforce; `mode` is a ceiling
+
+[yupana.policy.scopes.polecat-3]
+allow_targets = ["host:build-*", "service:metrics"]
+deny_targets  = ["service:etcd"]
+</code></pre>
+<p>Targets are matched as <code>class:target</code> against the <code>(verb, target, class)</code> a
+command resolves to — <code>host</code>, <code>service</code>, <code>repo</code>, <code>container</code>. Precedence and the
+empty rule match the path halves exactly: <code>deny_targets</code> beats <code>allow_targets</code>,
+and an empty <code>allow_targets</code> permits any target rather than none.</p>
+<p><strong>Declared only.</strong> There is no observed rung here: nothing in the graph records
+which hosts an item's prior work touched, so there is no record to infer from —
+and <code>declared</code> is the one provenance the trust ladder permits to hard-deny.</p>
+<p><strong>An abstention is never a violation.</strong> The resolver answers <code>unknown</code> for every
+command whose target is not unambiguous from syntax — a pipeline, a shell
+function, a script that ssh's internally, or a bare hostname with no dot. Those
+reach the check as <em>no check performed</em>. A guard that refused what it could not
+identify would refuse most of the shell, which is why the recognised set is
+deliberately small.</p>
+<p><strong>Stage <code>advise</code> first.</strong> At <code>advise</code> the violation goes to stderr and the spool
+and nothing is refused; at <code>enforce</code> the command is denied. The spool's
+<code>action_scope</code> records say what would have been refused, which is what a
+deployment should read before arming the boundary.</p>
 <h2 id="what-the-guard-checks"><a class="header" href="#what-the-guard-checks">What the guard checks</a></h2>
 <ol>
 <li><strong>Path scope</strong> (FR-25) — is the edited file inside this tenant's writable
@@ -1671,6 +1698,80 @@ into this same field.</li>
 </ul>
 <p><code>--json</code> emits the full <code>policy</code> object (mode, <code>scope_configured</code>, ceilings) and
 the <code>signed_rule_set</code> state for <code>st doctor</code> and other tooling to gate on.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="replay-measuring-a-rule-before-it-refuses-anything"><a class="header" href="#replay-measuring-a-rule-before-it-refuses-anything">Replay: measuring a rule before it refuses anything</a></h1>
+<p>The promotion ladder in <a href="https://github.com/scbrown/yupana/blob/main/docs/work-scoped-governance.md">work-scoped governance</a> gates the move from <code>advise</code> to
+<code>enforce</code> on evidence, not on a date: <em>would this rule have blocked anything that
+actually happened?</em> That question turns the decision from a waiting game into a
+computation, and answering it needs two things — a corpus of recorded actions,
+and a runner that replays a candidate rule over it.</p>
+<p>Yupana has had the corpus design since the trace phase. It did not have the
+records (the <code>pre-bash</code> hook was wired nowhere, and the <code>guard</code> records carried
+no <code>session</code> to group by), and it never had the runner.</p>
+<p>Both now exist.</p>
+<h2 id="the-runner-is-dogwood-and-it-is-used-offline-only"><a class="header" href="#the-runner-is-dogwood-and-it-is-used-offline-only">The runner is Dogwood, and it is used offline only</a></h2>
+<p>AWS open-sourced <a href="https://github.com/dogwood-policy/dogwood">Dogwood</a> on 2026-08-06: Cedar extended with temporal
+conditions that read an agent's own session event history — <code>formerly</code>,
+<code>count_within</code>, <code>count_distinct_within</code>, <code>sum_within</code> — plus</p>
+<pre><code class="language-bash">dogwood replay policy.dw --policy-schema schema.cedarschema --trace events.log
+</code></pre>
+<p>which prints ALLOW/DENY per event. That is the missing runner.</p>
+<p><strong>It is not adopted as an enforcement engine, and the reasons are worth stating
+rather than assuming.</strong></p>
+<p>Its own README says the reference interpreter is not for production, and the
+specific weaknesses it names are this estate's founding failure classes almost
+word for word: it <em>"accepts timestamps as provided and does not validate them"</em>,
+it has <em>"no authentication mechanism for events"</em>, and field inconsistencies
+<strong>silently weaken checks</strong>. A system built around unattributable action,
+unattributable message, and a control that could not fail cannot put a
+silently-weakening component on the path that refuses things.</p>
+<p>Offline, that caveat costs nothing: the trace is our own spool read from our own
+disk, timestamp integrity is our problem either way, and no agent's edit waits
+on the answer.</p>
+<p>There is a second reason and it is the deciding one. <a href="https://github.com/scbrown/yupana/blob/main/docs/design/paper.md">The paper plan</a> states
+that a policy is never <em>defined</em> in yupana — authoring, SHACL validation and
+verdict signing stay in quipu. Adopting Dogwood as the authoring language would
+either break that or add a second authoring surface beside <code>aegis:Policy</code>. Using
+it to <em>analyse records</em> breaks nothing.</p>
+<h2 id="running-it"><a class="header" href="#running-it">Running it</a></h2>
+<pre><code class="language-bash"># 1. Convert the spool. Reads $YUPANA_METRICS_PATH / $XDG_STATE_HOME / $HOME
+#    in the same order the emitter writes.
+scripts/spool-to-dogwood.py --out /tmp/trace.log
+
+# 2. Replay a candidate rule.
+dogwood replay candidate.dw --policy-schema yupana.cedarschema --trace /tmp/trace.log
+</code></pre>
+<p>The converter maps <code>guard</code> records to <code>Yupana::Action::"Edit"</code>, <code>action</code> records
+to the verb the resolver named, and <code>audit</code> records to
+<code>Yupana::Action::"Audit"</code>. <code>session</code> becomes the temporal grouping key and
+<code>item</code> the work item — the two fields that make a record replayable at all.</p>
+<h2 id="read-the-denominator"><a class="header" href="#read-the-denominator">Read the denominator</a></h2>
+<p>The converter prints, to stderr, how many events it wrote and how many records
+it dropped <strong>with a separate count per reason</strong>:</p>
+<pre><code class="language-text">1284 event(s) written from 3011 spool line(s)
+  dropped, no-session: 1502
+  dropped, not-an-action: 210
+  dropped, resolver-abstained: 15
+</code></pre>
+<p>That is not diagnostics; it is part of the result. A converter reporting only
+what it kept would let one covering 5% of traffic look identical to one covering
+95%, and the false-positive rate is measured <em>against the corpus that survived</em>.</p>
+<p>Two of those reasons need opposite responses, which is why they are counted
+separately:</p>
+<ul>
+<li><strong><code>no-session</code></strong> — records predating the field. Not replayable, and a rate
+measured without them is measured against a smaller corpus than the fleet
+produced. These age out as new records accumulate.</li>
+<li><strong><code>resolver-abstained</code></strong> — <code>crate::action</code> declined to name a verb. These are
+<em>correct</em> abstentions and must not be replayed under an invented verb: a rule
+derived from one would cite evidence that does not exist.</li>
+</ul>
+<h2 id="the-honest-limits-carried-with-the-numbers"><a class="header" href="#the-honest-limits-carried-with-the-numbers">The honest limits, carried with the numbers</a></h2>
+<p>From <a href="https://github.com/scbrown/yupana/blob/main/docs/work-scoped-governance.md">work-scoped governance</a>, and they travel with any rate this produces or
+the rate misleads:</p>
+<p>Replay measures false positives <strong>only on traffic that happened</strong>. It cannot see
+work nobody has done yet, and it measures <strong>no false negatives at all</strong>. A
+seeded adversarial corpus would give FN coverage against known attacks and none
+against novel ones.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-enforcement-trace"><a class="header" href="#the-enforcement-trace">The Enforcement Trace</a></h1>
 <p>What an action tells an auditor afterwards, and the two commands that carry it
 into quipu.</p>
