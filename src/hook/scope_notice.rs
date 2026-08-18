@@ -110,6 +110,40 @@ pub(super) fn notice(rel: &str, root: &Path, config: &YupanaConfig) -> Option<St
     let staleness = cache_age.map_or_else(String::new, |age| {
         format!(" (observed scope served from a projection cached {age}s ago)")
     });
+
+    // DEVIATION PACES DISCLOSURE. The symmetry work-scoped-governance.md §3
+    // names — "if the graph can predict what an agent may access, it can
+    // predict what that agent will need to read, and those are nearly the same
+    // query" — is otherwise only exploited at assignment time. Here it is
+    // seeded on the path the agent just stepped onto, which is the moment the
+    // answer is most useful and the moment nobody was serving it.
+    //
+    // Affordable here and not at the gate: the edit has landed, nothing waits
+    // on this, and the pre-edit budget that forbids `scope_arm` a round-trip
+    // does not apply. Empty on any failure — a notice must degrade to the
+    // advisory it already was, never to an error.
+    let prior = crate::brief_deviation::items_touching_path(&config.quipu.endpoint, rel);
+    let prior_line = if prior.is_empty() {
+        String::new()
+    } else {
+        let mut line = String::from("\n\nWhat the graph knows about `");
+        line.push_str(rel);
+        line.push_str("` — prior work that touched it:\n");
+        for (id, outcome) in &prior {
+            match outcome.as_deref() {
+                Some("done") => line.push_str(&format!(
+                    "- `{id}` — outcome: done. SUCCESSFUL prior work here: read it before \
+                     inventing an approach.\n"
+                )),
+                Some(other) => line.push_str(&format!("- `{id}` — outcome: {other}.\n")),
+                None => line.push_str(&format!(
+                    "- `{id}` — still open; coordinate rather than overlap.\n"
+                )),
+            }
+        }
+        line
+    };
+
     Some(format!(
         "## Outside your work item's ground (yupana)\n\n\
          This edit to `{rel}` landed OUTSIDE the paths prior work on `{item}` has \
@@ -121,7 +155,7 @@ pub(super) fn notice(rel: &str, root: &Path, config: &YupanaConfig) -> Option<St
          which one applies is yours to judge: if this change belongs to `{item}`, \
          carry on and the ground will grow to include it; if it belongs to \
          DIFFERENT work, update your tracked item before going further, so the \
-         record attributes it to the work that actually caused it.",
+         record attributes it to the work that actually caused it.{prior_line}",
         ground
             .iter()
             .map(|p| format!("`{p}`"))

@@ -18,6 +18,11 @@ pub mod audit;
 /// with the projection it reads.
 #[cfg(feature = "quipu")]
 pub mod brief;
+/// What the graph knows about a path an agent has just stepped OUTSIDE its
+/// work item's ground onto — the deviation-seeded counterpart to
+/// `brief_sources`. Gated with the projection it reads.
+#[cfg(feature = "quipu")]
+pub mod brief_deviation;
 /// The L0 half of that briefing: the small push, plus a census of what it held
 /// back. Gated with `brief`, whose `Brief` it renders.
 #[cfg(feature = "quipu")]
