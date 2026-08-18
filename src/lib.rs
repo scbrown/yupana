@@ -18,6 +18,10 @@ pub mod audit;
 /// with the projection it reads.
 #[cfg(feature = "quipu")]
 pub mod brief;
+/// The L0 half of that briefing: the small push, plus a census of what it held
+/// back. Gated with `brief`, whose `Brief` it renders.
+#[cfg(feature = "quipu")]
+pub mod brief_l0;
 /// The briefing's sources — each a reused surface of the suite.
 #[cfg(feature = "quipu")]
 pub mod brief_sources;
