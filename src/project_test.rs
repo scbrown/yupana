@@ -652,6 +652,7 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
+            work_item_parents: None,
         },
     );
 }

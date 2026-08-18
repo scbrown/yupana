@@ -231,6 +231,9 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "scripts/e2e/eval_f1.py",
         "scripts/e2e/harness.py",
         "shapes/code-edges.ttl",
+        // The deviation-seeded counterpart to brief_sources: same vocabulary,
+        // same data contract, asked of a path rather than of an item.
+        "src/brief_deviation.rs",
         "src/brief_sources.rs",
         "shapes/fixtures/conforming.ttl",
         "shapes/fixtures/violating.ttl",

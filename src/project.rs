@@ -223,6 +223,10 @@ pub struct ProjectionRegistry {
     /// bottom rung). `None` when missing/failed — unknown scope, which the
     /// guard reports as UNGUARDED-by-scope rather than silently in-scope.
     pub(crate) work_item_scopes: Option<crate::policy::WorkItemScopes>,
+    /// The DERIVED rung's parent map. Separate from `work_item_scopes` because
+    /// either can be absent while the other is present, and an absent map must
+    /// stay distinguishable from an item that genuinely has no parent.
+    pub(crate) work_item_parents: Option<crate::policy::WorkItemParents>,
     /// Whether the projected sets reflect a successful, current sync.
     freshness: Freshness,
 }
@@ -263,6 +267,7 @@ impl ProjectionRegistry {
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
+            work_item_parents: None,
             freshness: Freshness::Stale,
         }
     }
@@ -324,6 +329,8 @@ impl ProjectionRegistry {
                 // only its own rung (unknown scope advises), never the guard.
                 self.work_item_scopes =
                     crate::project_scope::fetch_work_item_scopes(&self.endpoint);
+                self.work_item_parents =
+                    crate::project_scope::fetch_work_item_parents(&self.endpoint);
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
@@ -379,6 +386,7 @@ impl ProjectionRegistry {
                             grounded_rules: self.grounded_rules.clone(),
                             grounding: self.grounding.clone(),
                             work_item_scopes: self.work_item_scopes.clone(),
+                            work_item_parents: self.work_item_parents.clone(),
                         },
                     );
                 }
@@ -405,6 +413,7 @@ impl ProjectionRegistry {
                 self.grounding = cached.grounding;
                 // Pre-scope caches restore `None` — unknown scope, honestly.
                 self.work_item_scopes = cached.work_item_scopes;
+                self.work_item_parents = cached.work_item_parents;
                 // STALE, never Fresh. The policies are real and worth
                 // enforcing; the claim that they are current is not ours to
                 // make, and every verdict computed against them says so.

@@ -266,6 +266,52 @@ impl WorkItemScopes {
     }
 }
 
+/// Which work item each item hangs under — the DERIVED rung's raw material.
+///
+/// Deliberately a separate map from [`WorkItemScopes`] rather than a field on
+/// it: the two are projected by different queries and either can be absent
+/// while the other is present, and folding them together would make an absent
+/// parent map indistinguishable from an item with no parent. One is UNKNOWN,
+/// the other is a fact.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkItemParents(BTreeMap<String, String>);
+
+impl WorkItemParents {
+    /// Build from projected `(child id, parent id)` rows.
+    ///
+    /// An item with more than one parent keeps the FIRST seen and ignores the
+    /// rest. That is deterministic given a sorted projection and, more to the
+    /// point, honest about what a multi-parent item means here: there is no
+    /// principled way to pick one ground over another, so the rung declines to
+    /// invent a union that no single piece of work ever touched.
+    #[must_use]
+    pub fn from_rows(rows: impl IntoIterator<Item = (String, String)>) -> Self {
+        let mut map: BTreeMap<String, String> = BTreeMap::new();
+        for (child, parent) in rows {
+            map.entry(child).or_insert(parent);
+        }
+        Self(map)
+    }
+
+    /// The parent of `item`, if the graph records one.
+    #[must_use]
+    pub fn parent_of(&self, item: &str) -> Option<&str> {
+        self.0.get(item).map(String::as_str)
+    }
+
+    /// How many items carry a parent.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether no item carries a parent.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 /// One tenant's capability scope.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]

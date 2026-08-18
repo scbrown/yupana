@@ -89,6 +89,12 @@ pub struct CachedProjection {
     /// "nothing is in scope".
     #[serde(default)]
     pub work_item_scopes: Option<crate::policy::WorkItemScopes>,
+    /// The parent map behind the DERIVED rung. Defaulted to `None` on older
+    /// caches for the same reason as the scope map above: no parents known is
+    /// UNKNOWN — the rung simply does not fire — never an empty map that would
+    /// read as "this item has no parent", which is a different claim.
+    #[serde(default)]
+    pub work_item_parents: Option<crate::policy::WorkItemParents>,
 }
 
 /// Why a cache could not be served. Every variant is a REASON, carried into the

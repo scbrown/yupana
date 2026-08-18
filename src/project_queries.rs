@@ -137,6 +137,26 @@ SELECT ?id ?path WHERE {
   ?e aegis:filePath ?path .
 }";
 
+/// The DERIVED rung's source: which work item each item hangs under.
+///
+/// `aegis:contains` is quipu's existing epic/bead hierarchy (an epic is just a
+/// Bead with children — `shapes/provenance.ttl`), so this rung, like the
+/// observed one below it, needs no new graph vocabulary.
+///
+/// WHY A PARENT'S GROUND IS A SCOPE AND NOT A GUESS: a child of an epic whose
+/// prior work has all landed in one subtree is, on the balance of evidence,
+/// scoped to that subtree. That is an INFERENCE about what work MAY touch,
+/// where the observed rung is a RECORD of what it HAS touched — which is
+/// exactly why `derived` sits above `observed` in trust order and why it never
+/// hard-denies (see `scope_arm`).
+pub const WORK_ITEM_PARENT_QUERY: &str = "\
+PREFIX aegis: <http://aegis.gastown.local/ontology/>
+SELECT ?id ?parent WHERE {
+  ?p aegis:contains ?w .
+  ?w aegis:identifier ?id .
+  ?p aegis:identifier ?parent .
+}";
+
 /// The grounding query itself — the authoritative work-item id set, projected
 /// into the hot plane at refresh time so evaluation is O(1) membership per
 /// token, never SPARQL per keystroke.

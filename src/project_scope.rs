@@ -11,10 +11,10 @@
 //!
 //! Split out of [`crate::project`] for file size, like `project_grounding`.
 
-use crate::policy::WorkItemScopes;
+use crate::policy::{WorkItemParents, WorkItemScopes};
 use crate::project::ProjectionRegistry;
-use crate::project_decode::decode_work_item_scope_rows;
-use crate::project_queries::WORK_ITEM_SCOPE_QUERY;
+use crate::project_decode::{decode_work_item_parent_rows, decode_work_item_scope_rows};
+use crate::project_queries::{WORK_ITEM_PARENT_QUERY, WORK_ITEM_SCOPE_QUERY};
 
 /// Fetch the observed work-item scope map, or `None` when it cannot be
 /// projected — loudly, because a scope that cannot be projected leaves an
@@ -43,6 +43,34 @@ pub fn fetch_work_item_scopes(endpoint: &str) -> Option<WorkItemScopes> {
     }
 }
 
+/// Fetch the work-item parent map behind the DERIVED rung.
+///
+/// Same contract as [`fetch_work_item_scopes`] in every respect: gated on a
+/// wired tracker, `None` on failure with a loud line, and never an error —
+/// a rung that cannot project must disable only itself.
+///
+/// The difference worth stating: a `None` here is strictly LESS serious than a
+/// `None` there. Losing the observed map leaves an undeclared tenant with no
+/// scope at all; losing this one only means an item with no ground of its own
+/// stops inheriting its parent's, which returns the ladder to exactly the
+/// behaviour it had before this rung existed.
+pub fn fetch_work_item_parents(endpoint: &str) -> Option<WorkItemParents> {
+    crate::plate::path_from_env()?;
+    match crate::project::query(endpoint, WORK_ITEM_PARENT_QUERY)
+        .and_then(|body| decode_work_item_parent_rows(&body).map(WorkItemParents::from_rows))
+    {
+        Ok(map) => Some(map),
+        Err(e) => {
+            eprintln!(
+                "yupana: work-item parent map could not be projected ({e}) — \
+                 the derived scope rung is inactive this refresh; items with no \
+                 observed ground of their own fall through to unknown scope"
+            );
+            None
+        }
+    }
+}
+
 impl ProjectionRegistry {
     /// The projected observed scope map, or `None` when the scope projection
     /// is missing/failed (unknown scope — the guard advises).
@@ -61,7 +89,7 @@ impl ProjectionRegistry {
 // Test names shout the invariant they turn on, the repo's emphasis convention.
 #[allow(non_snake_case)]
 mod tests {
-    use crate::policy::WorkItemScopes;
+    use crate::policy::{WorkItemParents, WorkItemScopes};
 
     #[test]
     fn rows_fold_into_per_item_path_sets() {
@@ -92,5 +120,14 @@ mod tests {
         ]}}"#;
         let rows = crate::project_decode::decode_work_item_scope_rows(body).unwrap();
         assert_eq!(rows, vec![("aegis-1".to_string(), "src/a.rs".to_string())]);
+    }
+}
+
+impl ProjectionRegistry {
+    /// The projected work-item parent map, or `None` when it is missing or
+    /// failed (the derived rung simply does not fire).
+    #[must_use]
+    pub fn work_item_parents(&self) -> Option<&crate::policy::WorkItemParents> {
+        self.work_item_parents.as_ref()
     }
 }

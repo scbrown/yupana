@@ -20,11 +20,19 @@ use super::*;
 
 use crate::policy::{Mode, ScopeProvenance};
 
+#[path = "scope_derived.rs"]
+mod scope_derived;
+use scope_derived::derived_rung;
+
 /// The projected observed-scope plane, extracted from the governed check's
 /// registry so the scope arm never adds a projection round-trip of its own.
 pub(super) struct ScopePlane {
     /// Work item id → the paths prior work on it touched.
     pub scopes: crate::policy::WorkItemScopes,
+    /// Work item id → the item it hangs under, for the DERIVED rung. `None`
+    /// when the parent map did not project — the rung then simply does not
+    /// fire, which is the pre-rung behaviour and not a new failure mode.
+    pub parents: Option<crate::policy::WorkItemParents>,
     /// `Some(age)` when the projection was served from the durable cache —
     /// carried into the advisory so a stale scope names its staleness.
     #[cfg_attr(not(feature = "quipu"), allow(dead_code))]
@@ -67,6 +75,27 @@ pub(super) fn ladder_fallback(
     // observed scope is what work HAS touched, not all it MAY touch, so a
     // deployment opts into the hard boundary deliberately.
     if let (Some(item), Some(plane)) = (item, plane) {
+        // DERIVED, evaluated ONLY when the item has no observed ground of its
+        // own. Trust order is declared > derived > observed, but availability
+        // runs the other way: observed is a RECORD of what this item touched
+        // and is therefore the better answer whenever it exists. Derived is an
+        // INFERENCE — "your parent epic's work has all landed here, so this
+        // probably belongs here too" — and an inference must not override a
+        // record.
+        //
+        // IT NEVER HARD-DENIES, at any rung setting. `crate::policy::ScopeProvenance`
+        // states the rule this honours: a declared scope may hard-deny;
+        // derived and observed advise. Observed already departs from that at
+        // `enforce`, deliberately, because it is evidence about THIS item.
+        // Derived has no such standing: denying an edit because a SIBLING's
+        // work happened to land elsewhere would strand an agent on the strength
+        // of somebody else's history, and a guard that strands an operator is
+        // worse than the thing it prevents.
+        if plane.scopes.scope_for(item).is_none() {
+            if let Some(decision) = derived_rung(item, rel, tenant, plane) {
+                return decision;
+            }
+        }
         if let Some(scope) = plane.scopes.scope_for(item) {
             let label = tenant.unwrap_or("unidentified");
             let Some(violation) = scope.check_path(rel, label) else {
@@ -169,180 +198,5 @@ pub(super) fn ladder_fallback(
 }
 
 #[cfg(test)]
-// Test names shout the invariant they turn on, the repo's emphasis convention.
-#[allow(non_snake_case)]
-mod tests {
-    use super::*;
-    use crate::policy::WorkItemScopes;
-
-    fn config(mode: Mode, rung: Mode) -> YupanaConfig {
-        let mut config = YupanaConfig::default();
-        config.policy.mode = mode;
-        config.policy.work_item_scope = rung;
-        config
-    }
-
-    fn input(session: &str) -> HookInput {
-        HookInput::parse(
-            &serde_json::json!({
-                "session_id": session,
-                "tool_name": "Edit",
-                "tool_input": { "file_path": "/r/src/a.rs" },
-            })
-            .to_string(),
-        )
-        .unwrap()
-    }
-
-    fn plane(rows: &[(&str, &str)]) -> ScopePlane {
-        ScopePlane {
-            scopes: WorkItemScopes::from_rows(
-                rows.iter()
-                    .map(|(a, b)| ((*a).to_string(), (*b).to_string())),
-            ),
-            cache_age: None,
-        }
-    }
-
-    #[test]
-    fn the_rung_is_OFF_by_default_preserving_the_pre_ladder_contract() {
-        let d = ladder_fallback(
-            &YupanaConfig::default(),
-            &input("s-default-off"),
-            Some("polecat"),
-            "src/other.rs",
-            Some("aegis-1"),
-            Some(&plane(&[("aegis-1", "src/a.rs")])),
-        );
-        assert_eq!(d.outcome, Outcome::Allow);
-    }
-
-    #[test]
-    fn observed_scope_allows_a_touched_path_silently() {
-        let d = ladder_fallback(
-            &config(Mode::Enforce, Mode::Advise),
-            &input("s-obs-in"),
-            Some("polecat"),
-            "src/a.rs",
-            Some("aegis-1"),
-            Some(&plane(&[("aegis-1", "src/a.rs")])),
-        );
-        assert_eq!(d.outcome, Outcome::Allow);
-    }
-
-    #[test]
-    fn observed_scope_ADVISES_out_of_scope_at_the_advise_rung() {
-        let d = ladder_fallback(
-            &config(Mode::Enforce, Mode::Advise),
-            &input("s-obs-out"),
-            Some("polecat"),
-            "src/other.rs",
-            Some("aegis-1"),
-            Some(&plane(&[("aegis-1", "src/a.rs")])),
-        );
-        let Outcome::Notify(message) = &d.outcome else {
-            panic!(
-                "observed scope must notify by default, not deny: {:?}",
-                d.outcome
-            );
-        };
-        assert!(message.contains("OBSERVED"), "names its rung: {message}");
-        assert!(message.contains("aegis-1"), "names the item: {message}");
-        assert_eq!(d.constraints[0].id, "scope-observed:allow_paths");
-    }
-
-    #[test]
-    fn work_item_scope_enforce_DENIES_out_of_scope() {
-        let d = ladder_fallback(
-            &config(Mode::Enforce, Mode::Enforce),
-            &input("s-obs-deny"),
-            Some("polecat"),
-            "src/other.rs",
-            Some("aegis-1"),
-            Some(&plane(&[("aegis-1", "src/a.rs")])),
-        );
-        let Outcome::Deny(message) = &d.outcome else {
-            panic!("work_item_scope=enforce must deny: {:?}", d.outcome);
-        };
-        // The constraint still TEACHES: the deny names the item, its paths,
-        // and both legitimate ways forward.
-        assert!(message.contains("aegis-1"), "names the item: {message}");
-        assert!(
-            message.contains("update your tracked item"),
-            "guides: {message}"
-        );
-    }
-
-    #[test]
-    fn ambient_advise_stays_a_ceiling_over_enforce() {
-        let d = ladder_fallback(
-            &config(Mode::Advise, Mode::Enforce),
-            &input("s-obs-ceiling"),
-            Some("polecat"),
-            "src/other.rs",
-            Some("aegis-1"),
-            Some(&plane(&[("aegis-1", "src/a.rs")])),
-        );
-        assert!(
-            matches!(d.outcome, Outcome::Notify(_)),
-            "advise-mode deployments never deny: {:?}",
-            d.outcome
-        );
-    }
-
-    #[test]
-    fn unknown_scope_NOTIFIES_an_identified_tenant_once_per_session() {
-        let session = format!("scope-arm-test-{}", std::process::id());
-        let d = ladder_fallback(
-            &config(Mode::Enforce, Mode::Advise),
-            &input(&session),
-            Some("polecat"),
-            "src/a.rs",
-            None,
-            None,
-        );
-        let Outcome::Notify(message) = &d.outcome else {
-            panic!(
-                "unknown scope must notify, not allow silently: {:?}",
-                d.outcome
-            );
-        };
-        assert!(message.contains("UNGUARDED"), "says unguarded: {message}");
-        // Second edit in the same session: the notice already fired.
-        let d2 = ladder_fallback(
-            &config(Mode::Enforce, Mode::Advise),
-            &input(&session),
-            Some("polecat"),
-            "src/a.rs",
-            None,
-            None,
-        );
-        assert_eq!(d2.outcome, Outcome::Allow);
-    }
-
-    #[test]
-    fn an_unidentified_caller_stays_silent() {
-        let d = ladder_fallback(
-            &config(Mode::Enforce, Mode::Advise),
-            &input("s-anon"),
-            None,
-            "src/a.rs",
-            None,
-            None,
-        );
-        assert_eq!(d.outcome, Outcome::Allow);
-    }
-
-    #[test]
-    fn mode_off_is_inert() {
-        let d = ladder_fallback(
-            &config(Mode::Off, Mode::Enforce),
-            &input("s-off"),
-            Some("polecat"),
-            "src/a.rs",
-            Some("aegis-1"),
-            Some(&plane(&[("aegis-1", "src/a.rs")])),
-        );
-        assert_eq!(d.outcome, Outcome::Allow);
-    }
-}
+#[path = "scope_arm_test.rs"]
+mod tests;

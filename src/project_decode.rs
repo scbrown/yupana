@@ -382,3 +382,19 @@ pub fn decode_work_item_scope_rows(sparql_json: &str) -> Result<Vec<(String, Str
         .filter_map(|b| Some((binding_value(b, "id")?, binding_value(b, "path")?)))
         .collect())
 }
+
+/// Decode `(child id, parent id)` rows for the DERIVED scope rung.
+///
+/// Separate from [`decode_work_item_scope_rows`] rather than parameterised on
+/// the variable names: these two decode different QUESTIONS, and a shared
+/// helper taking two strings would let a caller silently ask one query and
+/// decode it as the other — a scope built from the wrong pairs, which fails
+/// closed-looking rather than loudly.
+pub fn decode_work_item_parent_rows(sparql_json: &str) -> Result<Vec<(String, String)>> {
+    let value: serde_json::Value = serde_json::from_str(sparql_json)
+        .map_err(|e| Error::Projection(format!("results are not JSON: {e}")))?;
+    Ok(rows_of(&value)?
+        .iter()
+        .filter_map(|b| Some((binding_value(b, "id")?, binding_value(b, "parent")?)))
+        .collect())
+}
