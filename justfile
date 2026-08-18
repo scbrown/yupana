@@ -30,6 +30,10 @@ build:
 # Run tests
 test *args="":
     cargo test {{args}}
+    # The python-side tests. Small and few, but a converter that silently
+    # dropped records would misreport the false-positive rate that gates
+    # advise -> enforce promotion, so it does not get to sit outside the gate.
+    python3 tests/spool_to_dogwood.py
 
 # Run the linter (matches CI: deny warnings, allow missing-docs)
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every
