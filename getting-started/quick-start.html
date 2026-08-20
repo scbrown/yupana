@@ -220,7 +220,7 @@ referential structure in the <code>bobbin:</code> code ontology, <strong>not</st
 It is the substrate under Phase-4 promotion into Quipu; see the
 <a href="../design/specification.html">Specification</a> §5.10 and §9.</p>
 <h2 id="the-mcp-server"><a class="header" href="#the-mcp-server">The MCP server</a></h2>
-<p>Built with the <code>mcp</code> feature, <code>yupana serve</code> exposes fourteen <code>yupana_*</code> tools over MCP —
+<p>Built with the <code>mcp</code> feature, <code>yupana serve</code> exposes fifteen <code>yupana_*</code> tools over MCP —
 starting with <code>yupana_status</code>, <code>yupana_symbols</code>, <code>yupana_references</code>, and <code>yupana_analyze</code>
 (the full set is in the <a href="../reference/mcp-tools.html">MCP Tools reference</a>):</p>
 <pre><code class="language-bash">cargo run --features mcp -- serve         # stdio, for a local agent
@@ -229,7 +229,7 @@ cargo run --features mcp -- serve --http  # streamable-HTTP at :3040/mcp
 <p>See the <a href="../reference/mcp-tools.html">MCP Tools reference</a>.</p>
 <h2 id="what-works-today"><a class="header" href="#what-works-today">What works today</a></h2>
 <p><code>analyze</code>, <code>refs</code>, <code>status</code>, the call-graph commands <code>callers</code>/<code>impact</code>,
-<code>dataflow</code>, <code>verify</code> (the FR-23/FR-24 edit-buffer verdict), and the fourteen MCP tools
+<code>dataflow</code>, <code>verify</code> (the FR-23/FR-24 edit-buffer verdict), and the fifteen MCP tools
 are live. Only <code>promote</code> is still declared with its final shape and prints a phase
 notice until its engine lands — see the
 <a href="../design/specification.html">Specification</a>.</p>

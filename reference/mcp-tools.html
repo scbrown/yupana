@@ -210,6 +210,7 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 <tr><td><code>yupana_ingest</code></td><td>Load generic (non-code) facts into the hot board graph (FR-35; needs the <code>game-state</code> feature)</td></tr>
 <tr><td><code>yupana_guard</code></td><td>Check proposed orders against game-state policies (FR-37; needs the <code>game-state</code> feature)</td></tr>
 <tr><td><code>yupana_whatif</code></td><td>Speculative, uncommitted impact of an order set over the board (FR-38; needs the <code>game-state</code> feature)</td></tr>
+<tr><td><code>yupana_path_check</code></td><td>Conformance of a plan or work-in-progress against a blessed golden path under gp-grammar/1 (FR-41/FR-42; needs the <code>golden-path</code> feature)</td></tr>
 </tbody></table>
 </div>
 <p>The last three are the <strong>game-state harness</strong>. They are registered on every
