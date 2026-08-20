@@ -5,6 +5,9 @@
 //! uses. Tools follow the `yupana_*` naming convention (see `docs/yupana-spec.md`
 //! §10). This module is gated behind the `mcp` feature.
 
+/// Request DTO for the golden-path check (FR-41/FR-42), defined for both arms
+/// of the `golden-path` feature — the tool method is registered on every build.
+mod goldenpath_tools;
 mod resident;
 mod server;
 /// Request DTOs for the board tools (FR-35/37/38), defined for both arms of the

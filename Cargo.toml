@@ -148,6 +148,11 @@ quipu = ["dep:oxrdf", "dep:oxttl", "dep:oxrdfio", "dep:rudof_lib", "dep:ureq", "
 # gates a real engine (`src/state/`), which is why `Tier::served()` may key the
 # `engine-state` tier on it. It joins the CI matrix in this same change.
 game-state = []
+# FR-40..FR-42: the golden-path conformance guard — blessed-trajectory
+# projections (per-call, like StatePolicy) and plan/progress conformance
+# verdicts under gp-grammar/1 (shared with quipu's backtest). Gates src/goldenpath/
+# and joins the CI matrix in this same change.
+golden-path = []
 
 [dev-dependencies]
 tempfile = "3"

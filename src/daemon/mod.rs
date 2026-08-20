@@ -36,6 +36,8 @@ use crate::policy::PolicyConfig;
 pub mod client;
 #[cfg(feature = "mcp")]
 pub(crate) mod http;
+#[cfg(all(feature = "mcp", feature = "golden-path"))]
+pub(crate) mod path_http;
 #[cfg(all(feature = "mcp", feature = "game-state"))]
 pub(crate) mod state_http;
 mod tenanted;

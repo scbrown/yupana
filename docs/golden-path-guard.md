@@ -1,6 +1,15 @@
 # Addendum: Golden-Path Conformance Guard
 
-> **Status: DESIGN INTENT — nothing in this addendum is built.** This extends
+> **Status: BUILT (first cut), behind the `golden-path` Cargo feature** —
+> `src/goldenpath/` implements the grammar and the check; the surfaces are
+> `yupana_path_check` over MCP and `POST /path/check` on the daemon (both
+> feature-gated; the feature joined the CI matrix in the same change). Where
+> the implementation made a choice the design left open, the section says so
+> inline under **As built** — most notably: projected paths are supplied
+> per call like `StatePolicy` (a stale resident copy would enforce
+> yesterday's blessing), and deviation is decidable only against a complete
+> plan, so FR-41's per-action flow reports progress and hazards rather than
+> hard deviations. This addendum extends
 > [yupana-spec.md](yupana-spec.md) and the game-state addendum
 > ([neuralamplifier-harness.md](neuralamplifier-harness.md)) with the
 > enforcement half of the golden-paths design. The ontology and blessing
@@ -56,6 +65,15 @@ verdicts today. **As designed**, paths are a new rule plane beside the
 existing policy planes, not a reuse of one: their applicability is keyed by
 the tenant's declared `followsPath`, not by selector match.
 
+**As built:** the projection is carried per call, exactly as the board
+guard's `StatePolicy` list is — the request supplies the projected paths
+(`ProjectedPath`: grammar version, level, pattern, dead ends, exemplars,
+`projected_at`), because a stale resident copy would enforce yesterday's
+blessing while looking current. `projected_at` is echoed on every verdict and
+omitted rather than faked when the projection carries none. A
+`constraint-backing` level does not even parse (`src/goldenpath/grammar.rs`) —
+an unsigned L5 cannot enforce as if it were signed.
+
 ### FR-41 — Step-conformance verdicts
 
 Given a tenant whose work item declared `followsPath <path>`, evaluate each
@@ -80,6 +98,14 @@ record* (quipu stores it; the promotion gates consume it as traffic), not a
 judgment that the agent is wrong. Paths are demoted when conformers start
 failing; that evidence only exists if deviation and conformance are both
 recorded faithfully.
+
+**As built:** under gp-grammar/1 gaps are allowed, so an OPEN trajectory
+never hard-deviates — a future step could always match the next pattern
+element. The check therefore takes a mode: `progress` (this FR's per-action
+flow) reports pattern progress, dead-end hazards, and unevaluated steps, and
+never denies; `deny` is reachable only in `plan` mode (FR-42), where the
+submitted sequence is the whole intent and deviation is decidable — and only
+for a blessed path with the caller's explicit `deny: true`.
 
 ### FR-42 — Plan pre-check (what-if over a step sequence)
 

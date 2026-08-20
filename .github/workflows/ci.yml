@@ -40,6 +40,10 @@ jobs:
             flags: "--features game-state"
           - name: mcp+game-state
             flags: "--features mcp,game-state"
+          - name: golden-path
+            flags: "--features golden-path"
+          - name: mcp+golden-path
+            flags: "--features mcp,golden-path"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -77,6 +81,10 @@ jobs:
             flags: "--features game-state"
           - name: mcp+game-state
             flags: "--features mcp,game-state"
+          - name: golden-path
+            flags: "--features golden-path"
+          - name: mcp+golden-path
+            flags: "--features mcp,golden-path"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

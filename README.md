@@ -46,7 +46,7 @@ yupana status
 > **Status:** Phases 1 and 2 complete. `analyze`, `refs`, `status`, the
 > call-graph commands `callers`/`impact` (with `--cochange` reconciliation),
 > intra-procedural `dataflow`, and `verify` (the FR-23/FR-24 edit-buffer verdict)
-> do real work, and an MCP server (`yupana serve`, `--features mcp`) exposes fourteen
+> do real work, and an MCP server (`yupana serve`, `--features mcp`) exposes fifteen
 > `yupana_*` tools (`yupana_promote` writes to Quipu with the `quipu` feature). Promotion lands per the
 > [phasing](docs/yupana-spec.md#12-milestones--phasing); Phase 3 (multi-tenancy)
 > is next.

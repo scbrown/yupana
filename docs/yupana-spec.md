@@ -1337,12 +1337,13 @@ have grown from single files into modules.
 `serve` (`mcp` feature), `completions` — all live. `promote` — live behind
 the `quipu` feature (SHACL-validate, then write); a phase notice without it.
 
-**MCP tools (14, `mcp` feature):** `yupana_status`, `yupana_symbols`,
+**MCP tools (15, `mcp` feature):** `yupana_status`, `yupana_symbols`,
 `yupana_references`, `yupana_analyze`, `yupana_callers`, `yupana_callees`, `yupana_impact`
 (with `cochange`), `yupana_communities`, `yupana_dataflow`, `yupana_verify`,
 `yupana_promote` (writes to Quipu; needs the `quipu` feature), `yupana_ingest`,
 `yupana_guard`, `yupana_whatif` (the game-state harness; need the `game-state`
-feature). Over stdio + streamable-HTTP.
+feature), `yupana_path_check` (the golden-path conformance guard, FR-41/FR-42;
+needs the `golden-path` feature). Over stdio + streamable-HTTP.
 
 **Cargo features:** `default = []`; `mcp`, `langs-extra`, `quipu`, `game-state`
 (all off by default; `mcp`, `quipu` and `game-state` in the CI matrix).

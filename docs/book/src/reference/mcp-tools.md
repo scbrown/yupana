@@ -36,6 +36,7 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 | `yupana_ingest` | Load generic (non-code) facts into the hot board graph (FR-35; needs the `game-state` feature) |
 | `yupana_guard` | Check proposed orders against game-state policies (FR-37; needs the `game-state` feature) |
 | `yupana_whatif` | Speculative, uncommitted impact of an order set over the board (FR-38; needs the `game-state` feature) |
+| `yupana_path_check` | Conformance of a plan or work-in-progress against a blessed golden path under gp-grammar/1 (FR-41/FR-42; needs the `golden-path` feature) |
 
 The last three are the **game-state harness**. They are registered on every
 build, as `yupana_promote` is, and refuse with a message naming the feature when

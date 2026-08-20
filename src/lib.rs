@@ -44,6 +44,11 @@ pub mod exemplar;
 pub mod export;
 pub mod extract;
 pub mod git;
+/// The golden-path conformance guard (FR-40..FR-42): blessed-trajectory
+/// projections and the plan/progress conformance verdict under gp-grammar/1.
+/// Gated so a build that cannot check a path does not advertise the tier.
+#[cfg(feature = "golden-path")]
+pub mod goldenpath;
 pub mod graph;
 pub mod grounding;
 pub mod hook;

@@ -47,7 +47,7 @@ It is the substrate under Phase-4 promotion into Quipu; see the
 
 ## The MCP server
 
-Built with the `mcp` feature, `yupana serve` exposes fourteen `yupana_*` tools over MCP —
+Built with the `mcp` feature, `yupana serve` exposes fifteen `yupana_*` tools over MCP —
 starting with `yupana_status`, `yupana_symbols`, `yupana_references`, and `yupana_analyze`
 (the full set is in the [MCP Tools reference](../reference/mcp-tools.md)):
 
@@ -61,7 +61,7 @@ See the [MCP Tools reference](../reference/mcp-tools.md).
 ## What works today
 
 `analyze`, `refs`, `status`, the call-graph commands `callers`/`impact`,
-`dataflow`, `verify` (the FR-23/FR-24 edit-buffer verdict), and the fourteen MCP tools
+`dataflow`, `verify` (the FR-23/FR-24 edit-buffer verdict), and the fifteen MCP tools
 are live. Only `promote` is still declared with its final shape and prints a phase
 notice until its engine lands — see the
 [Specification](../design/specification.md).

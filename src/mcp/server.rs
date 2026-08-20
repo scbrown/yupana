@@ -17,6 +17,7 @@ use serde::Serialize;
 
 use std::collections::BTreeSet;
 
+use super::goldenpath_tools::PathCheckRequest;
 use super::state_tools::{StateGuardRequest, StateIngestRequest, StateWhatIfRequest};
 use super::tools::PromoteRequest;
 #[cfg(feature = "quipu")]
@@ -377,6 +378,18 @@ impl YupanaMcpServer {
     ) -> Result<CallToolResult, McpError> {
         state_handlers::whatif(self, &req)
     }
+
+    // The golden-path conformance check (FR-41/FR-42). Always REGISTERED, body
+    // feature-split on `golden-path`, same as the board tools above.
+    #[tool(
+        description = "Check work against a blessed golden path (a pruned, human-promoted trajectory governed in Quipu). Pass the declared follows_path, the steps as {action_kind, target_class} signatures, and the projected paths (per call — a stale resident copy would enforce yesterday's blessing). mode='plan' treats the steps as the whole intent and names the first deviation point; mode='progress' reports how far along the path the work is and which dead-end hazards it brushed, and never denies. Effects are capped by blessing level: advisory warns at most; blessed denies only with deny=true in plan mode. Refuses (never reports clean) an empty path set, an undeclared path, or a gp-grammar version this build does not implement."
+    )]
+    async fn yupana_path_check(
+        &self,
+        Parameters(req): Parameters<PathCheckRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        goldenpath_handlers::path_check(self, &req)
+    }
 }
 
 impl YupanaMcpServer {
@@ -464,6 +477,10 @@ mod handlers;
 // The board tool bodies (FR-35/37/38), feature-split on `game-state`.
 #[path = "state_handlers.rs"]
 mod state_handlers;
+
+// The golden-path check body (FR-41/FR-42), feature-split on `golden-path`.
+#[path = "goldenpath_handlers.rs"]
+mod goldenpath_handlers;
 
 // The FR-3 enforcement walk (aegis-8yrn) lives in a size-exempt sibling file so
 // it can call the private tool handlers as a child module without pushing

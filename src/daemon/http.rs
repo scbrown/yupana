@@ -33,7 +33,8 @@ use crate::graph::Dir;
 /// The FR-35/37/38 board routes are merged in from [`super::state_http`] when
 /// the `game-state` engine is compiled in — and are ABSENT otherwise, so a build
 /// without the engine 404s on `/guard` rather than mounting a route that cannot
-/// answer.
+/// answer. The FR-41/FR-42 golden-path route is merged from
+/// [`super::path_http`] under the same rule for `golden-path`.
 pub fn router(engine: ResidentEngine) -> Router {
     #[allow(unused_mut)]
     let mut router = Router::new()
@@ -50,6 +51,10 @@ pub fn router(engine: ResidentEngine) -> Router {
     #[cfg(feature = "game-state")]
     {
         router = router.merge(super::state_http::routes());
+    }
+    #[cfg(feature = "golden-path")]
+    {
+        router = router.merge(super::path_http::routes());
     }
     router.with_state(engine)
 }

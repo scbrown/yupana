@@ -73,8 +73,8 @@ fn registered_tools_match_the_mcp_reference() {
     let docs = documented_live_tools();
     assert_eq!(
         code.len(),
-        14,
-        "expected 14 registered yupana_* tools, got {code:?}"
+        15,
+        "expected 15 registered yupana_* tools, got {code:?}"
     );
     assert_eq!(
         code, docs,
@@ -107,7 +107,7 @@ fn readme_and_quickstart_state_the_right_tool_count() {
     // The count is spelled as a word in the prose; pin it to the registered count
     // and forbid the two stale numbers that were live (`eight`, `nine`).
     let n = registered_tools().len();
-    assert_eq!(n, 14);
+    assert_eq!(n, 15);
     for (file, rel) in [
         ("README.md", "README.md"),
         (
@@ -117,8 +117,8 @@ fn readme_and_quickstart_state_the_right_tool_count() {
     ] {
         let text = flow(&read(rel));
         assert!(
-            text.contains("fourteen `yupana_*` tools") || text.contains("fourteen MCP tools"),
-            "{file} does not state fourteen tools"
+            text.contains("fifteen `yupana_*` tools") || text.contains("fifteen MCP tools"),
+            "{file} does not state fifteen tools"
         );
         assert!(
             !text.contains("eleven `yupana_*`") && !text.contains("eleven MCP tools"),
