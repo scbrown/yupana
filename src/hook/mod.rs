@@ -25,6 +25,7 @@ mod measure;
 pub mod paa;
 mod post_edit;
 mod pre_bash;
+mod pre_bash_grounding;
 mod pre_edit;
 mod scope_notice;
 #[cfg(feature = "quipu")]
@@ -63,6 +64,10 @@ pub struct HookInput {
     /// The tool's arguments.
     #[serde(default)]
     pub tool_input: ToolInput,
+    /// Turn-boundary grounding reference injected by the harness for a
+    /// NeuralAmplifier-scoped action.
+    #[serde(default)]
+    pub grounding: Option<crate::turn_grounding::GroundingRef>,
 }
 
 /// The tool arguments Yupana reads, across `Edit` / `Write` / `MultiEdit`.

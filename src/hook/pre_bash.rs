@@ -70,6 +70,7 @@
 
 use std::io::Read;
 
+use super::pre_bash_grounding::action_fields;
 use crate::action;
 
 /// Handle a Claude Code `PreToolUse` payload for the Bash tool.
@@ -87,8 +88,21 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
     record_invocation(&buf, cmd.is_some());
 
     if let Some(cmd) = cmd {
+        let input = crate::hook::HookInput::parse(&buf);
+        let grounding = input
+            .as_ref()
+            .and_then(|i| i.grounding.as_ref())
+            .map(|reference| {
+                let state = crate::turn_grounding::assess(
+                    Some(reference),
+                    crate::turn_grounding::cache_dir().as_deref(),
+                    crate::turn_grounding::now_secs(),
+                    crate::turn_grounding::max_age_secs(),
+                );
+                (reference, state)
+            });
         let resolved = action::resolve(&cmd);
-        record(&resolved);
+        record(&resolved, grounding);
         // The scope check rides AFTER the record, deliberately: the trace is
         // the product and must not depend on a policy decision succeeding.
         if let Some(text) = scope_refusal(&buf, &resolved) {
@@ -215,19 +229,15 @@ pub fn command_of(payload: &str) -> Option<String> {
     Some(cmd.to_string())
 }
 
-/// Emit one `action` record. Fail-silent via the spool's own contract.
-fn record(a: &action::Action) {
-    let mut fields: Vec<(&str, serde_json::Value)> =
-        vec![("target_class", a.target_class.as_str().into())];
-    if let Some(v) = &a.verb {
-        fields.push(("verb", v.clone().into()));
-    }
-    if let Some(t) = &a.target {
-        fields.push(("target", t.clone().into()));
-    }
-    crate::metrics::emit("action", &fields);
+fn record(
+    a: &action::Action,
+    grounding: Option<(
+        &crate::turn_grounding::GroundingRef,
+        crate::turn_grounding::GroundingState,
+    )>,
+) {
+    crate::metrics::emit("action", &action_fields(a, grounding));
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,6 +298,27 @@ mod tests {
         let a = action::resolve("frobnicate --wibble");
         assert_eq!(a.target_class.as_str(), "unknown");
         assert!(a.verb.is_none());
+    }
+
+    #[test]
+    fn action_trace_binds_the_known_grounding_answer() {
+        let reference = crate::turn_grounding::GroundingRef {
+            scope: Some("na".into()),
+            grounding_id: Some(format!("sha256:{}", "a".repeat(64))),
+            faction_id: Some("raptors".into()),
+            worldview_sha256: Some("sha256:worldview".into()),
+        };
+        let action = action::resolve("ssh deploy@build-01 uptime");
+        let fields = action_fields(
+            &action,
+            Some((&reference, crate::turn_grounding::GroundingState::Used)),
+        );
+        let field = |name| fields.iter().find(|(key, _)| *key == name).map(|(_, v)| v);
+        assert_eq!(
+            field("grounding_outcome").and_then(serde_json::Value::as_str),
+            Some("used")
+        );
+        assert_eq!(field("constraints").unwrap()[0]["outcome"], "satisfied");
     }
 }
 

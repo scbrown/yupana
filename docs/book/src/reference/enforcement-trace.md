@@ -150,6 +150,31 @@ the only evidence of it.
 It is emitted only when true. A `false` on every line trains a reader to skip the
 field, which is the opposite of what it is for.
 
+## Turn-boundary grounding evidence
+
+NeuralAmplifier-scoped hook payloads may carry a `grounding` reference with
+`scope: "na"`, a content-addressed `grounding_id`, `faction_id`, and
+`worldview_sha256`. Yupana resolves only the matching local cache file; it never
+queries Quipu on an edit or action hot path. The exact cached bytes must hash to
+the id, and their faction/world-view bindings must match the payload.
+
+The result is the ordinary `na-turn-grounding` element in `constraints[]`, not
+a second trace format. Its `grounding_outcome` distinguishes `used`, `empty`,
+`transport-error`, `missing`, `unresolved`, `stale`, and `unknown-scope`.
+Missing or unverifiable evidence is `outcome: "unknown"`, never a fabricated
+success. Empty evidence is `unsatisfied`; fresh used evidence is `satisfied`.
+
+This stage only advises. It cannot emit a blocked response, even when the
+ambient policy mode is `enforce`, and workspace configuration does not control
+whether a harness-supplied grounding reference is checked. Promotion to a hard
+response remains gated on a measured zero-false-positive advise soak.
+
+The cache defaults to `$XDG_STATE_HOME/yupana/grounding` (or
+`~/.local/state/yupana/grounding`) and can be relocated by the harness with
+`YUPANA_GROUNDING_CACHE_DIR`. Files are named `<sha256>.json`; the default
+freshness ceiling is 300 seconds and the harness may set
+`YUPANA_GROUNDING_MAX_AGE_SECS`.
+
 ## Verdicts — `yupana verifier` and `yupana verdicts`
 
 Both need the `quipu` feature.

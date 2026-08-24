@@ -11,6 +11,50 @@
 #![allow(non_snake_case)]
 use super::*;
 
+#[test]
+fn grounding_binding_survives_decision_into_the_existing_trace_envelope() {
+    let reference = crate::turn_grounding::GroundingRef {
+        scope: Some("na".into()),
+        grounding_id: Some(format!("sha256:{}", "a".repeat(64))),
+        faction_id: Some("raptors".into()),
+        worldview_sha256: Some("sha256:worldview".into()),
+    };
+    let mut decision: Decision = Outcome::Allow.into();
+    apply_turn_grounding(
+        &mut decision,
+        &reference,
+        &crate::turn_grounding::GroundingState::Used,
+    );
+    assert_eq!(decision.outcome, Outcome::Allow);
+    let trace = crate::trace::to_json(&decision.constraints);
+    assert_eq!(trace[0]["id"], "na-turn-grounding");
+    assert_eq!(trace[0]["outcome"], "satisfied");
+    assert_eq!(trace[0]["grounding_outcome"], "used");
+}
+
+#[test]
+fn grounding_advice_never_upgrades_to_enforcement() {
+    let reference = crate::turn_grounding::GroundingRef {
+        scope: Some("na".into()),
+        ..crate::turn_grounding::GroundingRef::default()
+    };
+    let mut decision: Decision = Outcome::Allow.into();
+    apply_turn_grounding(
+        &mut decision,
+        &reference,
+        &crate::turn_grounding::GroundingState::Missing,
+    );
+    assert!(matches!(decision.outcome, Outcome::Notify(_)));
+    assert_eq!(
+        decision.constraints[0].outcome,
+        crate::trace::Outcome::Unknown
+    );
+    assert_eq!(
+        decision.constraints[0].response,
+        crate::trace::Response::Warned
+    );
+}
+
 /// A repo where `leaf` is called from three other files — HERMETIC BY
 /// CONSTRUCTION (aegis-enbzz, completed by aegis-0upyu).
 ///

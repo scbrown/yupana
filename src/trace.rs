@@ -114,6 +114,18 @@ pub struct ConstraintEvaluation {
     pub outcome: Outcome,
     /// What the runtime did about it.
     pub response: Response,
+    /// Content-addressed evidence used for this evaluation, when applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grounding_id: Option<String>,
+    /// Fog boundary bound into the grounding evidence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub faction_id: Option<String>,
+    /// Exact world-view content hash bound into the grounding evidence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worldview_sha256: Option<String>,
+    /// Turn-grounding resolver state (`used`, `empty`, `missing`, etc.).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grounding_outcome: Option<String>,
 }
 
 impl ConstraintEvaluation {
@@ -126,6 +138,10 @@ impl ConstraintEvaluation {
             hosted_at: None,
             outcome,
             response,
+            grounding_id: None,
+            faction_id: None,
+            worldview_sha256: None,
+            grounding_outcome: None,
         }
     }
 
@@ -149,6 +165,20 @@ impl ConstraintEvaluation {
     #[must_use]
     pub fn hosted_at(mut self, layer: crate::hosting::HostingLayer) -> Self {
         self.hosted_at = Some(layer);
+        self
+    }
+
+    /// Bind a turn-grounding evaluation to its content-addressed evidence.
+    #[must_use]
+    pub fn grounded(
+        mut self,
+        reference: &crate::turn_grounding::GroundingRef,
+        outcome: &crate::turn_grounding::GroundingState,
+    ) -> Self {
+        self.grounding_id = reference.grounding_id.clone();
+        self.faction_id = reference.faction_id.clone();
+        self.worldview_sha256 = reference.worldview_sha256.clone();
+        self.grounding_outcome = Some(outcome.as_str().to_string());
         self
     }
 }

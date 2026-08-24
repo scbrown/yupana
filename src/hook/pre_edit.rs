@@ -268,6 +268,45 @@ fn guard_inner(
     verdict
 }
 
+/// Compose turn-grounding advice with an existing decision without weakening it.
+fn apply_turn_grounding(
+    decision: &mut Decision,
+    reference: &crate::turn_grounding::GroundingRef,
+    state: &crate::turn_grounding::GroundingState,
+) {
+    if *state == crate::turn_grounding::GroundingState::NotApplicable {
+        return;
+    }
+    let outcome = match state {
+        crate::turn_grounding::GroundingState::Used => crate::trace::Outcome::Satisfied,
+        crate::turn_grounding::GroundingState::Empty => crate::trace::Outcome::Unsatisfied,
+        _ => crate::trace::Outcome::Unknown,
+    };
+    let response = if state.advice().is_some() {
+        crate::trace::Response::Warned
+    } else {
+        crate::trace::Response::NoAction
+    };
+    decision.constraints.push(
+        crate::trace::ConstraintEvaluation::new("na-turn-grounding", outcome, response)
+            .placed(
+                Some(crate::constraint::ConstraintClass::Soft),
+                Some(crate::constraint::VerificationPoint::Pag),
+            )
+            .hosted_at(crate::hosting::YUPANA_HOSTS_AT)
+            .grounded(reference, state),
+    );
+    if let Some(advice) = state.advice() {
+        match &mut decision.outcome {
+            Outcome::Allow => decision.outcome = Outcome::Notify(advice),
+            Outcome::Notify(existing) | Outcome::Deny(existing) => {
+                existing.push('\n');
+                existing.push_str(&advice);
+            }
+        }
+    }
+}
+
 /// Size an edit into a [`MeasureReply`], from the resident daemon when one is
 /// EXPECTED and usable, else the transient build. Returns `(reply, daemon_absent)`;
 /// `daemon_absent` is `Some(reason)` only when a daemon was expected but could not

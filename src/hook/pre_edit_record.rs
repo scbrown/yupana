@@ -44,12 +44,21 @@ pub(super) fn guard_recorded(
 ) -> (Outcome, Vec<(&'static str, serde_json::Value)>) {
     let started = Instant::now();
     let mut decision = guard_inner(input_json, default_root, tenant, config_override);
+    let input = HookInput::parse(input_json);
+    if let Some(reference) = input.as_ref().and_then(|i| i.grounding.as_ref()) {
+        let state = crate::turn_grounding::assess(
+            Some(reference),
+            crate::turn_grounding::cache_dir().as_deref(),
+            crate::turn_grounding::now_secs(),
+            crate::turn_grounding::max_age_secs(),
+        );
+        super::apply_turn_grounding(&mut decision, reference, &state);
+    }
     let result = match &decision.outcome {
         Outcome::Allow => "allow",
         Outcome::Deny(_) => "deny",
         Outcome::Notify(_) => "notify",
     };
-    let input = HookInput::parse(input_json);
     let file_path = input.as_ref().and_then(|i| i.tool_input.file_path.clone());
     let ext = file_path
         .as_ref()
