@@ -40,7 +40,8 @@ pub use session_start::run_session_start;
 // transient path does. Crate-visible so `crate::daemon` can call it.
 pub(crate) use measure::{measure_with_graph, Sizing};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 use serde::Deserialize;
 
@@ -153,11 +154,14 @@ pub fn system_message(message: &str) -> String {
 
 /// Whether this process has already emitted a fail-open notice for `session`.
 ///
-/// Records the notice as a marker file in the system temp directory, created
-/// atomically (`create_new`), so the warning fires once per session instead of
+/// Records the notice as a marker file in `YUPANA_FAILOPEN_MARKER_DIR`, or the
+/// system temp directory by default. The file is created atomically
+/// (`create_new`), so the warning fires once per session instead of
 /// on every edit — a per-edit warning about a down daemon just trains everyone
-/// to ignore it. When no session id is available, or the marker cannot be
-/// written, the notice is allowed through: over-warning beats silence.
+/// to ignore it. Markers older than one day are pruned before a new marker is
+/// written, bounding production state and preventing stale session-id collisions.
+/// When no session id is available, or the marker cannot be written, the notice
+/// is allowed through: over-warning beats silence.
 #[must_use]
 pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
     let Some(session) = session else {
@@ -182,7 +186,12 @@ pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .take(80)
         .collect();
-    let marker = std::env::temp_dir().join(format!("yupana-guard-failopen-{safe}-{kind_safe}"));
+    let marker_dir = fail_open_marker_dir();
+    if std::fs::create_dir_all(&marker_dir).is_err() {
+        return true;
+    }
+    prune_fail_open_markers(&marker_dir, SystemTime::now());
+    let marker = marker_dir.join(format!("{MARKER_PREFIX}{safe}-{kind_safe}"));
     match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -191,6 +200,45 @@ pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
         Ok(_) => true,
         // Already exists => already warned. Any other error => warn anyway.
         Err(e) => e.kind() != std::io::ErrorKind::AlreadyExists,
+    }
+}
+
+/// Marker file-name prefix. `HANK_MARKER_PREFIX` is the pre-rename spelling: markers
+/// written by an installed `hank` outlive the rename, and a prune that only matched
+/// the new prefix would leave them in the temp directory forever — the unbounded
+/// state this function exists to bound.
+const MARKER_PREFIX: &str = "yupana-guard-failopen-";
+const HANK_MARKER_PREFIX: &str = "hank-guard-failopen-";
+
+fn fail_open_marker_dir() -> PathBuf {
+    std::env::var_os("YUPANA_FAILOPEN_MARKER_DIR").map_or_else(std::env::temp_dir, PathBuf::from)
+}
+
+fn prune_fail_open_markers(dir: &Path, now: SystemTime) {
+    const MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_marker = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| {
+                name.starts_with(MARKER_PREFIX) || name.starts_with(HANK_MARKER_PREFIX)
+            });
+        if !is_marker {
+            continue;
+        }
+        let stale = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| now.duration_since(modified).ok())
+            .is_some_and(|age| age > MAX_AGE);
+        if stale {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 
@@ -292,10 +340,51 @@ mod tests {
                 .take(80)
                 .collect();
             let _ = std::fs::remove_file(
-                std::env::temp_dir().join(format!("yupana-guard-failopen-{session}-{safe_kind}")),
+                fail_open_marker_dir().join(format!("{MARKER_PREFIX}{session}-{safe_kind}")),
             );
         }
         // Without a session id we cannot rate-limit, so we always warn.
         assert!(first_notice_for_session(None, "config"));
+    }
+
+    #[test]
+    fn stale_fail_open_markers_are_pruned_but_fresh_markers_remain() {
+        use std::fs::FileTimes;
+
+        let dir = fail_open_marker_dir();
+        std::fs::create_dir_all(&dir).unwrap();
+        let nonce = format!("{}-{:?}", std::process::id(), SystemTime::now());
+        let stale = dir.join(format!("{MARKER_PREFIX}stale-{nonce}"));
+        let fresh = dir.join(format!("{MARKER_PREFIX}fresh-{nonce}"));
+        // A marker left behind by the pre-rename `hank` binary must be pruned too,
+        // otherwise the rename quietly makes this state unbounded again.
+        let legacy = dir.join(format!("{HANK_MARKER_PREFIX}stale-{nonce}"));
+        let stale_file = std::fs::File::create(&stale).unwrap();
+        let legacy_file = std::fs::File::create(&legacy).unwrap();
+        std::fs::File::create(&fresh).unwrap();
+        let old =
+            FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(25 * 60 * 60));
+        stale_file.set_times(old).unwrap();
+        legacy_file.set_times(old).unwrap();
+
+        prune_fail_open_markers(&dir, SystemTime::now());
+
+        assert!(!stale.exists());
+        assert!(
+            !legacy.exists(),
+            "a pre-rename hank marker survived the prune"
+        );
+        assert!(fresh.exists());
+        let _ = std::fs::remove_file(fresh);
+    }
+
+    #[test]
+    fn cargo_tests_use_the_sealed_fail_open_marker_directory() {
+        let dir = fail_open_marker_dir();
+        assert!(
+            dir.ends_with("target/test-state/failopen"),
+            "{}",
+            dir.display()
+        );
     }
 }

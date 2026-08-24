@@ -33,3 +33,4 @@
 YUPANA_METRICS_PATH = { value = "target/test-state/metrics.jsonl", relative = true }
 YUPANA_VERDICT_PATH = { value = "target/test-state/verdicts.jsonl", relative = true }
 YUPANA_PROJECTION_CACHE_PATH = { value = "target/test-state/projection.json", relative = true }
+YUPANA_FAILOPEN_MARKER_DIR = { value = "target/test-state/failopen", relative = true }
