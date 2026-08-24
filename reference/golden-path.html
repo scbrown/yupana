@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Harness Integration - Yupana — Live Code Structure</title>
+        <title>Golden-Path Conformance - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/getting-started/harness-integration.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/golden-path.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,152 +181,82 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="harness-integration-claude-code-hooks"><a class="header" href="#harness-integration-claude-code-hooks">Harness Integration (Claude Code Hooks)</a></h1>
-<p>Yupana can plug into an agent harness so it responds to edits <strong>synchronously</strong>,
-the way a language server reacts to a keystroke. The agent's edit tool call <em>is</em>
-the change event; a harness hook feeds it to Yupana, and Yupana replies inline — no
-tool call for the agent to remember.</p>
-<p>For Claude Code this uses <a href="https://docs.claude.com/en/docs/claude-code/hooks">hooks</a>.</p>
-<h2 id="post-edit-advisory-available-now"><a class="header" href="#post-edit-advisory-available-now">Post-edit advisory (available now)</a></h2>
-<p><code>yupana hook post-edit</code> reads the <code>PostToolUse</code> payload on stdin and, when the
-edited file has symbols called from <em>other</em> files, returns a cross-file
-blast-radius advisory as injected context.</p>
-<p>Wire it in <code>.claude/settings.json</code>:</p>
-<pre><code class="language-json">{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          { "type": "command", "command": "yupana hook post-edit" }
-        ]
-      }
-    ]
-  }
-}
-</code></pre>
-<p>After the agent edits <code>src/auth.rs</code>, it sees something like:</p>
-<pre><code class="language-text">Yupana (tree-sitter): your edit to src/auth.rs touches symbol(s) with callers
-elsewhere — re-check these still compile.
-  authenticate &lt;- 3 caller(s)
-  verify_token &lt;- 1 caller(s)
-Impacted files: src/api/login.rs, src/api/session.rs
-</code></pre>
-<p>The advisory is emitted only when there is cross-file impact, and the hook never
-fails the harness (no output = nothing to say).</p>
-<p>With the <code>quipu</code> feature and the work-item scope rung at <code>advise</code>, the same
-hook also delivers the <strong>out-of-ground notice</strong> as <code>additionalContext</code>: the
-edit has landed, nothing is blocked, and the agent is told — before its next
-action — that it stepped outside its work item's ground, with what the graph
-knows about that path (who worked it before, and how that went). This channel
-exists because a pre-edit <code>systemMessage</code> reaches the operator's pane, not the
-model's context; see the
-<a href="../reference/policy-guard.html">policy guard contract</a>.</p>
-<h2 id="work-item-briefing-available-now-quipu-feature"><a class="header" href="#work-item-briefing-available-now-quipu-feature">Work-item briefing (available now, <code>quipu</code> feature)</a></h2>
-<p><code>yupana hook session-start</code> (<code>SessionStart</code>) injects the graph's knowledge of
-the agent's tracked work item into its context at assignment time — before the
-first edit, not at the first denial: the item's ground (paths prior work
-touched, with symbols and caller locality), the central entities around it
-(quipu pagerank), semantically similar past items with their outcomes so
-<strong>successful work gets reused</strong>, related in-flight items, the governed rules
-in force, and the scope posture. Silent when no plate or no quipu seam.</p>
-<p>What lands in context is the <strong>L0</strong> briefing: the item, its ground paths and
-the scope posture, plus a <strong>census</strong> of every section held back — one line
-each, naming how many items it holds and the real <code>quipu_ask</code> /
-<code>quipu_context</code> / <code>quipu_project</code> call that expands it. The census is the
-whole difference between a briefing that is <em>small</em> and one that is
-<em>incomplete</em>: a short briefing with no counts is indistinguishable from a
-graph that knew nothing. Sections with zero items are omitted entirely rather
-than shown as empty headings.</p>
-<p>Division of labor with Bobbin: Bobbin's own hooks (<code>bobbin hook install</code> —
-<code>inject-context</code> on UserPromptSubmit, <code>session-context</code>/<code>prime-context</code> on
-SessionStart) own <em>semantic code</em> context; this briefing owns the
-<em>governance/work-item</em> context. Wire both side by side — the briefing
-deliberately does not nest a bobbin call, so the same context is never
-injected twice.</p>
-<pre><code class="language-json">{
-  "env": { "SHANTY_ROOT": "/gt", "SHANTY_AGENT": "polecat-3" },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          { "type": "command", "command": "yupana hook session-start", "timeout": 15 }
-        ]
-      }
-    ]
-  }
-}
-</code></pre>
-<h2 id="pre-edit-guard-available-now"><a class="header" href="#pre-edit-guard-available-now">Pre-edit guard (available now)</a></h2>
-<p><code>yupana hook pre-edit</code> (<code>PreToolUse</code>) checks an edit <em>before</em> it lands against the
-calling tenant's capability scope, and can <strong>deny</strong> it with a reason the model
-can act on. Blocking is <strong>opt-in and off by default</strong>.</p>
-<pre><code class="language-json">{
-  "env": { "BOBBIN_ROLE": "polecat-3" },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          { "type": "command", "command": "yupana hook pre-edit", "timeout": 5 }
-        ]
-      }
-    ]
-  }
-}
-</code></pre>
-<p>With a scope configured for that tenant (see
-<a href="../reference/config.html">Configuration</a>), an over-reaching edit comes back as:</p>
-<pre><code class="language-text">yupana: editing `src/core.rs` reaches 4 symbols (ceiling 2) and 4 files
-(ceiling 1) — beyond the blast radius allowed for tenant `polecat-demo`.
-Split this into a narrower change that touches fewer callers, or ask for a
-wider capability scope. (tree-sitter tier: the reach is an approximation.)
-</code></pre>
-<p>The guard <strong>always fails open</strong>: every error, timeout, and unparseable payload
-allows the edit, because a guard that fails closed would brick every agent the
-moment Yupana is unavailable. Read
-<a href="../reference/policy-guard.html">the full contract</a> before wiring it into a fleet
-— particularly the rules that allow is <em>silence</em> and that Yupana never exits <code>2</code>.</p>
-<h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
-<p><code>yupana hook pre-bash</code> (<code>PreToolUse</code> on <code>Bash</code>) records each command's
-resolved <code>(verb, target, class)</code> for the enforcement trace, and is
-<strong>record-only by default</strong>: it prints nothing unless a deployment explicitly
-sets <code>[yupana.policy] action_scope</code> (off out of the box), at which point a
-declared scope's <code>allow_targets</code> / <code>deny_targets</code> can advise or refuse a
-command. Commands whose target is not unambiguous from syntax are abstentions,
-never violations. See
-<a href="../reference/policy-guard.html#the-action-surface-pre-bash">the guard contract</a>.</p>
-<pre><code class="language-json">{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "yupana hook pre-bash", "timeout": 5 }
-        ]
-      }
-    ]
-  }
-}
-</code></pre>
-<h2 id="performance-note"><a class="header" href="#performance-note">Performance note</a></h2>
-<p>By default the hooks build the call graph transiently on each invocation. With
-a running <a href="../reference/daemon.html">resident daemon</a> and <code>[yupana.serve] use_daemon = true</code>, both hooks become thin clients of the resident graph — no
-per-invocation build, which is what meets the sub-100ms budget a synchronous
-guard needs. The daemon being down degrades differently per hook: the pre-edit
-guard fails open <strong>loudly</strong>, the post-edit advisory falls back silently (it is
-advice, not enforcement). See
-<a href="../design/specification.html">the specification</a> §5.9 (FR-30/FR-31).</p>
+                        <h1 id="golden-path-conformance"><a class="header" href="#golden-path-conformance">Golden-Path Conformance</a></h1>
+<p>FR-40..FR-42, behind the <code>golden-path</code> Cargo feature (in the CI matrix). A
+<strong>golden path</strong> is a blessed trajectory — a pruned, human-promoted record of
+how verified-successful work actually went, authored and governed in Quipu.
+This plane evaluates work against one: given a declared <code>followsPath</code> and a
+sequence of steps, it answers where the work stands — matched, deviating,
+hazard-adjacent — under the versioned conformance grammar shared with Quipu's
+backtest (<code>gp-grammar/1</code>).</p>
+<p>The full design addendum, including the blessing ladder and the division of
+labor with camayoc and quipu, is
+<a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md"><code>docs/golden-path-guard.md</code></a>.</p>
+<h2 id="surfaces"><a class="header" href="#surfaces">Surfaces</a></h2>
+<ul>
+<li><strong><code>yupana_path_check</code></strong> over MCP (registered on every build; refuses with a
+message naming the feature when <code>golden-path</code> is absent).</li>
+<li><strong><code>POST /path/check</code></strong> on the <a href="daemon.html">resident daemon</a>, mounted only on
+a build that can serve it.</li>
+</ul>
+<p>Both take the same request: the <code>followsPath</code> IRI the work declared, the steps
+as v1 signatures (<code>action_kind</code> + <code>target_class</code>), the <strong>projected paths
+supplied per call</strong>, a <code>mode</code>, and an optional <code>deny</code> opt-in.</p>
+<p>Paths are supplied per call, like the board guard's <code>StatePolicy</code> list,
+because a stale resident copy would enforce yesterday's blessing while looking
+current. "Empty registry" is therefore a per-call property: a request
+declaring a <code>followsPath</code> that is not in the supplied set is <strong>refused</strong>,
+never reported clean — <code>409 Conflict</code> over HTTP, an error result over MCP, so
+a caller gating on status alone cannot mistake "nothing was loaded" for "this
+plan conforms". A grammar version this build does not implement refuses the
+same way.</p>
+<h2 id="the-two-modes"><a class="header" href="#the-two-modes">The two modes</a></h2>
+<p>Under gp-grammar/1 gaps are allowed, so an <strong>open</strong> trajectory never
+hard-deviates — a future step could always match the next pattern element.
+Deviation is decidable only against a complete intent, which is what splits
+the check in two:</p>
+<ul>
+<li><strong><code>mode: "plan"</code></strong> (default, FR-42) — the submitted sequence is the whole
+intent. The report names how much of the pattern matched and the <strong>first
+deviation point</strong> (which pattern step was expected, after which submitted
+step). This is the only mode in which deviation is decidable, and so the
+only mode that can ever deny.</li>
+<li><strong><code>mode: "progress"</code></strong> (FR-41) — the work is in flight. The report says how
+far along the path the work is, which <code>deadEnd</code> hazards it has brushed
+("exemplars tried this; it did not help"), and which steps the grammar could
+not evaluate. It never denies.</li>
+</ul>
+<h2 id="effects-are-capped-by-blessing-level"><a class="header" href="#effects-are-capped-by-blessing-level">Effects are capped by blessing level</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Path level</th><th>Effect</th></tr></thead><tbody>
+<tr><td><code>advisory</code> (L3)</td><td><code>warn</code> only</td></tr>
+<tr><td><code>blessed</code> (L4)</td><td><code>warn</code> by default; <code>deny</code> only when the caller passed <code>deny: true</code> <strong>and</strong> the mode is <code>plan</code></td></tr>
+<tr><td>constraint-backing (L5)</td><td>does not even parse — an unsigned L5 cannot enforce as if it were signed; gated on verdict signing</td></tr>
+</tbody></table>
+</div>
+<p>Deviation is not failure: a deviation verdict is input to the record (quipu
+stores it; the promotion gates consume it as traffic), not a judgment that the
+agent is wrong. Paths are demoted when conformers start failing, and that
+evidence only exists if deviation and conformance are both recorded
+faithfully.</p>
+<h2 id="the-report"><a class="header" href="#the-report">The report</a></h2>
+<p>An answerable check returns a <code>PathCheckReport</code>: the grammar version and path
+IRI it evaluated, the path's <code>level</code> and the <code>mode</code>, <code>matched</code> out of
+<code>pattern_len</code>, the <code>first_deviation</code> (plan mode), <code>hazards</code> (which submitted
+step matched which dead end, with its note), <code>unevaluated_steps</code>, the
+resulting <code>effect</code>, the path's <strong>exemplar citations</strong> (a warn must be able to
+say "because this concrete work succeeded this way"), and <code>projected_at</code> —
+echoed from the projection, omitted rather than faked when the projection
+carries none.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting-started/configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/replay.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../reference/enforcement-trace.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -336,11 +266,11 @@ advice, not enforcement). See
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting-started/configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/replay.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../reference/enforcement-trace.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

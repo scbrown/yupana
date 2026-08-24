@@ -371,9 +371,12 @@ max_impacted_files = 10
 rung is armed (<code>[yupana.policy] work_item_scope = "advise" | "enforce"</code>), in
 which case the guard falls back to the OBSERVED scope of the agent's tracked
 work item (the paths prior work on it touched, projected from quipu), and an
-unknown scope draws a once-per-session advisory instead of silence. See the
-Configuration Reference and <code>docs/work-scoped-governance.md</code>. <code>deny_paths</code>
-beats <code>allow_paths</code>.
+unknown scope draws a once-per-session advisory instead of silence. An item
+with no observed ground of its own is scoped to its parent's — the <strong>derived</strong>
+rung, which never hard-denies at any setting (an inference must not block) and
+which answers <code>Allow</code> for an in-ground edit rather than falling through to
+"unguarded". See the Configuration Reference and
+<code>docs/work-scoped-governance.md</code>. <code>deny_paths</code> beats <code>allow_paths</code>.
 Path patterns are globs matched against the repo-relative path.</p>
 <p>With <code>mode = "advise"</code> the guard reports what it <em>would</em> have denied via
 <code>systemMessage</code> and never blocks — run a new scope in <code>advise</code> for a while
@@ -388,6 +391,15 @@ advise run, so the violation counts you collect are the <em>uncorrected</em> rat
 which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 <code>enforce</code> puts the reason in front of the model.</p>
+<p>The <strong>work-item scope</strong> advise rung is the exception: its out-of-ground notice
+is delivered where the agent <em>can</em> read it — as <code>PostToolUse</code>
+<code>additionalContext</code> on the post-edit hook, the channel that reaches the model
+without blocking. The edit has landed, nothing is prevented, and the agent is
+told before its next action that it stepped outside its item's ground — along
+with what the graph knows about where it went (which work items' commits
+touched that path before, and how each turned out). Silent whenever it cannot
+speak honestly: no plate, no scope for the item, an unreachable store, or an
+edit inside the ground. An unknown scope is UNKNOWN, not a deviation.</p>
 <h2 id="tripwires--boundaries-with-declared-effects"><a class="header" href="#tripwires--boundaries-with-declared-effects">Tripwires — boundaries with declared effects</a></h2>
 <p>A <strong>tripwire</strong> (<code>[[yupana.policy.tripwires]]</code>) is the local-config slice of the
 governance plane's <em>Binding / Gate</em> primitive: it attaches an effect to a

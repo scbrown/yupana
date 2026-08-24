@@ -220,9 +220,19 @@ equally correct, just slower); absence still goes to stderr for the operator.</l
 </ul>
 <h2 id="http-api"><a class="header" href="#http-api">HTTP API</a></h2>
 <p>Every reply carries its provenance <code>tier</code> (FR-3). Facts come from the graph
-built at daemon startup — <code>/status.uptime_secs</code> says how old that snapshot is.
-Freshness tags (the FR-3 second half) arrive with overlay updates (yupana #3);
-replies omit them rather than faking <code>fresh</code>.</p>
+built at daemon startup — <code>/status.uptime_secs</code> says how old that snapshot is.</p>
+<p><strong>Code-fact freshness</strong> (the FR-3 second half) is served on the tenant-scoped
+<code>/symbols</code> reply (bobbin-052): the watch path's per-<code>(tenant, file)</code> note —
+<code>recomputing</code> from touch until the frontier recompute is current, then
+<code>fresh</code> — read <em>before</em> the view is composed, so the tag describes the state
+the symbols came from. The omit rule survives the wiring: the field is
+<strong>absent</strong> on the untenanted path (no tenant to key the map by) and for a
+tenant that never had an edit absorbed — never <code>"fresh"</code>, never <code>"unknown"</code>,
+because a fabricated tag is indistinguishable from a measured one. This is a
+different quantity from the <em>projection</em> freshness the verdict surface serves
+(how current the projected policy registry is); they answer different
+questions and can disagree. See
+<a href="../concepts/tiers-and-freshness.html">Tiers and Freshness</a>.</p>
 <div class="table-wrapper"><table><thead><tr><th>Route</th><th>Method</th><th>Query/body</th><th>Answer</th></tr></thead><tbody>
 <tr><td><code>/health</code></td><td>GET</td><td>—</td><td>bare <code>ok</code> (the liveness probe)</td></tr>
 <tr><td><code>/status</code></td><td>GET</td><td>—</td><td>root, node/edge counts, uptime, tiers, <code>tenant_layer</code> (base commit + active overlays; <code>null</code> = layer absent)</td></tr>
@@ -233,9 +243,18 @@ replies omit them rather than faking <code>fresh</code>.</p>
 <tr><td><code>/symbols</code></td><td>GET</td><td><code>file</code> (root-relative), <code>tenant?</code></td><td>that file's symbols, line order</td></tr>
 <tr><td><code>/dataflow</code></td><td>GET</td><td><code>function</code>, <code>path?</code>, <code>var?</code>, <code>forward?</code>, <code>hops?</code></td><td>intra-procedural data dependence</td></tr>
 <tr><td><code>/measure</code></td><td>POST</td><td><code>{file, rel, anchors[], max_hops?}</code></td><td>edit blast-radius sizing for the guard</td></tr>
-<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's <code>frontier</code> counts what it reached). Per-<code>(tenant, file)</code> code-fact freshness follows the watch path's discipline — <code>recomputing</code> from touch until the frontier is current, then <code>fresh</code> (tracked; served at Phase 3). Omitted <code>content</code> is read from disk, root-confined.</td></tr>
+<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's <code>frontier</code> counts what it reached). The freshness this maintains is what tenant-scoped <code>/symbols</code> serves. Omitted <code>content</code> is read from disk, root-confined.</td></tr>
 </tbody></table>
 </div>
+<p>Feature-gated routes, mounted only on a build that can serve them:</p>
+<ul>
+<li><strong><code>game-state</code></strong> — <code>POST /ingest</code>, <code>POST /guard</code>, <code>POST /whatif</code> (FR-35,
+FR-37, FR-38; see <a href="../concepts/game-state.html">The Game-State Harness</a>).</li>
+<li><strong><code>golden-path</code></strong> — <code>POST /path/check</code> (FR-41/FR-42; see
+<a href="golden-path.html">Golden-Path Conformance</a>). A check that cannot be answered
+— no projected paths, an undeclared path, an unknown grammar version — is a
+<code>409 Conflict</code>, never 200-with-no-findings.</li>
+</ul>
 <h2 id="the-tenant-layer-yupana-2"><a class="header" href="#the-tenant-layer-yupana-2">The tenant layer (yupana #2)</a></h2>
 <p>When the root is a git repo, the daemon also holds a <strong>tenant registry</strong>: one
 shared read-only base built at the startup <code>HEAD</code>, plus a copy-on-write

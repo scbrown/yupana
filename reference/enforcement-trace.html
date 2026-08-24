@@ -218,6 +218,22 @@ negative value.</p>
 </div>
 <p>Every line also carries <code>ts</code> (unix seconds), and <code>agent</code> / <code>tenant</code> from
 <code>$SHANTY_AGENT</code> and <code>$BOBBIN_ROLE</code> when set.</p>
+<p>Three fields on the <code>guard</code> record earn a note:</p>
+<ul>
+<li><strong><code>parsed</code></strong> — two-sided liveness. The record fires on every invocation, so
+its <em>absence</em> means the hook never ran; <code>parsed: false</code> means it ran against
+a payload shape it did not recognise. Without the flag that second case is
+indistinguishable from a clean allow, which is how a guard gets believed to
+be passing while it inspects nothing. (<code>pre_bash_invoked</code> carries the same
+discriminator under the same name.)</li>
+<li><strong><code>session</code> and <code>item</code></strong> — which session, and which tracked work item,
+caused this decision. They are what make the spool <em>replayable</em> rather than
+merely auditable: a windowed rule ("this session has already done N of
+these") has nothing to group by without them. Both are <strong>omitted, never
+blanked</strong>, when unresolved — these records are replayed to <em>derive</em>
+enforcement rules, so a fabricated value does not mislabel one row, it
+manufactures evidence for a rule that then applies to everyone.</li>
+</ul>
 <h2 id="the-constraint-set--constraints"><a class="header" href="#the-constraint-set--constraints">The constraint set — <code>constraints[]</code></a></h2>
 <p>One array rather than sibling keys, so a reader never has to reassemble which
 class went with which id by position:</p>
@@ -378,7 +394,7 @@ what each one provably cannot decide.</p>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../reference/replay.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/golden-path.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -392,7 +408,7 @@ what each one provably cannot decide.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../reference/replay.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/golden-path.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

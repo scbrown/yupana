@@ -337,6 +337,14 @@ Impacted files: src/api/login.rs, src/api/session.rs
 </code></pre>
 <p>The advisory is emitted only when there is cross-file impact, and the hook never
 fails the harness (no output = nothing to say).</p>
+<p>With the <code>quipu</code> feature and the work-item scope rung at <code>advise</code>, the same
+hook also delivers the <strong>out-of-ground notice</strong> as <code>additionalContext</code>: the
+edit has landed, nothing is blocked, and the agent is told — before its next
+action — that it stepped outside its work item's ground, with what the graph
+knows about that path (who worked it before, and how that went). This channel
+exists because a pre-edit <code>systemMessage</code> reaches the operator's pane, not the
+model's context; see the
+<a href="getting-started/../reference/policy-guard.html">policy guard contract</a>.</p>
 <h2 id="work-item-briefing-available-now-quipu-feature"><a class="header" href="#work-item-briefing-available-now-quipu-feature">Work-item briefing (available now, <code>quipu</code> feature)</a></h2>
 <p><code>yupana hook session-start</code> (<code>SessionStart</code>) injects the graph's knowledge of
 the agent's tracked work item into its context at assignment time — before the
@@ -345,6 +353,14 @@ touched, with symbols and caller locality), the central entities around it
 (quipu pagerank), semantically similar past items with their outcomes so
 <strong>successful work gets reused</strong>, related in-flight items, the governed rules
 in force, and the scope posture. Silent when no plate or no quipu seam.</p>
+<p>What lands in context is the <strong>L0</strong> briefing: the item, its ground paths and
+the scope posture, plus a <strong>census</strong> of every section held back — one line
+each, naming how many items it holds and the real <code>quipu_ask</code> /
+<code>quipu_context</code> / <code>quipu_project</code> call that expands it. The census is the
+whole difference between a briefing that is <em>small</em> and one that is
+<em>incomplete</em>: a short briefing with no counts is indistinguishable from a
+graph that knew nothing. Sections with zero items are omitted entirely rather
+than shown as empty headings.</p>
 <p>Division of labor with Bobbin: Bobbin's own hooks (<code>bobbin hook install</code> —
 <code>inject-context</code> on UserPromptSubmit, <code>session-context</code>/<code>prime-context</code> on
 SessionStart) own <em>semantic code</em> context; this briefing owns the
@@ -394,6 +410,28 @@ allows the edit, because a guard that fails closed would brick every agent the
 moment Yupana is unavailable. Read
 <a href="getting-started/../reference/policy-guard.html">the full contract</a> before wiring it into a fleet
 — particularly the rules that allow is <em>silence</em> and that Yupana never exits <code>2</code>.</p>
+<h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
+<p><code>yupana hook pre-bash</code> (<code>PreToolUse</code> on <code>Bash</code>) records each command's
+resolved <code>(verb, target, class)</code> for the enforcement trace, and is
+<strong>record-only by default</strong>: it prints nothing unless a deployment explicitly
+sets <code>[yupana.policy] action_scope</code> (off out of the box), at which point a
+declared scope's <code>allow_targets</code> / <code>deny_targets</code> can advise or refuse a
+command. Commands whose target is not unambiguous from syntax are abstentions,
+never violations. See
+<a href="getting-started/../reference/policy-guard.html#the-action-surface-pre-bash">the guard contract</a>.</p>
+<pre><code class="language-json">{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "yupana hook pre-bash", "timeout": 5 }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
 <h2 id="performance-note"><a class="header" href="#performance-note">Performance note</a></h2>
 <p>By default the hooks build the call graph transiently on each invocation. With
 a running <a href="getting-started/../reference/daemon.html">resident daemon</a> and <code>[yupana.serve] use_daemon = true</code>, both hooks become thin clients of the resident graph — no
@@ -514,11 +552,15 @@ FR-7); not yet implemented or served.</em></li>
 <ul>
 <li><strong>Code-fact freshness</strong> — is this structural fact current with the file it
 came from? The watch path tracks it per file (<code>Recomputing → Fresh</code>
-transitions in <code>src/watch/overlay_refresh.rs</code>), but no query surface serves
-it yet: the on-demand serve path rebuilds per request, so no cached code fact
-can be stale. Query responses therefore <em>omit</em> <code>freshness</code> rather than stamp
-a constant <code>fresh</code> — the tag arrives with the Phase 3 resident-graph serve
-path.</li>
+transitions in <code>src/watch/overlay_refresh.rs</code>), and since Phase 3
+(bobbin-052) the <a href="concepts/../reference/daemon.html">resident daemon</a> <em>serves</em> it on
+the tenant-scoped <code>/symbols</code> reply — read before the view is composed, so
+the tag describes the state the symbols came from. Everywhere it is
+unknown, the field is <strong>omitted rather than faked</strong>: the untenanted path
+has no tenant to key the map by, a tenant that never had an edit absorbed
+has no note to report, and the on-demand (non-daemon) serve path rebuilds
+per request so no cached code fact can be stale. Absent, never <code>"fresh"</code>,
+never <code>"unknown"</code>.</li>
 <li><strong>Projection freshness</strong> — are the governed rules a verdict enforced still
 the current ones? This is <em>served today</em>: the pre-edit guard's rule verdicts
 state <code>fresh</code> / <code>stale</code> (with the cache age in seconds) / <code>recomputing</code>
@@ -677,6 +719,15 @@ side.</p>
 each turn with new numbers replaces rather than accumulates. A <strong>dangling edge is
 refused</strong> — a pattern traversing it would bind a variable to an id with no entity
 behind it.</p>
+<p>Ingest otherwise <strong>merges</strong>: a node the new request does not mention survives
+from the last one. That is right for a caller sending patches and wrong for a
+caller whose payload <em>is</em> the board — without a way to say so, a base razed
+twenty turns ago goes on matching policy selectors forever, a stale second
+source of board state behind a caller who believes it just stated the current
+one. <code>"replace": true</code> on the request makes that ingest the <em>whole</em> of the
+tenant's private layer rather than a patch on it. Default <code>false</code>, so every
+existing caller keeps the additive behaviour; private layer only, because the
+shared base is common knowledge and not one tenant's to clear.</p>
 <h2 id="policies-graph-pattern-and-where-the-line-to-quipu-is"><a class="header" href="#policies-graph-pattern-and-where-the-line-to-quipu-is">Policies: <code>graph-pattern</code>, and where the line to Quipu is</a></h2>
 <p>A policy is the code plane's shape with three additions: a <code>selector_lang</code>
 discriminator, a <code>boundary</code> value of <code>"order"</code>, and the <code>engine-state</code> tier.
@@ -1137,6 +1188,11 @@ promote_on = "merge"
 # "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback).
 branch_model = "named_graph"
 shapes_path = "shapes/"
+# Max age (secs) the durable projection cache (projection.json) may be SERVED
+# when quipu cannot be reached — a cache-served verdict is STALE and states
+# its age. Past the TTL the guard fails open loudly instead. 0 disables
+# serving the cache.
+projection_cache_ttl_secs = 3600
 
 [yupana.policy]
 # "off" (inert) | "advise" (report only) | "enforce" (deny).
@@ -1159,6 +1215,11 @@ verify = false
 # edits). `mode` stays a ceiling; needs [yupana.quipu] and a tracker plate
 # ($SHANTY_ROOT/crew/$SHANTY_AGENT/plate.json).
 work_item_scope = "off"
+# The ACTION surface (`yupana hook pre-bash`): "off" (record-only, default) |
+# "advise" | "enforce". `mode` stays a ceiling. Checked against the declared
+# allow_targets / deny_targets below; a command whose target is not
+# unambiguous from syntax is an abstention, never a violation.
+action_scope = "off"
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.
@@ -1167,6 +1228,9 @@ allow_paths = ["src/**", "tests/**"]   # empty = any path
 deny_paths = ["src/config.rs"]         # beats allow_paths
 max_impacted_symbols = 25
 max_impacted_files = 10
+# Action targets, matched as `class:target` (host | service | repo | container).
+allow_targets = ["host:build-*"]       # empty = any target
+deny_targets = ["service:etcd"]        # beats allow_targets
 
 # Structural (tree-sitter-tier) rules — checks a linter finds hard or slow.
 # Unlike scopes, rules are NOT per-tenant: they govern the code an edit
@@ -1183,6 +1247,18 @@ pattern = '\b[A-Z]+-[0-9]+\b'          # Predicate: the regex
 # gate = '\bTODO\b'                    # optional: only test captures matching this
 # applies_to = ["src/**"]              # optional path globs; empty = any path
 # message = "keep ticket refs in commits, not comments"  # optional override
+
+# Tripwires — boundaries with declared effects; the edit itself is the
+# crossing. See "Pre-Edit Policy Guard" § Tripwires. A misconfigured wire
+# (malformed glob, unknown rule, throttle without backoff_secs, no paths and
+# no rule) is a LOUD fail-open, never a silently inert control.
+[[yupana.policy.tripwires]]
+name = "auth-boundary"
+paths = ["src/auth/**"]            # repo-relative globs; empty needs `rule`
+effect = "deny"                    # warn | deny | throttle
+# rule = "no-ticket-in-comment"    # optional: trip only when this rule fires inside
+# backoff_secs = 300               # required for effect = "throttle"
+# message = "auth changes need the security workflow"  # optional override
 
 # What the usage spool records about each guard decision.
 [yupana.metrics]
@@ -1356,9 +1432,19 @@ equally correct, just slower); absence still goes to stderr for the operator.</l
 </ul>
 <h2 id="http-api"><a class="header" href="#http-api">HTTP API</a></h2>
 <p>Every reply carries its provenance <code>tier</code> (FR-3). Facts come from the graph
-built at daemon startup — <code>/status.uptime_secs</code> says how old that snapshot is.
-Freshness tags (the FR-3 second half) arrive with overlay updates (yupana #3);
-replies omit them rather than faking <code>fresh</code>.</p>
+built at daemon startup — <code>/status.uptime_secs</code> says how old that snapshot is.</p>
+<p><strong>Code-fact freshness</strong> (the FR-3 second half) is served on the tenant-scoped
+<code>/symbols</code> reply (bobbin-052): the watch path's per-<code>(tenant, file)</code> note —
+<code>recomputing</code> from touch until the frontier recompute is current, then
+<code>fresh</code> — read <em>before</em> the view is composed, so the tag describes the state
+the symbols came from. The omit rule survives the wiring: the field is
+<strong>absent</strong> on the untenanted path (no tenant to key the map by) and for a
+tenant that never had an edit absorbed — never <code>"fresh"</code>, never <code>"unknown"</code>,
+because a fabricated tag is indistinguishable from a measured one. This is a
+different quantity from the <em>projection</em> freshness the verdict surface serves
+(how current the projected policy registry is); they answer different
+questions and can disagree. See
+<a href="reference/../concepts/tiers-and-freshness.html">Tiers and Freshness</a>.</p>
 <div class="table-wrapper"><table><thead><tr><th>Route</th><th>Method</th><th>Query/body</th><th>Answer</th></tr></thead><tbody>
 <tr><td><code>/health</code></td><td>GET</td><td>—</td><td>bare <code>ok</code> (the liveness probe)</td></tr>
 <tr><td><code>/status</code></td><td>GET</td><td>—</td><td>root, node/edge counts, uptime, tiers, <code>tenant_layer</code> (base commit + active overlays; <code>null</code> = layer absent)</td></tr>
@@ -1369,9 +1455,18 @@ replies omit them rather than faking <code>fresh</code>.</p>
 <tr><td><code>/symbols</code></td><td>GET</td><td><code>file</code> (root-relative), <code>tenant?</code></td><td>that file's symbols, line order</td></tr>
 <tr><td><code>/dataflow</code></td><td>GET</td><td><code>function</code>, <code>path?</code>, <code>var?</code>, <code>forward?</code>, <code>hops?</code></td><td>intra-procedural data dependence</td></tr>
 <tr><td><code>/measure</code></td><td>POST</td><td><code>{file, rel, anchors[], max_hops?}</code></td><td>edit blast-radius sizing for the guard</td></tr>
-<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's <code>frontier</code> counts what it reached). Per-<code>(tenant, file)</code> code-fact freshness follows the watch path's discipline — <code>recomputing</code> from touch until the frontier is current, then <code>fresh</code> (tracked; served at Phase 3). Omitted <code>content</code> is read from disk, root-confined.</td></tr>
+<tr><td><code>/edit</code></td><td>POST</td><td><code>{tenant, rel, content?}</code></td><td>FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's <code>frontier</code> counts what it reached). The freshness this maintains is what tenant-scoped <code>/symbols</code> serves. Omitted <code>content</code> is read from disk, root-confined.</td></tr>
 </tbody></table>
 </div>
+<p>Feature-gated routes, mounted only on a build that can serve them:</p>
+<ul>
+<li><strong><code>game-state</code></strong> — <code>POST /ingest</code>, <code>POST /guard</code>, <code>POST /whatif</code> (FR-35,
+FR-37, FR-38; see <a href="reference/../concepts/game-state.html">The Game-State Harness</a>).</li>
+<li><strong><code>golden-path</code></strong> — <code>POST /path/check</code> (FR-41/FR-42; see
+<a href="reference/golden-path.html">Golden-Path Conformance</a>). A check that cannot be answered
+— no projected paths, an undeclared path, an unknown grammar version — is a
+<code>409 Conflict</code>, never 200-with-no-findings.</li>
+</ul>
 <h2 id="the-tenant-layer-yupana-2"><a class="header" href="#the-tenant-layer-yupana-2">The tenant layer (yupana #2)</a></h2>
 <p>When the root is a git repo, the daemon also holds a <strong>tenant registry</strong>: one
 shared read-only base built at the startup <code>HEAD</code>, plus a copy-on-write
@@ -1609,9 +1704,12 @@ max_impacted_files = 10
 rung is armed (<code>[yupana.policy] work_item_scope = "advise" | "enforce"</code>), in
 which case the guard falls back to the OBSERVED scope of the agent's tracked
 work item (the paths prior work on it touched, projected from quipu), and an
-unknown scope draws a once-per-session advisory instead of silence. See the
-Configuration Reference and <code>docs/work-scoped-governance.md</code>. <code>deny_paths</code>
-beats <code>allow_paths</code>.
+unknown scope draws a once-per-session advisory instead of silence. An item
+with no observed ground of its own is scoped to its parent's — the <strong>derived</strong>
+rung, which never hard-denies at any setting (an inference must not block) and
+which answers <code>Allow</code> for an in-ground edit rather than falling through to
+"unguarded". See the Configuration Reference and
+<code>docs/work-scoped-governance.md</code>. <code>deny_paths</code> beats <code>allow_paths</code>.
 Path patterns are globs matched against the repo-relative path.</p>
 <p>With <code>mode = "advise"</code> the guard reports what it <em>would</em> have denied via
 <code>systemMessage</code> and never blocks — run a new scope in <code>advise</code> for a while
@@ -1626,6 +1724,15 @@ advise run, so the violation counts you collect are the <em>uncorrected</em> rat
 which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 <code>enforce</code> puts the reason in front of the model.</p>
+<p>The <strong>work-item scope</strong> advise rung is the exception: its out-of-ground notice
+is delivered where the agent <em>can</em> read it — as <code>PostToolUse</code>
+<code>additionalContext</code> on the post-edit hook, the channel that reaches the model
+without blocking. The edit has landed, nothing is prevented, and the agent is
+told before its next action that it stepped outside its item's ground — along
+with what the graph knows about where it went (which work items' commits
+touched that path before, and how each turned out). Silent whenever it cannot
+speak honestly: no plate, no scope for the item, an unreachable store, or an
+edit inside the ground. An unknown scope is UNKNOWN, not a deviation.</p>
 <h2 id="tripwires--boundaries-with-declared-effects"><a class="header" href="#tripwires--boundaries-with-declared-effects">Tripwires — boundaries with declared effects</a></h2>
 <p>A <strong>tripwire</strong> (<code>[[yupana.policy.tripwires]]</code>) is the local-config slice of the
 governance plane's <em>Binding / Gate</em> primitive: it attaches an effect to a
@@ -1687,7 +1794,7 @@ quipu's placement law puts soft throttle wires there, and the PAA-side
 projection is that seam's sequencing step 2. Effects this seam cannot enforce
 (<code>require-approval</code>, <code>record</code>, …) refuse the projection loudly rather than
 decode into an inert wire.</p>
-<h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
+<h2 id="the-action-surface-pre-bash-1"><a class="header" href="#the-action-surface-pre-bash-1">The action surface (<code>pre-bash</code>)</a></h2>
 <p><code>yupana hook pre-bash</code> is <strong>record-only by default</strong> and stays that way unless a
 deployment sets <code>[yupana.policy] action_scope</code>, which is <code>off</code> out of the box.</p>
 <pre><code class="language-toml">[yupana.policy]
@@ -1834,6 +1941,72 @@ the rate misleads:</p>
 work nobody has done yet, and it measures <strong>no false negatives at all</strong>. A
 seeded adversarial corpus would give FN coverage against known attacks and none
 against novel ones.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="golden-path-conformance"><a class="header" href="#golden-path-conformance">Golden-Path Conformance</a></h1>
+<p>FR-40..FR-42, behind the <code>golden-path</code> Cargo feature (in the CI matrix). A
+<strong>golden path</strong> is a blessed trajectory — a pruned, human-promoted record of
+how verified-successful work actually went, authored and governed in Quipu.
+This plane evaluates work against one: given a declared <code>followsPath</code> and a
+sequence of steps, it answers where the work stands — matched, deviating,
+hazard-adjacent — under the versioned conformance grammar shared with Quipu's
+backtest (<code>gp-grammar/1</code>).</p>
+<p>The full design addendum, including the blessing ladder and the division of
+labor with camayoc and quipu, is
+<a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md"><code>docs/golden-path-guard.md</code></a>.</p>
+<h2 id="surfaces"><a class="header" href="#surfaces">Surfaces</a></h2>
+<ul>
+<li><strong><code>yupana_path_check</code></strong> over MCP (registered on every build; refuses with a
+message naming the feature when <code>golden-path</code> is absent).</li>
+<li><strong><code>POST /path/check</code></strong> on the <a href="reference/daemon.html">resident daemon</a>, mounted only on
+a build that can serve it.</li>
+</ul>
+<p>Both take the same request: the <code>followsPath</code> IRI the work declared, the steps
+as v1 signatures (<code>action_kind</code> + <code>target_class</code>), the <strong>projected paths
+supplied per call</strong>, a <code>mode</code>, and an optional <code>deny</code> opt-in.</p>
+<p>Paths are supplied per call, like the board guard's <code>StatePolicy</code> list,
+because a stale resident copy would enforce yesterday's blessing while looking
+current. "Empty registry" is therefore a per-call property: a request
+declaring a <code>followsPath</code> that is not in the supplied set is <strong>refused</strong>,
+never reported clean — <code>409 Conflict</code> over HTTP, an error result over MCP, so
+a caller gating on status alone cannot mistake "nothing was loaded" for "this
+plan conforms". A grammar version this build does not implement refuses the
+same way.</p>
+<h2 id="the-two-modes"><a class="header" href="#the-two-modes">The two modes</a></h2>
+<p>Under gp-grammar/1 gaps are allowed, so an <strong>open</strong> trajectory never
+hard-deviates — a future step could always match the next pattern element.
+Deviation is decidable only against a complete intent, which is what splits
+the check in two:</p>
+<ul>
+<li><strong><code>mode: "plan"</code></strong> (default, FR-42) — the submitted sequence is the whole
+intent. The report names how much of the pattern matched and the <strong>first
+deviation point</strong> (which pattern step was expected, after which submitted
+step). This is the only mode in which deviation is decidable, and so the
+only mode that can ever deny.</li>
+<li><strong><code>mode: "progress"</code></strong> (FR-41) — the work is in flight. The report says how
+far along the path the work is, which <code>deadEnd</code> hazards it has brushed
+("exemplars tried this; it did not help"), and which steps the grammar could
+not evaluate. It never denies.</li>
+</ul>
+<h2 id="effects-are-capped-by-blessing-level"><a class="header" href="#effects-are-capped-by-blessing-level">Effects are capped by blessing level</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Path level</th><th>Effect</th></tr></thead><tbody>
+<tr><td><code>advisory</code> (L3)</td><td><code>warn</code> only</td></tr>
+<tr><td><code>blessed</code> (L4)</td><td><code>warn</code> by default; <code>deny</code> only when the caller passed <code>deny: true</code> <strong>and</strong> the mode is <code>plan</code></td></tr>
+<tr><td>constraint-backing (L5)</td><td>does not even parse — an unsigned L5 cannot enforce as if it were signed; gated on verdict signing</td></tr>
+</tbody></table>
+</div>
+<p>Deviation is not failure: a deviation verdict is input to the record (quipu
+stores it; the promotion gates consume it as traffic), not a judgment that the
+agent is wrong. Paths are demoted when conformers start failing, and that
+evidence only exists if deviation and conformance are both recorded
+faithfully.</p>
+<h2 id="the-report"><a class="header" href="#the-report">The report</a></h2>
+<p>An answerable check returns a <code>PathCheckReport</code>: the grammar version and path
+IRI it evaluated, the path's <code>level</code> and the <code>mode</code>, <code>matched</code> out of
+<code>pattern_len</code>, the <code>first_deviation</code> (plan mode), <code>hazards</code> (which submitted
+step matched which dead end, with its note), <code>unevaluated_steps</code>, the
+resulting <code>effect</code>, the path's <strong>exemplar citations</strong> (a warn must be able to
+say "because this concrete work succeeded this way"), and <code>projected_at</code> —
+echoed from the projection, omitted rather than faked when the projection
+carries none.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-enforcement-trace"><a class="header" href="#the-enforcement-trace">The Enforcement Trace</a></h1>
 <p>What an action tells an auditor afterwards, and the two commands that carry it
 into quipu.</p>
@@ -1871,6 +2044,22 @@ negative value.</p>
 </div>
 <p>Every line also carries <code>ts</code> (unix seconds), and <code>agent</code> / <code>tenant</code> from
 <code>$SHANTY_AGENT</code> and <code>$BOBBIN_ROLE</code> when set.</p>
+<p>Three fields on the <code>guard</code> record earn a note:</p>
+<ul>
+<li><strong><code>parsed</code></strong> — two-sided liveness. The record fires on every invocation, so
+its <em>absence</em> means the hook never ran; <code>parsed: false</code> means it ran against
+a payload shape it did not recognise. Without the flag that second case is
+indistinguishable from a clean allow, which is how a guard gets believed to
+be passing while it inspects nothing. (<code>pre_bash_invoked</code> carries the same
+discriminator under the same name.)</li>
+<li><strong><code>session</code> and <code>item</code></strong> — which session, and which tracked work item,
+caused this decision. They are what make the spool <em>replayable</em> rather than
+merely auditable: a windowed rule ("this session has already done N of
+these") has nothing to group by without them. Both are <strong>omitted, never
+blanked</strong>, when unresolved — these records are replayed to <em>derive</em>
+enforcement rules, so a fabricated value does not mislabel one row, it
+manufactures evidence for a rule that then applies to everyone.</li>
+</ul>
 <h2 id="the-constraint-set--constraints"><a class="header" href="#the-constraint-set--constraints">The constraint set — <code>constraints[]</code></a></h2>
 <p>One array rather than sibling keys, so a reader never has to reassemble which
 class went with which id by position:</p>
@@ -3997,7 +4186,7 @@ synchronous Quipu query. The blocking <code>pre-edit</code> guard cannot — it 
 live graph (or a startup-loaded cache), never a synchronous Quipu round-trip
 (FR-31's sub-100ms budget).</li>
 </ul>
-<h2 id="surfaces"><a class="header" href="#surfaces">Surfaces</a></h2>
+<h2 id="surfaces-1"><a class="header" href="#surfaces-1">Surfaces</a></h2>
 <ul>
 <li><strong><code>yupana relations &lt;symbol&gt;</code> / <code>yupana_relations</code> (MCP)</strong> — the governed
 neighborhood of a symbol, with an optional predicate filter, tier-tagged

@@ -244,6 +244,15 @@ side.</p>
 each turn with new numbers replaces rather than accumulates. A <strong>dangling edge is
 refused</strong> — a pattern traversing it would bind a variable to an id with no entity
 behind it.</p>
+<p>Ingest otherwise <strong>merges</strong>: a node the new request does not mention survives
+from the last one. That is right for a caller sending patches and wrong for a
+caller whose payload <em>is</em> the board — without a way to say so, a base razed
+twenty turns ago goes on matching policy selectors forever, a stale second
+source of board state behind a caller who believes it just stated the current
+one. <code>"replace": true</code> on the request makes that ingest the <em>whole</em> of the
+tenant's private layer rather than a patch on it. Default <code>false</code>, so every
+existing caller keeps the additive behaviour; private layer only, because the
+shared base is common knowledge and not one tenant's to clear.</p>
 <h2 id="policies-graph-pattern-and-where-the-line-to-quipu-is"><a class="header" href="#policies-graph-pattern-and-where-the-line-to-quipu-is">Policies: <code>graph-pattern</code>, and where the line to Quipu is</a></h2>
 <p>A policy is the code plane's shape with three additions: a <code>selector_lang</code>
 discriminator, a <code>boundary</code> value of <code>"order"</code>, and the <code>engine-state</code> tier.

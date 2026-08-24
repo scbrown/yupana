@@ -205,11 +205,15 @@ FR-7); not yet implemented or served.</em></li>
 <ul>
 <li><strong>Code-fact freshness</strong> — is this structural fact current with the file it
 came from? The watch path tracks it per file (<code>Recomputing → Fresh</code>
-transitions in <code>src/watch/overlay_refresh.rs</code>), but no query surface serves
-it yet: the on-demand serve path rebuilds per request, so no cached code fact
-can be stale. Query responses therefore <em>omit</em> <code>freshness</code> rather than stamp
-a constant <code>fresh</code> — the tag arrives with the Phase 3 resident-graph serve
-path.</li>
+transitions in <code>src/watch/overlay_refresh.rs</code>), and since Phase 3
+(bobbin-052) the <a href="../reference/daemon.html">resident daemon</a> <em>serves</em> it on
+the tenant-scoped <code>/symbols</code> reply — read before the view is composed, so
+the tag describes the state the symbols came from. Everywhere it is
+unknown, the field is <strong>omitted rather than faked</strong>: the untenanted path
+has no tenant to key the map by, a tenant that never had an edit absorbed
+has no note to report, and the on-demand (non-daemon) serve path rebuilds
+per request so no cached code fact can be stale. Absent, never <code>"fresh"</code>,
+never <code>"unknown"</code>.</li>
 <li><strong>Projection freshness</strong> — are the governed rules a verdict enforced still
 the current ones? This is <em>served today</em>: the pre-edit guard's rule verdicts
 state <code>fresh</code> / <code>stale</code> (with the cache age in seconds) / <code>recomputing</code>
