@@ -59,7 +59,7 @@ fn documented_live_tools() -> BTreeSet<String> {
     let md = read("docs/book/src/reference/mcp-tools.md");
     let start = md.find("## Live tools").expect("Live tools section");
     let after = &md[start + "## Live tools".len()..];
-    let end = after.find("\n## ").map_or(after.len(), |e| e);
+    let end = after.find("\n## ").unwrap_or(after.len());
     after[..end]
         .lines()
         .filter(|l| l.trim_start().starts_with("| `yupana_"))
