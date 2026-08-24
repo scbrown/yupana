@@ -614,9 +614,11 @@ fn stub_quipu(serve: usize) -> String {
             let request = String::from_utf8_lossy(&raw).to_string();
             // The two queries are told apart by the class they target — the
             // same distinction quipu itself makes.
-            // Text-rule and grounded-predicate queries get empty catalogues;
-            // the structural-policy query gets the canned one.
-            let body = if request.contains("aegis:TextRule") || request.contains("candidateSource")
+            // Text-rule, grounded-predicate and tripwire queries get empty
+            // catalogues; the structural-policy query gets the canned one.
+            let body = if request.contains("aegis:TextRule")
+                || request.contains("candidateSource")
+                || request.contains("?selector ?predicate")
             {
                 empty_results_json()
             } else {
@@ -653,6 +655,7 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
             endpoint: endpoint.to_string(),
             policies: decode_policies(&catalog_json()).unwrap(),
             text_rules: Vec::new(),
+            tripwires: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -757,10 +760,11 @@ fn no_cache_and_no_quipu_fails_open_rather_than_serving_an_empty_catalogue() {
 fn a_successful_refresh_persists_the_projection_for_the_next_process() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
-    // Three requests per refresh: the structural catalogue, the text rules
-    // and the grounded-predicate catalogue. (An empty grounded catalogue asks
-    // for no grounding set — a fourth request would hang the refresh here.)
-    let endpoint = stub_quipu(3);
+    // Four requests per refresh: the structural catalogue, the text rules,
+    // the grounded-predicate catalogue and the tripwire catalogue. (An empty
+    // grounded catalogue asks for no grounding set — a fifth request would
+    // hang the refresh here.)
+    let endpoint = stub_quipu(4);
 
     let mut registry = ProjectionRegistry::new(&endpoint);
     assert_eq!(

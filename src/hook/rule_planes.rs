@@ -1,20 +1,18 @@
 //! The guard's two RULE planes, lifted out of `pre_edit` for size (yupana #83).
 //!
 //! Both answer the same question — "does the text this edit introduces break a
-//! rule?" — and both return a [`Decision`], so the guard applies one verdict per
-//! edit whichever plane produced it:
+//! rule?" — and both return a [`Decision`], one verdict per edit:
 //!
-//! - **local** ([`rule_check`]) — the `[[yupana.policy.rules]]` set from config,
-//!   language-gated, evaluated against the added text. Not per-tenant: a rule
-//!   like "no ticket id in a comment" governs the code, not who wrote it.
-//! - **governed** ([`governed_check`], `quipu` feature) — the same shape, but
-//!   projected from quipu's policy registry, spanning a text plane (no grammar
-//!   needed) and a language-gated structural plane.
+//! - **local** ([`rule_check`]) — the `[[yupana.policy.rules]]` set from
+//!   config, language-gated, evaluated against the added text. Not per-tenant.
+//! - **governed** ([`governed_check`], `quipu` feature) — projected from
+//!   quipu's registry: a text plane (no grammar needed), a language-gated
+//!   structural plane, and the governed TRIPWIRE plane (path boundaries;
+//!   `tripwire_arm::governed_plane`).
 //!
 //! A child module of `pre_edit` rather than a sibling: it reads that module's
 //! private `Decision`, `decide`, `fail_open` and `introduced_text` through
-//! `use super::*`, so lifting it out changed no visibility beyond the two entry
-//! points below.
+//! `use super::*`.
 
 use super::*;
 
@@ -387,6 +385,12 @@ pub(super) fn governed_check(
             messages.push(v.message.clone());
         }
         structural_violations = violations;
+    }
+
+    for v in super::tripwire_arm::governed_plane(&registry, config, root, &target_rel) {
+        any_blocking |= v.blocking;
+        messages.push(v.message.clone());
+        structural_violations.push(v);
     }
 
     // --- GROUNDED plane: membership against the projected work-item set ------

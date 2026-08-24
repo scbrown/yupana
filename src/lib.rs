@@ -80,6 +80,10 @@ pub mod project_queries;
 /// from `project` for size and gated with it.
 #[cfg(feature = "quipu")]
 pub mod project_scope;
+/// Governed tripwires — quipu's path-boundary policies, projected. Gated with
+/// the projection that serves them.
+#[cfg(feature = "quipu")]
+pub mod project_tripwire;
 /// The DURABLE half of the projection cache — what lets a projection failure
 /// degrade to stale-but-enforcing instead of to unguarded (aegis-0upyu).
 #[cfg(feature = "quipu")]

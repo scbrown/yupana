@@ -100,6 +100,16 @@ stays commented; the RDF/`ureq` crates the feature already pulls are enough.
   frontier code-graph freshness (Phase 3) is only needed for *graph-consulting*
   structural rules, which are not shipped — the buffer-local rules are fresh by
   construction.
+- **H-TRIPWIRE** ✅ (slice) Governed tripwires: quipu's path-boundary policies
+  (`aegis:appliesTo`, no Selector/Predicate — quipu `shapes/policies/tripwire.ttl`)
+  project via `src/project_tripwire.rs` into the same `Tripwire` shape local
+  config uses, ride the registry's one refresh and its durable cache, and
+  evaluate as the governed TRIPWIRE plane of the pre-edit guard — class-first
+  blocking, `backoffFormula` compiled into a recorded throttle. *Remaining:*
+  PAA-declared wires are projected but skipped at the gate (the post-edit
+  auditor's projection is sequencing step 2, per the quipu catalog), and the
+  governed plane still skips pure deletions (its `introduced_text` seam), so a
+  deletion inside a governed boundary is caught only by a local wire today.
 - **H-PROMOTE-VERDICT** ✅ `src/verdict.rs`: ed25519 signing that MIRRORS quipu's
   `signing.rs` (same `ring`, same canonical `v1|…` message, same hex encodings),
   a `VerdictShape`-conformant signed `aegis:Verdict` Turtle, and `promote_verdict`

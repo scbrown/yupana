@@ -212,6 +212,8 @@ pub struct ProjectionRegistry {
     policies: Vec<ProjectedPolicy>,
     /// Last-known governed text rules (aegis-mqnl catalogue).
     text_rules: Vec<TextRule>,
+    /// Last-known governed tripwires (path-boundary policies, no selector).
+    pub(crate) tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
     /// Last-known entity-grounded rules (bobbin-tvn; see [`crate::grounding`]).
     pub(crate) grounded_rules: Vec<crate::grounding::GroundedRule>,
     /// The projected work-item id set the grounded rules evaluate against.
@@ -264,6 +266,7 @@ impl ProjectionRegistry {
             endpoint: endpoint.to_string(),
             policies: Vec::new(),
             text_rules: Vec::new(),
+            tripwires: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -306,8 +309,9 @@ impl ProjectionRegistry {
             fetch_policies(&self.endpoint),
             fetch_text_rules(&self.endpoint),
             crate::project_grounding::fetch_grounded_rules(&self.endpoint),
+            crate::project_tripwire::fetch_tripwires(&self.endpoint),
         ) {
-            (Ok(policies), Ok(text_rules), Ok(grounded_rules)) => {
+            (Ok(policies), Ok(text_rules), Ok(grounded_rules), Ok(tripwires)) => {
                 // I6, at the seam where both halves are known at once: what the
                 // catalog CLAIMS about its hosting layer, against the layer that
                 // will actually evaluate it. Once per refresh rather than per
@@ -316,6 +320,7 @@ impl ProjectionRegistry {
                 report_overclaims(&policies);
                 self.policies = policies;
                 self.text_rules = text_rules;
+                self.tripwires = tripwires;
                 self.grounded_rules = grounded_rules;
                 // The grounding SET is fetched apart from the catalogues: its
                 // failure must not disable the whole guard, and a grounded rule
@@ -334,7 +339,7 @@ impl ProjectionRegistry {
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
-            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => {
+            (Err(e), _, _, _) | (_, Err(e), _, _) | (_, _, Err(e), _) | (_, _, _, Err(e)) => {
                 self.freshness = Freshness::Stale;
                 Err(e)
             }
@@ -383,6 +388,7 @@ impl ProjectionRegistry {
                             endpoint: self.endpoint.clone(),
                             policies: self.policies.clone(),
                             text_rules: self.text_rules.clone(),
+                            tripwires: self.tripwires.clone(),
                             grounded_rules: self.grounded_rules.clone(),
                             grounding: self.grounding.clone(),
                             work_item_scopes: self.work_item_scopes.clone(),
@@ -406,6 +412,9 @@ impl ProjectionRegistry {
                 let age_secs = cached.age_secs(now);
                 self.policies = cached.policies;
                 self.text_rules = cached.text_rules;
+                // A cache written before tripwires existed restores an empty
+                // set — those caches never held wires, honestly.
+                self.tripwires = cached.tripwires;
                 self.grounded_rules = cached.grounded_rules;
                 // A cache written before grounding existed restores `None`,
                 // which is the honest answer: that cache never held a set, so

@@ -163,3 +163,30 @@ SELECT ?id ?parent WHERE {
 pub const GROUNDING_SET_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
 SELECT ?id WHERE { ?w a aegis:WorkItem ; aegis:identifier ?id }";
+
+/// The SPARQL SELECT that pulls quipu's TRIPWIRE policies — `boundary:"action"`
+/// policies whose whole condition is their `aegis:appliesTo` path scope (quipu
+/// `shapes/policies/tripwire.ttl`).
+///
+/// `?selector` / `?predicate` are selected as OPTIONALs so the DECODER can drop
+/// rule policies rather than the query filtering them: `FILTER NOT EXISTS`
+/// support is a property of quipu's engine this seam refuses to bet on — the
+/// both-sides-shipped-and-zero-rows failure mode, again. `?appliesTo` is
+/// required: a tripwire without a boundary is not a tripwire, and the shape's
+/// own errors discipline (`crate::tripwire::errors`) says the same locally.
+pub const TRIPWIRE_QUERY: &str = "\
+PREFIX aegis: <http://aegis.gastown.local/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?policy ?name ?appliesTo ?effect ?constraintClass ?verificationPoint
+       ?backoffFormula ?selector ?predicate WHERE {
+  ?policy a aegis:Policy ;
+          aegis:boundary \"action\" ;
+          aegis:appliesTo ?appliesTo .
+  OPTIONAL { ?policy aegis:selector ?selector }
+  OPTIONAL { ?policy aegis:predicate ?predicate }
+  OPTIONAL { ?policy rdfs:label ?name }
+  OPTIONAL { ?policy aegis:effect ?effect }
+  OPTIONAL { ?policy aegis:constraintClass ?constraintClass }
+  OPTIONAL { ?policy aegis:verificationPoint ?verificationPoint }
+  OPTIONAL { ?policy aegis:backoffFormula ?backoffFormula }
+}";

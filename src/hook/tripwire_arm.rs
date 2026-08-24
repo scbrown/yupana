@@ -115,6 +115,29 @@ pub(super) fn tripwire_check(
     ))
 }
 
+/// The GOVERNED tripwire plane — quipu's path-boundary policies, evaluated
+/// inside `governed_check`'s flow against the registry it already refreshed
+/// (one refresh per edit; the ladder's own rule). Returns the violations for
+/// the governed accumulator; the throttle orders the pure evaluation produced
+/// are RECORDED here, because this arm is the seam that owns that I/O — same
+/// split as the local wires above.
+#[cfg(feature = "quipu")]
+pub(super) fn governed_plane(
+    registry: &crate::project::ProjectionRegistry,
+    config: &YupanaConfig,
+    root: &Path,
+    rel: &str,
+) -> Vec<crate::project::ProjectedViolation> {
+    let (violations, throttles) =
+        crate::project_tripwire::gate_violations(&registry.tripwires, rel, config.policy.mode);
+    let now = crate::throttle::now_secs();
+    let scope = root.display().to_string();
+    for order in &throttles {
+        crate::throttle::record(&order.name, &scope, order.secs, now);
+    }
+    violations
+}
+
 /// One [`ConstraintEvaluation`](crate::trace::ConstraintEvaluation) per tripped
 /// wire, in stable order — the `evaluations_for` shape, with the wire's fixed
 /// placement: a tripwire is a local binding with no declared class, evaluated

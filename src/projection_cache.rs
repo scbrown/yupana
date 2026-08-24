@@ -75,6 +75,11 @@ pub struct CachedProjection {
     pub policies: Vec<ProjectedPolicy>,
     /// Last-known governed text rules (the aegis-mqnl catalogue).
     pub text_rules: Vec<TextRule>,
+    /// Last-known governed tripwires. Defaulted so a cache written before
+    /// tripwires existed still loads — restoring an empty set, honestly:
+    /// that cache never held a wire.
+    #[serde(default)]
+    pub tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
     /// Last-known entity-grounded rules (bobbin-tvn). Defaulted so a cache
     /// written before grounding existed still loads.
     #[serde(default)]

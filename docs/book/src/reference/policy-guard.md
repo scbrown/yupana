@@ -309,6 +309,20 @@ A misconfigured wire — a malformed glob, a `rule` no rules entry defines, a
 **loud fail-open**, never a silently inert control: the wire set names each
 broken entry once per session and the guard allows.
 
+**Governed tripwires** (`quipu` feature). The same concept with quipu as the
+canonical store: an `aegis:Policy` at `boundary:"action"` carrying
+`aegis:appliesTo` globs and *no* Selector/Predicate (quipu
+`shapes/policies/tripwire.ttl`). They ride the governed plane's one registry
+refresh (and its durable cache — a projection failure serves last-known wires,
+stale and saying so), and evaluate class-first like every projected policy: a
+`hard` wire's `deny` blocks under `enforce`, a `soft` wire never blocks, a
+`throttle` wire's declared `aegis:backoffFormula` is compiled into a recorded
+backoff. A wire declaring `verificationPoint "PAA"` is skipped at the gate —
+quipu's placement law puts soft throttle wires there, and the PAA-side
+projection is that seam's sequencing step 2. Effects this seam cannot enforce
+(`require-approval`, `record`, …) refuse the projection loudly rather than
+decode into an inert wire.
+
 ## The action surface (`pre-bash`)
 
 `yupana hook pre-bash` is **record-only by default** and stays that way unless a

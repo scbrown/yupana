@@ -165,7 +165,7 @@ fn merge_optional(
 
 /// The `results.bindings` array of a W3C SPARQL-results body, or a projection
 /// error naming what was malformed.
-fn rows_of(value: &serde_json::Value) -> Result<&Vec<serde_json::Value>> {
+pub(crate) fn rows_of(value: &serde_json::Value) -> Result<&Vec<serde_json::Value>> {
     value
         .get("results")
         .and_then(|r| r.get("bindings"))
@@ -174,7 +174,7 @@ fn rows_of(value: &serde_json::Value) -> Result<&Vec<serde_json::Value>> {
 }
 
 /// One binding's `.value` string, if present.
-fn binding_value(binding: &serde_json::Value, key: &str) -> Option<String> {
+pub(crate) fn binding_value(binding: &serde_json::Value, key: &str) -> Option<String> {
     binding
         .get(key)
         .and_then(|v| v.get("value"))
