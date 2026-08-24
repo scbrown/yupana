@@ -85,11 +85,20 @@ impl ProjectionRegistry {
     }
 }
 
+impl ProjectionRegistry {
+    /// The projected work-item parent map, or `None` when it is missing or
+    /// failed (the derived rung simply does not fire).
+    #[must_use]
+    pub fn work_item_parents(&self) -> Option<&crate::policy::WorkItemParents> {
+        self.work_item_parents.as_ref()
+    }
+}
+
 #[cfg(test)]
 // Test names shout the invariant they turn on, the repo's emphasis convention.
 #[allow(non_snake_case)]
 mod tests {
-    use crate::policy::{WorkItemParents, WorkItemScopes};
+    use crate::policy::WorkItemScopes;
 
     #[test]
     fn rows_fold_into_per_item_path_sets() {
@@ -120,14 +129,5 @@ mod tests {
         ]}}"#;
         let rows = crate::project_decode::decode_work_item_scope_rows(body).unwrap();
         assert_eq!(rows, vec![("aegis-1".to_string(), "src/a.rs".to_string())]);
-    }
-}
-
-impl ProjectionRegistry {
-    /// The projected work-item parent map, or `None` when it is missing or
-    /// failed (the derived rung simply does not fire).
-    #[must_use]
-    pub fn work_item_parents(&self) -> Option<&crate::policy::WorkItemParents> {
-        self.work_item_parents.as_ref()
     }
 }

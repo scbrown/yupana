@@ -43,12 +43,12 @@ fn sections(brief: &Brief) -> Vec<Section> {
         Section {
             label: "similar past work items",
             count: brief.similar.len(),
-            expand: format!("quipu_context {{query: \"<this item's subject>\"}}"),
+            expand: "quipu_context {query: \"<this item's subject>\"}".to_string(),
         },
         Section {
             label: "central entities around the ground",
             count: brief.central.len(),
-            expand: format!("quipu_project {{algorithm: \"ppr\", seeds: [<ground entities>]}}"),
+            expand: "quipu_project {algorithm: \"ppr\", seeds: [<ground entities>]}".to_string(),
         },
         Section {
             label: "related in-flight work items",
