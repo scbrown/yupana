@@ -273,6 +273,16 @@ sync state (<code>fresh</code>, or <code>stale</code> when a refresh fails). The
 frontier code-graph freshness (Phase 3) is only needed for <em>graph-consulting</em>
 structural rules, which are not shipped — the buffer-local rules are fresh by
 construction.</li>
+<li><strong>H-TRIPWIRE</strong> ✅ (slice) Governed tripwires: quipu's path-boundary policies
+(<code>aegis:appliesTo</code>, no Selector/Predicate — quipu <code>shapes/policies/tripwire.ttl</code>)
+project via <code>src/project_tripwire.rs</code> into the same <code>Tripwire</code> shape local
+config uses, ride the registry's one refresh and its durable cache, and
+evaluate as the governed TRIPWIRE plane of the pre-edit guard — class-first
+blocking, <code>backoffFormula</code> compiled into a recorded throttle. <em>Remaining:</em>
+PAA-declared wires are projected but skipped at the gate (the post-edit
+auditor's projection is sequencing step 2, per the quipu catalog), and the
+governed plane still skips pure deletions (its <code>introduced_text</code> seam), so a
+deletion inside a governed boundary is caught only by a local wire today.</li>
 <li><strong>H-PROMOTE-VERDICT</strong> ✅ <code>src/verdict.rs</code>: ed25519 signing that MIRRORS quipu's
 <code>signing.rs</code> (same <code>ring</code>, same canonical <code>v1|…</code> message, same hex encodings),
 a <code>VerdictShape</code>-conformant signed <code>aegis:Verdict</code> Turtle, and <code>promote_verdict</code>

@@ -1674,6 +1674,19 @@ rides in the same message and is recorded as its own constraint evaluation
 <code>throttle</code> with no <code>backoff_secs</code>, or a wire with no paths and no rule — is a
 <strong>loud fail-open</strong>, never a silently inert control: the wire set names each
 broken entry once per session and the guard allows.</p>
+<p><strong>Governed tripwires</strong> (<code>quipu</code> feature). The same concept with quipu as the
+canonical store: an <code>aegis:Policy</code> at <code>boundary:"action"</code> carrying
+<code>aegis:appliesTo</code> globs and <em>no</em> Selector/Predicate (quipu
+<code>shapes/policies/tripwire.ttl</code>). They ride the governed plane's one registry
+refresh (and its durable cache — a projection failure serves last-known wires,
+stale and saying so), and evaluate class-first like every projected policy: a
+<code>hard</code> wire's <code>deny</code> blocks under <code>enforce</code>, a <code>soft</code> wire never blocks, a
+<code>throttle</code> wire's declared <code>aegis:backoffFormula</code> is compiled into a recorded
+backoff. A wire declaring <code>verificationPoint "PAA"</code> is skipped at the gate —
+quipu's placement law puts soft throttle wires there, and the PAA-side
+projection is that seam's sequencing step 2. Effects this seam cannot enforce
+(<code>require-approval</code>, <code>record</code>, …) refuse the projection loudly rather than
+decode into an inert wire.</p>
 <h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
 <p><code>yupana hook pre-bash</code> is <strong>record-only by default</strong> and stays that way unless a
 deployment sets <code>[yupana.policy] action_scope</code>, which is <code>off</code> out of the box.</p>
@@ -2220,6 +2233,16 @@ sync state (<code>fresh</code>, or <code>stale</code> when a refresh fails). The
 frontier code-graph freshness (Phase 3) is only needed for <em>graph-consulting</em>
 structural rules, which are not shipped — the buffer-local rules are fresh by
 construction.</li>
+<li><strong>H-TRIPWIRE</strong> ✅ (slice) Governed tripwires: quipu's path-boundary policies
+(<code>aegis:appliesTo</code>, no Selector/Predicate — quipu <code>shapes/policies/tripwire.ttl</code>)
+project via <code>src/project_tripwire.rs</code> into the same <code>Tripwire</code> shape local
+config uses, ride the registry's one refresh and its durable cache, and
+evaluate as the governed TRIPWIRE plane of the pre-edit guard — class-first
+blocking, <code>backoffFormula</code> compiled into a recorded throttle. <em>Remaining:</em>
+PAA-declared wires are projected but skipped at the gate (the post-edit
+auditor's projection is sequencing step 2, per the quipu catalog), and the
+governed plane still skips pure deletions (its <code>introduced_text</code> seam), so a
+deletion inside a governed boundary is caught only by a local wire today.</li>
 <li><strong>H-PROMOTE-VERDICT</strong> ✅ <code>src/verdict.rs</code>: ed25519 signing that MIRRORS quipu's
 <code>signing.rs</code> (same <code>ring</code>, same canonical <code>v1|…</code> message, same hex encodings),
 a <code>VerdictShape</code>-conformant signed <code>aegis:Verdict</code> Turtle, and <code>promote_verdict</code>
