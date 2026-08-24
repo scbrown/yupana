@@ -24,11 +24,15 @@ Freshness names **two different questions**, and Yupana keeps them apart:
 
 - **Code-fact freshness** — is this structural fact current with the file it
   came from? The watch path tracks it per file (`Recomputing → Fresh`
-  transitions in `src/watch/overlay_refresh.rs`), but no query surface serves
-  it yet: the on-demand serve path rebuilds per request, so no cached code fact
-  can be stale. Query responses therefore *omit* `freshness` rather than stamp
-  a constant `fresh` — the tag arrives with the Phase 3 resident-graph serve
-  path.
+  transitions in `src/watch/overlay_refresh.rs`), and since Phase 3
+  (bobbin-052) the [resident daemon](../reference/daemon.md) *serves* it on
+  the tenant-scoped `/symbols` reply — read before the view is composed, so
+  the tag describes the state the symbols came from. Everywhere it is
+  unknown, the field is **omitted rather than faked**: the untenanted path
+  has no tenant to key the map by, a tenant that never had an edit absorbed
+  has no note to report, and the on-demand (non-daemon) serve path rebuilds
+  per request so no cached code fact can be stale. Absent, never `"fresh"`,
+  never `"unknown"`.
 - **Projection freshness** — are the governed rules a verdict enforced still
   the current ones? This is *served today*: the pre-edit guard's rule verdicts
   state `fresh` / `stale` (with the cache age in seconds) / `recomputing`

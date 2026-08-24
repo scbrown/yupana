@@ -43,6 +43,15 @@ Impacted files: src/api/login.rs, src/api/session.rs
 The advisory is emitted only when there is cross-file impact, and the hook never
 fails the harness (no output = nothing to say).
 
+With the `quipu` feature and the work-item scope rung at `advise`, the same
+hook also delivers the **out-of-ground notice** as `additionalContext`: the
+edit has landed, nothing is blocked, and the agent is told — before its next
+action — that it stepped outside its work item's ground, with what the graph
+knows about that path (who worked it before, and how that went). This channel
+exists because a pre-edit `systemMessage` reaches the operator's pane, not the
+model's context; see the
+[policy guard contract](../reference/policy-guard.md).
+
 ## Work-item briefing (available now, `quipu` feature)
 
 `yupana hook session-start` (`SessionStart`) injects the graph's knowledge of
@@ -52,6 +61,15 @@ touched, with symbols and caller locality), the central entities around it
 (quipu pagerank), semantically similar past items with their outcomes so
 **successful work gets reused**, related in-flight items, the governed rules
 in force, and the scope posture. Silent when no plate or no quipu seam.
+
+What lands in context is the **L0** briefing: the item, its ground paths and
+the scope posture, plus a **census** of every section held back — one line
+each, naming how many items it holds and the real `quipu_ask` /
+`quipu_context` / `quipu_project` call that expands it. The census is the
+whole difference between a briefing that is *small* and one that is
+*incomplete*: a short briefing with no counts is indistinguishable from a
+graph that knew nothing. Sections with zero items are omitted entirely rather
+than shown as empty headings.
 
 Division of labor with Bobbin: Bobbin's own hooks (`bobbin hook install` —
 `inject-context` on UserPromptSubmit, `session-context`/`prime-context` on
@@ -112,6 +130,32 @@ allows the edit, because a guard that fails closed would brick every agent the
 moment Yupana is unavailable. Read
 [the full contract](../reference/policy-guard.md) before wiring it into a fleet
 — particularly the rules that allow is *silence* and that Yupana never exits `2`.
+
+## The action surface (`pre-bash`)
+
+`yupana hook pre-bash` (`PreToolUse` on `Bash`) records each command's
+resolved `(verb, target, class)` for the enforcement trace, and is
+**record-only by default**: it prints nothing unless a deployment explicitly
+sets `[yupana.policy] action_scope` (off out of the box), at which point a
+declared scope's `allow_targets` / `deny_targets` can advise or refuse a
+command. Commands whose target is not unambiguous from syntax are abstentions,
+never violations. See
+[the guard contract](../reference/policy-guard.md#the-action-surface-pre-bash).
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "yupana hook pre-bash", "timeout": 5 }
+        ]
+      }
+    ]
+  }
+}
+```
 
 ## Performance note
 

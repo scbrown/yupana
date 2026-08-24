@@ -45,8 +45,19 @@ never answer for repo A.
 
 Every reply carries its provenance `tier` (FR-3). Facts come from the graph
 built at daemon startup — `/status.uptime_secs` says how old that snapshot is.
-Freshness tags (the FR-3 second half) arrive with overlay updates (yupana #3);
-replies omit them rather than faking `fresh`.
+
+**Code-fact freshness** (the FR-3 second half) is served on the tenant-scoped
+`/symbols` reply (bobbin-052): the watch path's per-`(tenant, file)` note —
+`recomputing` from touch until the frontier recompute is current, then
+`fresh` — read *before* the view is composed, so the tag describes the state
+the symbols came from. The omit rule survives the wiring: the field is
+**absent** on the untenanted path (no tenant to key the map by) and for a
+tenant that never had an edit absorbed — never `"fresh"`, never `"unknown"`,
+because a fabricated tag is indistinguishable from a measured one. This is a
+different quantity from the *projection* freshness the verdict surface serves
+(how current the projected policy registry is); they answer different
+questions and can disagree. See
+[Tiers and Freshness](../concepts/tiers-and-freshness.md).
 
 | Route | Method | Query/body | Answer |
 |-------|--------|------------|--------|
@@ -59,7 +70,16 @@ replies omit them rather than faking `fresh`.
 | `/symbols` | GET | `file` (root-relative), `tenant?` | that file's symbols, line order |
 | `/dataflow` | GET | `function`, `path?`, `var?`, `forward?`, `hops?` | intra-procedural data dependence |
 | `/measure` | POST | `{file, rel, anchors[], max_hops?}` | edit blast-radius sizing for the guard |
-| `/edit` | POST | `{tenant, rel, content?}` | FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's `frontier` counts what it reached). Per-`(tenant, file)` code-fact freshness follows the watch path's discipline — `recomputing` from touch until the frontier is current, then `fresh` (tracked; served at Phase 3). Omitted `content` is read from disk, root-confined. |
+| `/edit` | POST | `{tenant, rel, content?}` | FR-30 feed-and-advise: record the edit in the tenant's overlay, return which of the file's symbols have external callers (from the fresh view), and drive the FR-16 bounded frontier recompute over that same view (the reply's `frontier` counts what it reached). The freshness this maintains is what tenant-scoped `/symbols` serves. Omitted `content` is read from disk, root-confined. |
+
+Feature-gated routes, mounted only on a build that can serve them:
+
+- **`game-state`** — `POST /ingest`, `POST /guard`, `POST /whatif` (FR-35,
+  FR-37, FR-38; see [The Game-State Harness](../concepts/game-state.md)).
+- **`golden-path`** — `POST /path/check` (FR-41/FR-42; see
+  [Golden-Path Conformance](golden-path.md)). A check that cannot be answered
+  — no projected paths, an undeclared path, an unknown grammar version — is a
+  `409 Conflict`, never 200-with-no-findings.
 
 ## The tenant layer (yupana #2)
 

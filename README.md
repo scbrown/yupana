@@ -43,13 +43,19 @@ yupana status
   quipu     : enabled=false branch_model=named_graph
 ```
 
-> **Status:** Phases 1 and 2 complete. `analyze`, `refs`, `status`, the
+> **Status:** Phases 1–3 complete. `analyze`, `refs`, `status`, the
 > call-graph commands `callers`/`impact` (with `--cochange` reconciliation),
 > intra-procedural `dataflow`, and `verify` (the FR-23/FR-24 edit-buffer verdict)
-> do real work, and an MCP server (`yupana serve`, `--features mcp`) exposes fifteen
-> `yupana_*` tools (`yupana_promote` writes to Quipu with the `quipu` feature). Promotion lands per the
-> [phasing](docs/yupana-spec.md#12-milestones--phasing); Phase 3 (multi-tenancy)
-> is next.
+> do real work; an MCP server (`yupana serve`, `--features mcp`) exposes fifteen
+> `yupana_*` tools (`yupana_promote` writes to Quipu with the `quipu` feature);
+> and the resident daemon (`yupana daemon`) holds the base graph plus
+> per-tenant copy-on-write overlays hot, serving code-fact freshness on
+> tenant-scoped queries. Around the graph sit the governance planes: the
+> pre-edit policy guard (scopes, structural rules, tripwires, and the
+> work-item scope ladder), the record-only Bash action surface, session-start
+> work-item briefings, the game-state harness (`game-state`), and the
+> golden-path conformance guard (`golden-path`, FR-40..FR-42). Promotion lands
+> per the [phasing](docs/yupana-spec.md#12-milestones--phasing).
 
 ## 🤔 Why Yupana? — and how it's different
 
@@ -192,9 +198,15 @@ yupana export src --repo myrepo --format turtle
 # Serve over MCP (stdio) for an agent
 yupana serve
 
+# Hold the graph resident: base + per-tenant overlays, hot, over local HTTP —
+# what makes the sub-100ms guard budget reachable
+yupana daemon
+
 # Edit-reactive: wire `yupana hook post-edit` into a Claude Code PostToolUse hook
 # for synchronous blast-radius advisories on every edit, and `yupana hook pre-edit`
 # into PreToolUse to check an edit against the tenant's scope before it lands.
+# `yupana hook session-start` briefs the agent on its tracked work item up front,
+# and `yupana hook pre-bash` records (and can guard) the Bash action surface.
 
 # Governance (quipu feature): the verdict-signing identity, and the spool drain
 yupana verifier --key-path yupana-signing.pk8   # public key to register in quipu

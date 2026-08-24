@@ -54,6 +54,11 @@ promote_on = "merge"
 # "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback).
 branch_model = "named_graph"
 shapes_path = "shapes/"
+# Max age (secs) the durable projection cache (projection.json) may be SERVED
+# when quipu cannot be reached — a cache-served verdict is STALE and states
+# its age. Past the TTL the guard fails open loudly instead. 0 disables
+# serving the cache.
+projection_cache_ttl_secs = 3600
 
 [yupana.policy]
 # "off" (inert) | "advise" (report only) | "enforce" (deny).
@@ -76,6 +81,11 @@ verify = false
 # edits). `mode` stays a ceiling; needs [yupana.quipu] and a tracker plate
 # ($SHANTY_ROOT/crew/$SHANTY_AGENT/plate.json).
 work_item_scope = "off"
+# The ACTION surface (`yupana hook pre-bash`): "off" (record-only, default) |
+# "advise" | "enforce". `mode` stays a ceiling. Checked against the declared
+# allow_targets / deny_targets below; a command whose target is not
+# unambiguous from syntax is an abstention, never a violation.
+action_scope = "off"
 
 # Per-tenant capability scopes, keyed by tenant/role id. A tenant with no entry
 # is unconstrained. See "Pre-Edit Policy Guard" for the full contract.
@@ -84,6 +94,9 @@ allow_paths = ["src/**", "tests/**"]   # empty = any path
 deny_paths = ["src/config.rs"]         # beats allow_paths
 max_impacted_symbols = 25
 max_impacted_files = 10
+# Action targets, matched as `class:target` (host | service | repo | container).
+allow_targets = ["host:build-*"]       # empty = any target
+deny_targets = ["service:etcd"]        # beats allow_targets
 
 # Structural (tree-sitter-tier) rules — checks a linter finds hard or slow.
 # Unlike scopes, rules are NOT per-tenant: they govern the code an edit
@@ -100,6 +113,18 @@ pattern = '\b[A-Z]+-[0-9]+\b'          # Predicate: the regex
 # gate = '\bTODO\b'                    # optional: only test captures matching this
 # applies_to = ["src/**"]              # optional path globs; empty = any path
 # message = "keep ticket refs in commits, not comments"  # optional override
+
+# Tripwires — boundaries with declared effects; the edit itself is the
+# crossing. See "Pre-Edit Policy Guard" § Tripwires. A misconfigured wire
+# (malformed glob, unknown rule, throttle without backoff_secs, no paths and
+# no rule) is a LOUD fail-open, never a silently inert control.
+[[yupana.policy.tripwires]]
+name = "auth-boundary"
+paths = ["src/auth/**"]            # repo-relative globs; empty needs `rule`
+effect = "deny"                    # warn | deny | throttle
+# rule = "no-ticket-in-comment"    # optional: trip only when this rule fires inside
+# backoff_secs = 300               # required for effect = "throttle"
+# message = "auth changes need the security workflow"  # optional override
 
 # What the usage spool records about each guard decision.
 [yupana.metrics]

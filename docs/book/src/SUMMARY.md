@@ -25,6 +25,7 @@
 - [Resident Daemon](reference/daemon.md)
 - [Pre-Edit Policy Guard](reference/policy-guard.md)
   - [Replay: measuring a rule](reference/replay.md)
+- [Golden-Path Conformance](reference/golden-path.md)
 - [The Enforcement Trace](reference/enforcement-trace.md)
 - [E2E Grounding Eval](reference/e2e-grounding-eval.md)
 

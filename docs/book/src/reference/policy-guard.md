@@ -235,9 +235,12 @@ A tenant with no scope entry is unconstrained — unless the work-item scope
 rung is armed (`[yupana.policy] work_item_scope = "advise" | "enforce"`), in
 which case the guard falls back to the OBSERVED scope of the agent's tracked
 work item (the paths prior work on it touched, projected from quipu), and an
-unknown scope draws a once-per-session advisory instead of silence. See the
-Configuration Reference and `docs/work-scoped-governance.md`. `deny_paths`
-beats `allow_paths`.
+unknown scope draws a once-per-session advisory instead of silence. An item
+with no observed ground of its own is scoped to its parent's — the **derived**
+rung, which never hard-denies at any setting (an inference must not block) and
+which answers `Allow` for an in-ground edit rather than falling through to
+"unguarded". See the Configuration Reference and
+`docs/work-scoped-governance.md`. `deny_paths` beats `allow_paths`.
 Path patterns are globs matched against the repo-relative path.
 
 With `mode = "advise"` the guard reports what it *would* have denied via
@@ -255,6 +258,16 @@ advise run, so the violation counts you collect are the *uncorrected* rate —
 which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 `enforce` puts the reason in front of the model.
+
+The **work-item scope** advise rung is the exception: its out-of-ground notice
+is delivered where the agent *can* read it — as `PostToolUse`
+`additionalContext` on the post-edit hook, the channel that reaches the model
+without blocking. The edit has landed, nothing is prevented, and the agent is
+told before its next action that it stepped outside its item's ground — along
+with what the graph knows about where it went (which work items' commits
+touched that path before, and how each turned out). Silent whenever it cannot
+speak honestly: no plate, no scope for the item, an unreachable store, or an
+edit inside the ground. An unknown scope is UNKNOWN, not a deviation.
 
 ## Tripwires — boundaries with declared effects
 

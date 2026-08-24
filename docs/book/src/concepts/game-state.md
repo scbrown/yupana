@@ -75,6 +75,16 @@ each turn with new numbers replaces rather than accumulates. A **dangling edge i
 refused** — a pattern traversing it would bind a variable to an id with no entity
 behind it.
 
+Ingest otherwise **merges**: a node the new request does not mention survives
+from the last one. That is right for a caller sending patches and wrong for a
+caller whose payload *is* the board — without a way to say so, a base razed
+twenty turns ago goes on matching policy selectors forever, a stale second
+source of board state behind a caller who believes it just stated the current
+one. `"replace": true` on the request makes that ingest the *whole* of the
+tenant's private layer rather than a patch on it. Default `false`, so every
+existing caller keeps the additive behaviour; private layer only, because the
+shared base is common knowledge and not one tenant's to clear.
+
 ## Policies: `graph-pattern`, and where the line to Quipu is
 
 A policy is the code plane's shape with three additions: a `selector_lang`

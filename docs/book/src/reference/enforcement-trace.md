@@ -46,6 +46,22 @@ negative value.
 Every line also carries `ts` (unix seconds), and `agent` / `tenant` from
 `$SHANTY_AGENT` and `$BOBBIN_ROLE` when set.
 
+Three fields on the `guard` record earn a note:
+
+- **`parsed`** — two-sided liveness. The record fires on every invocation, so
+  its *absence* means the hook never ran; `parsed: false` means it ran against
+  a payload shape it did not recognise. Without the flag that second case is
+  indistinguishable from a clean allow, which is how a guard gets believed to
+  be passing while it inspects nothing. (`pre_bash_invoked` carries the same
+  discriminator under the same name.)
+- **`session` and `item`** — which session, and which tracked work item,
+  caused this decision. They are what make the spool *replayable* rather than
+  merely auditable: a windowed rule ("this session has already done N of
+  these") has nothing to group by without them. Both are **omitted, never
+  blanked**, when unresolved — these records are replayed to *derive*
+  enforcement rules, so a fabricated value does not mislabel one row, it
+  manufactures evidence for a rule that then applies to everyone.
+
 ## The constraint set — `constraints[]`
 
 One array rather than sibling keys, so a reader never has to reassemble which
