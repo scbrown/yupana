@@ -388,6 +388,54 @@ advise run, so the violation counts you collect are the <em>uncorrected</em> rat
 which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 <code>enforce</code> puts the reason in front of the model.</p>
+<h2 id="tripwires--boundaries-with-declared-effects"><a class="header" href="#tripwires--boundaries-with-declared-effects">Tripwires — boundaries with declared effects</a></h2>
+<p>A <strong>tripwire</strong> (<code>[[yupana.policy.tripwires]]</code>) is the local-config slice of the
+governance plane's <em>Binding / Gate</em> primitive: it attaches an effect to a
+boundary, and the edit itself is the crossing — nothing has to remember to
+check the wire. Where a rule says what text may look like everywhere it
+applies, a tripwire says what happens <em>at this boundary</em>.</p>
+<pre><code class="language-toml"># Touching the boundary at all trips the wire.
+[[yupana.policy.tripwires]]
+name = "auth-boundary"
+paths = ["src/auth/**"]
+effect = "deny"                  # warn | deny | throttle
+message = "auth changes need the security workflow"   # optional
+
+# Rule-conditioned: trips only when the named rule fires INSIDE the boundary.
+# The same rule can advise repo-wide and deny here.
+[[yupana.policy.tripwires]]
+name = "no-tickets-in-auth"
+paths = ["src/auth/**"]
+rule = "no-ticket-in-comment"    # a [[yupana.policy.rules]] name
+effect = "deny"
+
+# Crossing records an expiring backoff subsequent edits surface. Never blocks.
+[[yupana.policy.tripwires]]
+name = "hot-file"
+paths = ["src/core.rs"]
+effect = "throttle"
+backoff_secs = 300
+</code></pre>
+<p>Semantics, with the ambient <code>mode</code> a ceiling throughout:</p>
+<ul>
+<li><strong><code>deny</code></strong> blocks under <code>enforce</code> and advises under <code>advise</code>.</li>
+<li><strong><code>warn</code></strong> notifies and never blocks.</li>
+<li><strong><code>throttle</code></strong> records a backoff via the same machinery the Post-Action
+Auditor uses; the next edits surface the advisory. It is recorded even when a
+sibling <code>deny</code> wire blocks the same edit — the attempt crossed the boundary,
+and the crossing is recorded either way.</li>
+<li>A <strong>path-only</strong> wire trips on any edit whose repo-relative path matches
+(a pure deletion included: the crossing is the edit's target, not its text).
+A <strong>rule-conditioned</strong> wire needs the introduced text and a grammar; without
+them it has no evidence and does not trip.</li>
+<li>One decision per edit: a deny-effect trip decides it, and every tripped wire
+rides in the same message and is recorded as its own constraint evaluation
+(point <code>PAG</code>, tree-sitter tier, <code>fresh</code> — local config is authoritative).</li>
+</ul>
+<p>A misconfigured wire — a malformed glob, a <code>rule</code> no rules entry defines, a
+<code>throttle</code> with no <code>backoff_secs</code>, or a wire with no paths and no rule — is a
+<strong>loud fail-open</strong>, never a silently inert control: the wire set names each
+broken entry once per session and the guard allows.</p>
 <h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
 <p><code>yupana hook pre-bash</code> is <strong>record-only by default</strong> and stays that way unless a
 deployment sets <code>[yupana.policy] action_scope</code>, which is <code>off</code> out of the box.</p>

@@ -187,7 +187,12 @@ that layers on the Yupana × Quipu × Bobbin stack. The primitives, trust model,
 integration contract, and build order are settled; see
 <a href="#implementation-phasing">Implementation phasing</a> for the MVP and the build order,
 and <a href="#decisions-and-deferrals">Decisions and deferrals</a> for the calls made. Not
-yet built. Scope for v1 is a single trust domain.</p>
+yet built, with one shipped slice: the <strong>Binding / Gate</strong> primitive has a
+local-config form in yupana — <code>[[yupana.policy.tripwires]]</code>, a boundary (path
+globs and/or a rule) bound to an effect (<code>warn</code> / <code>deny</code> / <code>throttle</code>) at the
+pre-edit gate; see the
+<a href="../reference/policy-guard.html#tripwires--boundaries-with-declared-effects">policy guard reference</a>.
+Scope for v1 is a single trust domain.</p>
 <h2 id="motivation"><a class="header" href="#motivation">Motivation</a></h2>
 <p>The stack today is a <strong>knowledge plane</strong> — Yupana (live code structure), Quipu
 (governed bitemporal record), Bobbin (search / fusion / RAG). Its job is to
