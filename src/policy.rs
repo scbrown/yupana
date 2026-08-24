@@ -93,6 +93,12 @@ pub struct PolicyConfig {
     /// not per-tenant: a rule like "no ticket id in a comment" governs the code,
     /// not who wrote it. See [`crate::rules`].
     pub rules: Vec<crate::rules::Rule>,
+    /// Tripwires (`[[yupana.policy.tripwires]]`) — local Binding/Gate
+    /// declarations that attach an effect (`warn` / `deny` / `throttle`) to a
+    /// boundary of path globs and/or a named rule. Like [`Self::rules`], not
+    /// per-tenant: a boundary governs the code, not who crosses it. See
+    /// [`crate::tripwire`].
+    pub tripwires: Vec<crate::tripwire::Tripwire>,
     /// Run the FR-23 buffer verifier as an arm of the pre-edit guard: reject
     /// edits that introduce references resolving to nothing (hallucinated
     /// identifiers, wrong arity, unresolved `mod` imports). Opt-in and off by
@@ -130,6 +136,7 @@ impl Default for PolicyConfig {
             max_hops: DEFAULT_MAX_HOPS,
             scopes: BTreeMap::new(),
             rules: Vec::new(),
+            tripwires: Vec::new(),
             verify: false,
             work_item_scope: Mode::Off,
             action_scope: Mode::Off,

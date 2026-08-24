@@ -256,6 +256,59 @@ which is what you want for sizing a ceiling. And "agents behaved no differently
 under advise" is not evidence that they saw the advisory; they did not. Only
 `enforce` puts the reason in front of the model.
 
+## Tripwires — boundaries with declared effects
+
+A **tripwire** (`[[yupana.policy.tripwires]]`) is the local-config slice of the
+governance plane's *Binding / Gate* primitive: it attaches an effect to a
+boundary, and the edit itself is the crossing — nothing has to remember to
+check the wire. Where a rule says what text may look like everywhere it
+applies, a tripwire says what happens *at this boundary*.
+
+```toml
+# Touching the boundary at all trips the wire.
+[[yupana.policy.tripwires]]
+name = "auth-boundary"
+paths = ["src/auth/**"]
+effect = "deny"                  # warn | deny | throttle
+message = "auth changes need the security workflow"   # optional
+
+# Rule-conditioned: trips only when the named rule fires INSIDE the boundary.
+# The same rule can advise repo-wide and deny here.
+[[yupana.policy.tripwires]]
+name = "no-tickets-in-auth"
+paths = ["src/auth/**"]
+rule = "no-ticket-in-comment"    # a [[yupana.policy.rules]] name
+effect = "deny"
+
+# Crossing records an expiring backoff subsequent edits surface. Never blocks.
+[[yupana.policy.tripwires]]
+name = "hot-file"
+paths = ["src/core.rs"]
+effect = "throttle"
+backoff_secs = 300
+```
+
+Semantics, with the ambient `mode` a ceiling throughout:
+
+- **`deny`** blocks under `enforce` and advises under `advise`.
+- **`warn`** notifies and never blocks.
+- **`throttle`** records a backoff via the same machinery the Post-Action
+  Auditor uses; the next edits surface the advisory. It is recorded even when a
+  sibling `deny` wire blocks the same edit — the attempt crossed the boundary,
+  and the crossing is recorded either way.
+- A **path-only** wire trips on any edit whose repo-relative path matches
+  (a pure deletion included: the crossing is the edit's target, not its text).
+  A **rule-conditioned** wire needs the introduced text and a grammar; without
+  them it has no evidence and does not trip.
+- One decision per edit: a deny-effect trip decides it, and every tripped wire
+  rides in the same message and is recorded as its own constraint evaluation
+  (point `PAG`, tree-sitter tier, `fresh` — local config is authoritative).
+
+A misconfigured wire — a malformed glob, a `rule` no rules entry defines, a
+`throttle` with no `backoff_secs`, or a wire with no paths and no rule — is a
+**loud fail-open**, never a silently inert control: the wire set names each
+broken entry once per session and the guard allows.
+
 ## The action surface (`pre-bash`)
 
 `yupana hook pre-bash` is **record-only by default** and stays that way unless a

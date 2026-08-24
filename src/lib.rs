@@ -99,6 +99,7 @@ pub mod state;
 pub mod textrules;
 pub mod throttle;
 pub mod trace;
+pub mod tripwire;
 pub mod types;
 /// Phase-4 verdict signing + promotion (H-PROMOTE-VERDICT).
 #[cfg(feature = "quipu")]

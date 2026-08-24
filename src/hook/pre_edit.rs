@@ -106,6 +106,14 @@ fn guard_inner(
     let file = PathBuf::from(&file_path);
     let rel = relative(&file, &root);
 
+    // Tripwires — local Binding/Gate declarations — run FIRST: a wire is the
+    // more specific binding (this boundary, this effect), and its declared
+    // effect must not be preempted by the ambient-mode outcome the plain rule
+    // plane would produce for the same violation.
+    if let Some(decision) = tripwire_arm::tripwire_check(&config, &input, &root, &rel) {
+        return decision;
+    }
+
     // Structural rules (tree-sitter tier) govern the TEXT an edit introduces and
     // are NOT per-tenant: a "no ticket id in a comment" rule holds for everyone.
     // Evaluate them before the tenant-scope gate so they apply even to an
@@ -328,6 +336,8 @@ use pre_edit_util::{decide, fail_open, introduced_text};
 mod rule_planes;
 #[path = "scope_arm.rs"]
 mod scope_arm;
+#[path = "tripwire_arm.rs"]
+mod tripwire_arm;
 #[path = "verify_arm.rs"]
 mod verify_arm;
 #[cfg(feature = "quipu")]

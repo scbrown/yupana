@@ -5,7 +5,12 @@ that layers on the Yupana × Quipu × Bobbin stack. The primitives, trust model,
 integration contract, and build order are settled; see
 [Implementation phasing](#implementation-phasing) for the MVP and the build order,
 and [Decisions and deferrals](#decisions-and-deferrals) for the calls made. Not
-yet built. Scope for v1 is a single trust domain.
+yet built, with one shipped slice: the **Binding / Gate** primitive has a
+local-config form in yupana — `[[yupana.policy.tripwires]]`, a boundary (path
+globs and/or a rule) bound to an effect (`warn` / `deny` / `throttle`) at the
+pre-edit gate; see the
+[policy guard reference](../reference/policy-guard.md#tripwires--boundaries-with-declared-effects).
+Scope for v1 is a single trust domain.
 
 ## Motivation
 
