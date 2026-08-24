@@ -18,6 +18,7 @@ use crate::errors::{Error, Result};
 use crate::project::ProjectedPolicy;
 use crate::rules::{MatchType, Rule};
 use crate::textrules::{TextRule, TextTier};
+use std::collections::{HashMap, HashSet};
 
 /// Decode the [`TEXT_POLICY_QUERY`] result into text rules. Same contract as
 /// [`decode_policies`]: a row missing a required binding, or carrying a tier
@@ -29,6 +30,7 @@ pub fn decode_text_rules(sparql_json: &str) -> Result<Vec<TextRule>> {
     let bindings = rows_of(&value)?;
 
     let mut out = Vec::with_capacity(bindings.len());
+    let mut optional_values: HashMap<(String, &'static str), HashSet<String>> = HashMap::new();
     for (i, binding) in bindings.iter().enumerate() {
         let get = |key: &str| -> Option<String> { binding_value(binding, key) };
         let required = |key: &str| -> Result<String> {
@@ -99,10 +101,34 @@ pub fn decode_text_rules(sparql_json: &str) -> Result<Vec<TextRule>> {
                 // Dropping a rationale would lose the author's reasoning, and
                 // choosing between them by row order would be arbitrary and
                 // unstable across graph writes.
-                merge_optional(&mut existing.rationale, rule.rationale);
-                merge_optional(&mut existing.label, rule.label);
-                merge_optional(&mut existing.class, rule.class);
-                merge_optional(&mut existing.exempt_path_regex, rule.exempt_path_regex);
+                merge_optional(
+                    &mut existing.rationale,
+                    rule.rationale,
+                    &mut optional_values,
+                    &rule.name,
+                    "rationale",
+                );
+                merge_optional(
+                    &mut existing.label,
+                    rule.label,
+                    &mut optional_values,
+                    &rule.name,
+                    "label",
+                );
+                merge_optional(
+                    &mut existing.class,
+                    rule.class,
+                    &mut optional_values,
+                    &rule.name,
+                    "class",
+                );
+                merge_optional(
+                    &mut existing.exempt_path_regex,
+                    rule.exempt_path_regex,
+                    &mut optional_values,
+                    &rule.name,
+                    "exempt_path_regex",
+                );
             }
         }
     }
@@ -114,12 +140,22 @@ pub fn decode_text_rules(sparql_json: &str) -> Result<Vec<TextRule>> {
 /// Distinct values are joined rather than replaced: these are explanatory
 /// strings, and the whole reason a second one exists is that somebody had more
 /// to say. Identical values collapse, so the common case stays clean.
-fn merge_optional(existing: &mut Option<String>, incoming: Option<String>) {
+fn merge_optional(
+    existing: &mut Option<String>,
+    incoming: Option<String>,
+    seen: &mut HashMap<(String, &'static str), HashSet<String>>,
+    rule: &str,
+    field: &'static str,
+) {
     let Some(add) = incoming else { return };
-    match existing {
-        None => *existing = Some(add),
-        Some(have) => {
-            if !have.split(" — ").any(|part| part == add) {
+    let values = seen.entry((rule.to_string(), field)).or_default();
+    if values.is_empty() {
+        values.extend(existing.iter().cloned());
+    }
+    if values.insert(add.clone()) {
+        match existing {
+            None => *existing = Some(add),
+            Some(have) => {
                 have.push_str(" — ");
                 have.push_str(&add);
             }

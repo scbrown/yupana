@@ -198,7 +198,11 @@ fn two_comments_json() -> String {
     };
     serde_json::json!({
         "head": { "vars": ["s", "regex", "tier", "class", "rationale"] },
-        "results": { "bindings": [row("the reason"), row("the exemption note")] }
+        "results": { "bindings": [
+            row("the reason — with detail"),
+            row("the exemption note"),
+            row("the reason — with detail")
+        ] }
     })
     .to_string()
 }
@@ -223,7 +227,7 @@ fn merging_keeps_every_distinct_rationale() {
     // would be arbitrary AND unstable across graph writes.
     let rules = decode_text_rules(&two_comments_json()).unwrap();
     let rationale = rules[0].rationale.as_deref().unwrap();
-    assert!(rationale.contains("the reason"));
+    assert_eq!(rationale.matches("the reason — with detail").count(), 1);
     assert!(rationale.contains("the exemption note"));
 }
 
