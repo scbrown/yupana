@@ -305,6 +305,26 @@ names somebody else — and a record that resolved it by precedence would delete
 the only evidence of it.</p>
 <p>It is emitted only when true. A <code>false</code> on every line trains a reader to skip the
 field, which is the opposite of what it is for.</p>
+<h2 id="turn-boundary-grounding-evidence"><a class="header" href="#turn-boundary-grounding-evidence">Turn-boundary grounding evidence</a></h2>
+<p>NeuralAmplifier-scoped hook payloads may carry a <code>grounding</code> reference with
+<code>scope: "na"</code>, a content-addressed <code>grounding_id</code>, <code>faction_id</code>, and
+<code>worldview_sha256</code>. Yupana resolves only the matching local cache file; it never
+queries Quipu on an edit or action hot path. The exact cached bytes must hash to
+the id, and their faction/world-view bindings must match the payload.</p>
+<p>The result is the ordinary <code>na-turn-grounding</code> element in <code>constraints[]</code>, not
+a second trace format. Its <code>grounding_outcome</code> distinguishes <code>used</code>, <code>empty</code>,
+<code>transport-error</code>, <code>missing</code>, <code>unresolved</code>, <code>stale</code>, and <code>unknown-scope</code>.
+Missing or unverifiable evidence is <code>outcome: "unknown"</code>, never a fabricated
+success. Empty evidence is <code>unsatisfied</code>; fresh used evidence is <code>satisfied</code>.</p>
+<p>This stage only advises. It cannot emit a blocked response, even when the
+ambient policy mode is <code>enforce</code>, and workspace configuration does not control
+whether a harness-supplied grounding reference is checked. Promotion to a hard
+response remains gated on a measured zero-false-positive advise soak.</p>
+<p>The cache defaults to <code>$XDG_STATE_HOME/yupana/grounding</code> (or
+<code>~/.local/state/yupana/grounding</code>) and can be relocated by the harness with
+<code>YUPANA_GROUNDING_CACHE_DIR</code>. Files are named <code>&lt;sha256&gt;.json</code>; the default
+freshness ceiling is 300 seconds and the harness may set
+<code>YUPANA_GROUNDING_MAX_AGE_SECS</code>.</p>
 <h2 id="verdicts--yupana-verifier-and-yupana-verdicts"><a class="header" href="#verdicts--yupana-verifier-and-yupana-verdicts">Verdicts — <code>yupana verifier</code> and <code>yupana verdicts</code></a></h2>
 <p>Both need the <code>quipu</code> feature.</p>
 <p>A trace record is diagnostic. A <strong>verdict</strong> is an attestation: ed25519-signed,
