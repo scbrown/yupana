@@ -4329,6 +4329,43 @@ optional <code>required_workflow</code> field on the <code>pre-edit</code> verdi
 <li><strong>See also:</strong> <a href="design/governed-relations.html">Governed Relations</a> — the Yupana ⋈ Quipu
 join this builds on.</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="game-state--policy-harness-addendum"><a class="header" href="#game-state--policy-harness-addendum">Game-State &amp; Policy Harness (addendum)</a></h1>
+<p>The FR-35..FR-39 addendum — the net-new capabilities the
+<a href="https://github.com/scbrown/NeuralAmplifier">NeuralAmplifier</a> project needs
+from Yupana — lives at the repository root:</p>
+<ul>
+<li><strong><a href="https://github.com/scbrown/yupana/blob/main/docs/neuralamplifier-harness.md"><code>docs/neuralamplifier-harness.md</code></a></strong></li>
+</ul>
+<p><strong>Status: BUILT, behind the <code>game-state</code> Cargo feature.</strong> The code is
+<code>src/state/</code>; what shipped, as opposed to what was designed, is described in
+<a href="design/../concepts/game-state.html">The Game-State Harness</a>.</p>
+<p>Yupana ingests facts an engine <em>adapter</em> stated — a game board, not source —
+and serves them at the <code>engine-state</code> tier, a peer of the code tiers rather
+than a rung above or below them. Nothing there is span-anchored, so a consumer
+that read an <code>engine-state</code> fact as if it pointed at a <code>file:line</code> would be
+wrong in exactly the way FR-3 exists to prevent.</p>
+<p>One spelling trap the addendum fixes and this page repeats because it is a
+wire value: <strong><code>game-state</code> is the Cargo feature; <code>engine-state</code> is the tier.</strong>
+Two names for two things, and a consumer discriminating on the wrong string
+matches nothing, silently.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="golden-path-conformance-guard-addendum"><a class="header" href="#golden-path-conformance-guard-addendum">Golden-Path Conformance Guard (addendum)</a></h1>
+<p>The FR-40..FR-42 addendum — blessed-trajectory projections and plan/progress
+conformance under <code>gp-grammar/1</code> — lives at the repository root:</p>
+<ul>
+<li><strong><a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md"><code>docs/golden-path-guard.md</code></a></strong></li>
+</ul>
+<p><strong>Status: BUILT (first cut), behind the <code>golden-path</code> Cargo feature.</strong> The code
+is <code>src/goldenpath/</code>; the surfaces are <code>yupana_path_check</code> over MCP and
+<code>POST /path/check</code> on the daemon, both feature-gated. The operational reference
+is <a href="design/../reference/golden-path.html">Golden-Path Conformance</a>.</p>
+<p>Two choices the implementation made that the design left open, since they
+change how the guard is used:</p>
+<ul>
+<li><strong>Projected paths are supplied per call</strong>, like <code>StatePolicy</code>, rather than
+held resident — a stale resident copy would enforce yesterday's blessing.</li>
+<li><strong>Deviation is decidable only against a complete plan</strong>, so FR-41's
+per-action flow reports <em>progress and hazards</em> rather than hard deviations.</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
 <p>See <a href="https://github.com/scbrown/yupana/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>
 and <a href="https://github.com/scbrown/yupana/blob/main/AGENTS.md"><code>AGENTS.md</code></a> at the

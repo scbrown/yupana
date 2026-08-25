@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Contributing - Yupana — Live Code Structure</title>
+        <title>Golden-Path Guard (addendum) - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/contributing.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/design/golden-path-guard.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,29 +181,36 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
-<p>See <a href="https://github.com/scbrown/yupana/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>
-and <a href="https://github.com/scbrown/yupana/blob/main/AGENTS.md"><code>AGENTS.md</code></a> at the
-repository root.</p>
-<p>The essentials:</p>
+                        <h1 id="golden-path-conformance-guard-addendum"><a class="header" href="#golden-path-conformance-guard-addendum">Golden-Path Conformance Guard (addendum)</a></h1>
+<p>The FR-40..FR-42 addendum — blessed-trajectory projections and plan/progress
+conformance under <code>gp-grammar/1</code> — lives at the repository root:</p>
 <ul>
-<li><strong>Use <code>just</code>, never raw <code>cargo</code>.</strong></li>
-<li>Run <code>just check</code> and <code>just test</code> before every push — both must pass.</li>
-<li>Clippy is <code>-D warnings</code>; the lint policy mirrors Quipu's.</li>
-<li>Keep source files small (warn at 400 lines, fail at 500).</li>
-<li>Tag every served fact with a <code>tier</code> and <code>freshness</code>.</li>
-<li>No Cargo feature ships dark — add it to the CI matrix in the same change.</li>
-<li>Work is not complete until it is pushed and CI is green.</li>
+<li><strong><a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md"><code>docs/golden-path-guard.md</code></a></strong></li>
+</ul>
+<p><strong>Status: BUILT (first cut), behind the <code>golden-path</code> Cargo feature.</strong> The code
+is <code>src/goldenpath/</code>; the surfaces are <code>yupana_path_check</code> over MCP and
+<code>POST /path/check</code> on the daemon, both feature-gated. The operational reference
+is <a href="../reference/golden-path.html">Golden-Path Conformance</a>.</p>
+<p>Two choices the implementation made that the design left open, since they
+change how the guard is used:</p>
+<ul>
+<li><strong>Projected paths are supplied per call</strong>, like <code>StatePolicy</code>, rather than
+held resident — a stale resident copy would enforce yesterday's blessing.</li>
+<li><strong>Deviation is decidable only against a complete plan</strong>, so FR-41's
+per-action flow reports <em>progress and hazards</em> rather than hard deviations.</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../design/golden-path-guard.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../design/game-state-harness.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
+                            <a rel="next prefetch" href="../reference/contributing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -211,10 +218,13 @@ repository root.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../design/golden-path-guard.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../design/game-state-harness.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
+                    <a rel="next prefetch" href="../reference/contributing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
             </nav>
 
         </div>

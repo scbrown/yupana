@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Contributing - Yupana — Live Code Structure</title>
+        <title>Game-State Harness (addendum) - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/contributing.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/design/game-state-harness.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,29 +181,37 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
-<p>See <a href="https://github.com/scbrown/yupana/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>
-and <a href="https://github.com/scbrown/yupana/blob/main/AGENTS.md"><code>AGENTS.md</code></a> at the
-repository root.</p>
-<p>The essentials:</p>
+                        <h1 id="game-state--policy-harness-addendum"><a class="header" href="#game-state--policy-harness-addendum">Game-State &amp; Policy Harness (addendum)</a></h1>
+<p>The FR-35..FR-39 addendum — the net-new capabilities the
+<a href="https://github.com/scbrown/NeuralAmplifier">NeuralAmplifier</a> project needs
+from Yupana — lives at the repository root:</p>
 <ul>
-<li><strong>Use <code>just</code>, never raw <code>cargo</code>.</strong></li>
-<li>Run <code>just check</code> and <code>just test</code> before every push — both must pass.</li>
-<li>Clippy is <code>-D warnings</code>; the lint policy mirrors Quipu's.</li>
-<li>Keep source files small (warn at 400 lines, fail at 500).</li>
-<li>Tag every served fact with a <code>tier</code> and <code>freshness</code>.</li>
-<li>No Cargo feature ships dark — add it to the CI matrix in the same change.</li>
-<li>Work is not complete until it is pushed and CI is green.</li>
+<li><strong><a href="https://github.com/scbrown/yupana/blob/main/docs/neuralamplifier-harness.md"><code>docs/neuralamplifier-harness.md</code></a></strong></li>
 </ul>
+<p><strong>Status: BUILT, behind the <code>game-state</code> Cargo feature.</strong> The code is
+<code>src/state/</code>; what shipped, as opposed to what was designed, is described in
+<a href="../concepts/game-state.html">The Game-State Harness</a>.</p>
+<p>Yupana ingests facts an engine <em>adapter</em> stated — a game board, not source —
+and serves them at the <code>engine-state</code> tier, a peer of the code tiers rather
+than a rung above or below them. Nothing there is span-anchored, so a consumer
+that read an <code>engine-state</code> fact as if it pointed at a <code>file:line</code> would be
+wrong in exactly the way FR-3 exists to prevent.</p>
+<p>One spelling trap the addendum fixes and this page repeats because it is a
+wire value: <strong><code>game-state</code> is the Cargo feature; <code>engine-state</code> is the tier.</strong>
+Two names for two things, and a consumer discriminating on the wrong string
+matches nothing, silently.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../design/golden-path-guard.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../design/workflow-gated-edits.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
+                            <a rel="next prefetch" href="../design/golden-path-guard.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -211,10 +219,13 @@ repository root.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../design/golden-path-guard.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../design/workflow-gated-edits.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
+                    <a rel="next prefetch" href="../design/golden-path-guard.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
             </nav>
 
         </div>
