@@ -195,6 +195,14 @@ cd yupana
 just build            # or: cargo build --release
 </code></pre>
 <p>The binary is produced at <code>target/debug/yupana</code> (or <code>target/release/yupana</code>).</p>
+<h2 id="install-locally"><a class="header" href="#install-locally">Install locally</a></h2>
+<pre><code class="language-bash">just install
+</code></pre>
+<p>The install recipe builds the complete feature set into <code>~/.local/bin/yupana</code>
+and installs <code>~/.local/bin/hank</code> as a relative symlink to that same executable.
+Both names therefore report the same version and expose <code>exemplar</code>, <code>verifier</code>,
+and <code>verdicts</code>; they can never silently select different feature builds. Set
+<code>YUPANA_INSTALL_ROOT</code> to use another prefix.</p>
 <h2 id="install-the-git-hooks"><a class="header" href="#install-the-git-hooks">Install the git hooks</a></h2>
 <pre><code class="language-bash">just setup            # installs pre-commit hooks
 </code></pre>
