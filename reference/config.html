@@ -240,8 +240,18 @@ enabled = false
 # is still the only thing that authorizes a write. An unrecognised value is
 # REFUSED, not silently defaulted.
 promote_on = "merge"
-# "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback).
-branch_model = "named_graph"
+# "qualifier" | "named_graph" — how promoted facts are scoped to a branch
+# (spec §9.4). "qualifier" is IMPLEMENTED: every promoted entity gains
+# `bobbin:onBranch "&lt;branch&gt;"`, so `?m bobbin:onBranch "main"` works with zero
+# Quipu change. It answers branch MEMBERSHIP, not per-branch structure — two
+# branches promoting the same module write the same subject and accumulate both
+# values, because promoted IRIs are branch-independent by design.
+# "named_graph" is preferred by §9.4 and needs quad support in Quipu
+# (scbrown/quipu#36); until that lands it REFUSES the promotion rather than
+# degrading to the qualifier, so a config that asked for partitioned branches
+# never looks like it got them. A branch that cannot be determined (a bare SHA
+# that is not a branch tip) is OMITTED, never guessed.
+branch_model = "qualifier"
 # NOT READ, and cannot be honoured as written: promotion validates against
 # shapes COMPILED INTO the binary (`include_str!`), deliberately, so no
 # directory on disk can change what gates a write.
