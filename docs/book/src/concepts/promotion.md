@@ -67,6 +67,43 @@ but IRIs are deterministic and `/knot` supersedes, so re-running a failed
 promotion converges instead of duplicating — the failure message names exactly
 how many chunks landed.
 
+## Branches — the qualifier fallback
+
+`[yupana.quipu] branch_model` selects how promoted facts are scoped to a branch
+(spec §9.4). One of the two designs is implemented:
+
+- **`"qualifier"` (default, implemented).** Every entity the projection declares
+  gains `bobbin:onBranch "<branch>"`, so `?m bobbin:onBranch "main"` is
+  answerable with **zero Quipu change**.
+- **`"named_graph"` (preferred by §9.4, not implemented).** Needs quad support in
+  Quipu ([quipu#36](https://github.com/scbrown/quipu/issues/36)). Until it lands,
+  setting it **refuses the promotion** and names the blocker, rather than quietly
+  writing under the qualifier's semantics — a config that asked for partitioned
+  branches must never look like it got them.
+
+Two limits worth knowing before you depend on the qualifier:
+
+- **It answers membership, not per-branch structure.** Promoted IRIs are
+  deterministic and branch-independent by design — that is what makes a
+  re-promotion supersede rather than fork — so two branches promoting the same
+  module write the *same* subject and accumulate both branch values on it. "Which
+  branches is this module on" works. "What did the call graph look like on
+  `feature` versus `main`" does not, because both branches' edges land on one set
+  of subjects with nothing to tell them apart. That gap is what quipu#36 closes.
+- **An undeterminable branch is omitted, never invented.** Promoting a bare SHA
+  that is not a branch tip emits no qualifier and says so; a commit can sit on
+  many branches and git will not pick one, so neither does yupana.
+
+The branch is resolved from the ref you promote: `--commit main` (the CI shape,
+where the argument names the branch) or `--commit HEAD` on an attached checkout
+(the developer/hook shape).
+
+**Migrating to named graphs when quads land**: the qualifier triples are additive
+and carry no structure of their own, so it is register the branch graphs,
+re-promote each branch's HEAD under `branch_model = "named_graph"` (deterministic
+IRIs supersede rather than duplicate), then retract `bobbin:onBranch` as one
+predicate sweep.
+
 Code and docs are one referential graph (spec §5.10): code leans real-time (the
 live graph + edit hook), docs lean asynchronous (this export). Once in Quipu,
 doc rot becomes a SPARQL query — "every `Document` referencing a `CodeSymbol`

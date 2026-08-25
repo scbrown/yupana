@@ -105,6 +105,33 @@ bobbin:HasTierShape a sh:NodeShape ;
         sh:in ( "tree-sitter" "lsp" "cpg" ) ;
     ] .
 
+# --- branch qualifier (§9.4) --------------------------------------------------
+#
+# The branch-as-qualifier fallback: each promoted entity carries the branch its
+# facts came from, so branch-scoped queries work with ZERO Quipu change while
+# named-graph-per-branch waits on quad support (scbrown/quipu#36).
+#
+# NOT maxCount 1, deliberately. The same module legitimately lives on several
+# branches, and promoted IRIs are branch-independent by design (that is what
+# makes a re-promotion supersede rather than fork), so the values accumulate on
+# one subject — which is the fact "this entity is on these branches" and is the
+# most the qualifier model can honestly express. Constraining it to one would
+# refuse the second branch's promotion of an unchanged file, which is most of
+# every promotion after the first.
+#
+# datatype IS constrained: a branch is a string. An IRI here would be someone
+# reaching for the named-graph model through the qualifier's predicate, and that
+# should fail at yupana rather than land as a shape nobody can query.
+
+bobbin:OnBranchShape a sh:NodeShape ;
+    rdfs:comment "the branch a promoted fact came from (§9.4 qualifier fallback)" ;
+    sh:targetSubjectsOf bobbin:onBranch ;
+    sh:property [
+        sh:path bobbin:onBranch ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
 # --- Section -> references (§5.10) -------------------------------------------
 #
 # A documentation Section that cites a code symbol. This is the edge that makes

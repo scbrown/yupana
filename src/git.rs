@@ -82,6 +82,47 @@ pub fn is_merge_commit(root: &Path, reference: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// The branch `reference` names or sits at, or `None` when no branch can be
+/// determined — which is a real answer, not a failure (§9.4 / GH #4: the
+/// promotion then emits NO branch qualifier rather than guessing one).
+///
+/// Two questions, in the order that makes them unambiguous:
+///
+/// 1. Is `reference` itself a branch name (`refs/heads/<reference>`)? This is
+///    the CI shape — a detached checkout promoted with `--commit main`, where
+///    `HEAD` names no branch but the argument does.
+/// 2. Otherwise, is it the commit `HEAD` is on, with `HEAD` attached to a
+///    branch? This is the developer/hook shape — `--commit HEAD` on a checkout.
+///
+/// Anything else (a bare SHA that is not the current tip, a tag, a detached
+/// HEAD) is `None`. A commit can sit on many branches and git will not pick one
+/// for us; picking one here would attribute facts to a branch nobody named.
+#[must_use]
+pub fn branch_for(root: &Path, reference: &str) -> Option<String> {
+    let name = reference.trim();
+    if !name.is_empty()
+        && git(
+            root,
+            &[
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                &format!("refs/heads/{name}"),
+            ],
+        )
+        .is_some()
+    {
+        return Some(name.to_string());
+    }
+    let head = git(root, &["rev-parse", "--abbrev-ref", "HEAD"])?
+        .trim()
+        .to_string();
+    if head.is_empty() || head == "HEAD" {
+        return None; // detached: HEAD names no branch
+    }
+    (resolve_commit(root, reference)? == resolve_commit(root, "HEAD")?).then_some(head)
+}
+
 /// The paths changed between two commit-ish refs (`from..to`), relative to the
 /// repository root. Empty when either ref does not resolve, when there is no
 /// diff, or outside a repo — the promotion path treats an empty set as

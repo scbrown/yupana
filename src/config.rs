@@ -158,8 +158,11 @@ pub struct QuipuConfig {
     pub enabled: bool,
     /// When to promote: `"commit"`, `"merge"`, or `"manual"`.
     pub promote_on: String,
-    /// Branch model: `"named_graph"` (preferred, needs Quipu quads) or
-    /// `"qualifier"` (fallback). See `docs/yupana-spec.md` §9.4.
+    /// Branch model for promoted facts: `"qualifier"` (implemented — a
+    /// `bobbin:onBranch` term per promoted entity, zero Quipu change) or
+    /// `"named_graph"` (preferred by §9.4, blocked on quad support in Quipu,
+    /// scbrown/quipu#36, and therefore REFUSED rather than silently degraded).
+    /// See `docs/yupana-spec.md` §9.4 and `src/promote_branch.rs`.
     pub branch_model: String,
     /// Directory holding the SHACL shapes promotion validates against.
     pub shapes_path: String,
@@ -199,7 +202,12 @@ impl Default for QuipuConfig {
         Self {
             enabled: false,
             promote_on: "merge".to_string(),
-            branch_model: "named_graph".to_string(),
+            // The IMPLEMENTED model, not the preferred one. §9.4 names
+            // named-graph as preferred and that is still true, but defaulting
+            // to a model whose only honest behaviour is a refusal would refuse
+            // every promotion out of the box. Flip this back when quipu#36
+            // lands.
+            branch_model: "qualifier".to_string(),
             shapes_path: "shapes/".to_string(),
             endpoint: String::new(),
             signing_key_path: "yupana-signing.pk8".to_string(),

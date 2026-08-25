@@ -901,6 +901,40 @@ qualifier** (a reified `bobbin:onBranch` term on each edge, queries adding a
 and migrates to named graphs when they arrive. The config `branch_model` key
 (§11) selects between them.
 
+**Status (GH #4): the qualifier fallback is IMPLEMENTED; named-graph refuses.**
+`src/promote_branch.rs` attaches `bobbin:onBranch "<branch>"` to every entity a
+promotion declares, so `?m bobbin:onBranch "main"` is answerable today with zero
+Quipu change. `branch_model = "named_graph"` **refuses the promotion**, naming
+quipu#36, rather than degrading to the qualifier — an operator who asked for the
+partitioned model must not be left believing their branches are partitioned when
+nothing partitions them. The **default moved to `"qualifier"`** in the same
+change: while neither model existed, defaulting to the preferred one was right;
+now that exactly one is implementable, the other would refuse every promotion out
+of the box.
+
+Two limits, stated because the fallback is easy to over-read:
+
+- **It answers membership, not per-branch structure.** Promoted IRIs are
+  deterministic and branch-independent by design (`code/{repo}/{path}` — that is
+  what makes a re-promotion supersede instead of fork), so two branches promoting
+  the same module write the *same* subject and accumulate both branch values on
+  it. That answers "which branches is this module on". It cannot answer "what did
+  the call graph look like on `feature` versus `main`", because both branches'
+  `calls` edges land on one set of subjects with nothing to tell them apart.
+  Distinguishing them needs per-branch IRIs (which forks the graph) or named
+  graphs (quipu#36). This is exactly why §9.4 calls named-graph the preferred
+  design and this the fallback.
+- **An undeterminable branch is OMITTED, never invented.** A promotion of a bare
+  SHA that is not a branch tip emits no qualifier and says so on stderr — the
+  same absent-beats-wrong rule FR-3 freshness follows.
+
+**Migration, qualifier → named_graph, once quads land.** The qualifier triples
+are additive and carry no structure of their own, so the migration is: register
+the branch graphs, re-promote each branch's HEAD with `branch_model =
+"named_graph"` (deterministic IRIs mean this supersedes rather than duplicates),
+then retract the `bobbin:onBranch` triples as a single predicate sweep. Nothing
+else in the projection changes shape.
+
 ### 9.5 Quipu quad-store RFC (sketch, Quipu-side follow-up)
 
 > **Tracked as [scbrown/quipu#36](https://github.com/scbrown/quipu/issues/36)** —
@@ -1071,7 +1105,8 @@ promote_on = "merge"       # §14.3: WHEN an automated promotion runs. The calle
                            # (`yupana promote --trigger commit|merge`); this decides whether it promotes.
                            # A `commit` event on a merge commit counts as a merge. `manual` (the default
                            # trigger) always promotes — this governs automation, not authorization.
-branch_model = "named_graph" # §9.4: "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback)
+branch_model = "qualifier" # §9.4: "qualifier" (implemented — bobbin:onBranch per entity, zero Quipu change)
+                           # | "named_graph" (preferred, needs Quipu quads — quipu#36; REFUSES until then)
 shapes_path = "shapes/"    # NOT READ — shapes are compiled in (include_str!), so a path cannot gate a write
 ```
 
@@ -1137,9 +1172,13 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
       distinction a `post-commit` hook cannot. `manual` (the default trigger)
       always promotes — the key governs automation, not authorization. The key
       is no longer exempted in `src/config_test.rs`'s live-control guard. GH #3.
-- [ ] Branch modeling per §9.4: promote each branch into a named graph if Quipu
-      quad support (§9.5) has landed; else branch-as-qualifier fallback. SPARQL-
-      over-code recipes.
+- [x] Branch modeling per §9.4, qualifier half: `src/promote_branch.rs` attaches
+      `bobbin:onBranch "<branch>"` to every promoted entity, needing no Quipu
+      change, and `branch_model = "named_graph"` REFUSES naming quipu#36 rather
+      than degrading to it silently. Default moved to `"qualifier"`.
+- [ ] Branch modeling per §9.4, named-graph half: promote each branch into
+      `GRAPH bobbin:branch/<b>` once Quipu quad support (§9.5, quipu#36) has
+      landed, and migrate the qualifier triples out. Blocked on quipu#36.
 - **Exit:** committed structure lives in Quipu, SHACL-validated, bitemporally queryable; uncommitted churn never pollutes it.
 
 ### Phase 5 — Consumption & guardrails
@@ -1473,7 +1512,7 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 | FR-21 full bitemporal fields | 🟡 Partial | `actor` + the resolved commit SHA as `source` on every transaction (`promote.rs:276-283`). `valid_from` is not set from the commit's author time; `/knot` times the transaction as *when learned*. `src/cli_promote.rs` says so inline. |
 | FR-19 promote **on commit/merge** | ✅ Implemented | `src/promote_trigger.rs::decide` is the `promote_on` × trigger decision table; `cli_promote::trigger_admits` reads the key and short-circuits before any tree is read. The caller declares the event (`yupana promote --trigger commit\|merge`) because yupana installs no git hooks; `git::is_merge_commit` upgrades a `commit` event on a two-parent commit to a merge, so the default policy works from the simplest hook. A decline exits **0** — a `post-commit` hook that failed every ordinary commit would be switched off — and prints `SKIPPED … Wrote nothing`. `promote_on` is delisted from `config_test.rs`'s phased allowlist. GH #3. |
 | §9.7 commit→touched-entities provenance edge | 🟡 Partial | Yupana emits only code structure — no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of yupana (an hourly commit-ingest job), so §9.7's *yupana-placement* is unmet; module-granularity only. GH #5. |
-| §9.4 branch modeling (named-graph vs qualifier) | ⬜ Planned | Config scaffold only — `config.rs::branch_model` (default `"named_graph"`); no code attaches `bobbin:onBranch` or a `GRAPH bobbin:branch/<b>` to any promoted edge. Qualifier fallback first. GH #4. |
+| §9.4 branch modeling (named-graph vs qualifier) | 🟡 Qualifier implemented; named-graph refuses | `src/promote_branch.rs` attaches `bobbin:onBranch "<branch>"` to every entity a promotion declares (`git::branch_for` resolves it, or ABSTAINS — no qualifier rather than a guess), gated by `shapes/code-edges.ttl::OnBranchShape`. Default `branch_model` moved to `"qualifier"`, the implemented model. `"named_graph"` REFUSES the promotion naming quipu#36, rather than silently writing under the fallback's semantics. The qualifier answers branch MEMBERSHIP, not per-branch structure — promoted IRIs are branch-independent by design, so both branches' edges land on one subject; that gap is what quipu#36 closes. GH #4. |
 
 Pre-existing Phase 1/2 spec-gaps also remain open (out of the graph-export
 scope): FR-2/FR-4 LSP precision (GH #1), §10/FR-4 column-granularity position

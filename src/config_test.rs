@@ -9,7 +9,11 @@ fn defaults_are_sensible() {
     let config = YupanaConfig::default();
     assert_eq!(config.base_ref, "main");
     assert_eq!(config.serve.mcp_http_port, 3040);
-    assert_eq!(config.quipu.branch_model, "named_graph");
+    // The implemented model (§9.4 / GH #4). `"named_graph"` is preferred but
+    // blocked on quipu#36, and a default that refuses every promotion is not a
+    // default. `promote_branch_test::the_config_default_is_the_implemented_model`
+    // is the other half of this pin.
+    assert_eq!(config.quipu.branch_model, "qualifier");
     assert!(config.languages.contains(&"rust".to_string()));
 }
 

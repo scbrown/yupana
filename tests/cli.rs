@@ -1358,3 +1358,129 @@ fn promote_on_gates_the_declared_trigger() {
         .stderr(predicate::str::contains("commit | merge | manual"));
     drop(server);
 }
+
+/// A one-shot `/knot` stand-in that CAPTURES the posted body and answers 200.
+/// Returns the bound address and a receiver for the request text.
+#[cfg(feature = "quipu")]
+fn capturing_knot() -> (std::net::SocketAddr, std::sync::mpsc::Receiver<String>) {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let Ok((mut sock, _)) = listener.accept() else {
+            return;
+        };
+        // Read until the peer pauses: one `read` is not guaranteed to carry a
+        // whole request, and a test that asserts on a truncated body would fail
+        // for a reason that has nothing to do with what it is testing.
+        sock.set_read_timeout(Some(std::time::Duration::from_millis(400)))
+            .ok();
+        let mut text = String::new();
+        let mut buf = [0u8; 65536];
+        while let Ok(n) = sock.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            text.push_str(&String::from_utf8_lossy(&buf[..n]));
+            if text.contains("\r\n\r\n") && text.len() > 512 {
+                break;
+            }
+        }
+        let _ = sock.write_all(
+            b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 13\r\n\r\n\
+              {\"count\": 42}",
+        );
+        let _ = tx.send(text);
+    });
+    (addr, rx)
+}
+
+/// §9.4 branch modeling (GH #4), end to end: the qualifier fallback reaches the
+/// wire, and the named-graph model that nothing implements REFUSES rather than
+/// quietly writing under the fallback's semantics.
+#[cfg(feature = "quipu")]
+#[test]
+fn branch_model_qualifies_promoted_facts_and_refuses_named_graph() {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(dir.path())
+            .assert()
+            .success();
+    };
+    std::fs::write(dir.path().join("x.rs"), "pub fn x() -> u32 { 1 }\n").unwrap();
+    git(&["init", "-q", "-b", "main"]);
+    git(&["config", "user.email", "t@t"]);
+    git(&["config", "user.name", "t"]);
+    git(&[
+        "remote",
+        "add",
+        "origin",
+        "https://example.com/o/realname.git",
+    ]);
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "base"]);
+    let cfg = dir.path().join("branch.toml");
+    let set = |value: &str| {
+        std::fs::write(
+            &cfg,
+            format!("[yupana.quipu]\nbranch_model = \"{value}\"\n"),
+        )
+        .unwrap();
+    };
+
+    // named_graph: REFUSED, before any tree is read, naming quipu#36 and the
+    // working alternative. Not even a dry run proceeds — reporting conformance
+    // for a projection that can never be written that way is the same lie.
+    set("named_graph");
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args(["promote", "--dry-run", "--config"])
+        .arg(&cfg)
+        .env("HOME", dir.path())
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("quipu#36"))
+        .stderr(predicate::str::contains("qualifier"));
+
+    // An unrecognised value refuses too, rather than defaulting.
+    set("branches");
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args(["promote", "--dry-run", "--config"])
+        .arg(&cfg)
+        .env("HOME", dir.path())
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("branch_model"));
+
+    // qualifier (the default): every promoted entity carries the branch, and the
+    // proof is the bytes that actually reached `/knot` — not the exit code.
+    set("qualifier");
+    let (addr, rx) = capturing_knot();
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args(["promote", "--config"])
+        .arg(&cfg)
+        .args(["--to", &format!("http://{addr}")])
+        .env("HOME", dir.path())
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("promoted: 42 triples"));
+    let body = rx
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("the promotion posted nothing");
+    assert!(
+        body.contains("bobbin:onBranch"),
+        "the qualifier never reached the wire: {body}"
+    );
+    assert!(
+        body.contains(r#"bobbin:onBranch \"main\""#),
+        "the branch must be the one promoted, not a placeholder: {body}"
+    );
+}

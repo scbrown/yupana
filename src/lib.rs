@@ -91,6 +91,9 @@ pub mod projection_cache;
 /// Phase-4 Quipu promotion: SHACL-validate a Turtle projection, then write it.
 #[cfg(feature = "quipu")]
 pub mod promote;
+/// §9.4 branch modeling for promoted facts: the `bobbin:onBranch` qualifier
+/// fallback, and a loud refusal for the named-graph design blocked on quipu#36.
+pub mod promote_branch;
 /// When promotion runs: `[yupana.quipu] promote_on` × the declared trigger.
 /// Ungated on purpose — the policy is meaningful (and testable) in a build
 /// without `quipu`, where it decides whether the feature-off refusal is even

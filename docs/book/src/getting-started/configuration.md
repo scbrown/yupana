@@ -22,7 +22,7 @@ read_only = false
 
 [yupana.quipu]
 enabled = false
-branch_model = "named_graph"
+branch_model = "qualifier"
 ```
 
 `enable_lsp`, `enable_cpg`, and the `[yupana.tenancy]` limits exist but are not yet

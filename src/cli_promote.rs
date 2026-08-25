@@ -78,6 +78,11 @@ impl Cli {
         // endpoint comes from a server an operator deliberately started, not from
         // whatever config is ambient in an agent's shell.
         let cfg = self.load_config(path)?;
+        // §9.4 branch modeling (GH #4), refused HERE — before any tree is read —
+        // when the configured model is the named-graph one nothing implements.
+        // A misconfiguration should cost a message, not a full projection.
+        let branch_model = crate::promote_branch::parse(&cfg.quipu.branch_model)?;
+        crate::promote_branch::ensure_implemented(branch_model)?;
         let discovered = Some(cfg.quipu.endpoint.clone()).filter(|e| !e.is_empty());
         let endpoint: Option<String> = match to {
             // An empty `--to` is not a target; it would post to `/knot` on the
@@ -144,6 +149,19 @@ impl Cli {
             );
             std::process::exit(2);
         }
+        // §9.4's qualifier fallback: tag every promoted entity with the branch
+        // its facts came from, so branch-scoped queries are answerable with no
+        // Quipu change. A branch that cannot be determined is OMITTED, never
+        // guessed — the same absent-beats-invented rule FR-3 freshness follows.
+        let branch = crate::git::branch_for(path, commit);
+        if branch.is_none() && !self.quiet {
+            eprintln!(
+                "yupana promote: no branch resolves for `{commit}` — promoting WITHOUT a \
+                 `bobbin:onBranch` qualifier rather than guessing one. Promote from an \
+                 attached checkout, or pass a branch name to --commit, to qualify these facts."
+            );
+        }
+        let turtle = crate::promote_branch::qualify(branch_model, &turtle, branch.as_deref())?;
         // Provenance carries the RESOLVED commit SHA, not the ref spelling —
         // `--commit main` and `--commit <sha>` promoting the same tree record
         // the same source (partial FR-21; full bitemporal fields are a #15
