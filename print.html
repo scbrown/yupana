@@ -626,6 +626,37 @@ still whole-graph and up front; a chunked write is not atomic across chunks,
 but IRIs are deterministic and <code>/knot</code> supersedes, so re-running a failed
 promotion converges instead of duplicating — the failure message names exactly
 how many chunks landed.</p>
+<h2 id="commit-provenance--what-work-touched-this-entity"><a class="header" href="#commit-provenance--what-work-touched-this-entity">Commit provenance — what work touched this entity</a></h2>
+<p>Every promotion also writes the commit it promoted, and one edge per code module
+that commit changed (spec §9.7):</p>
+<pre><code class="language-turtle">&lt;…/code/myrepo/commit/2f1c…&gt; a bobbin:GitCommit ;
+    rdfs:label "myrepo@2f1c9a4b1d0e" ;
+    bobbin:hash "2f1c9a4b1d0e…" ;
+    bobbin:repo "myrepo" ;
+    bobbin:author "Dev &lt;dev@example.com&gt;" ;
+    bobbin:date "2026-08-25T09:14:02+00:00"^^xsd:dateTime .
+
+&lt;…/code/myrepo/commit/2f1c…&gt; bobbin:modifies &lt;…/code/myrepo/src%2Fauth.rs&gt; .
+</code></pre>
+<p>That is the substrate for Quipu-side, <em>deterministic</em> work-item co-occurrence —
+"what work touched this, and what else did it touch" — as a SPARQL join, not a
+statistical mine (statistical co-change stays Bobbin's). Quipu aggregates it;
+Yupana only emits the raw edge.</p>
+<p>Three things it deliberately does not do:</p>
+<ul>
+<li><strong>It does not emit <code>implements</code></strong> (the commit → work-item half of the chain).
+That link needs a declared project-prefix vocabulary Yupana does not hold, and
+the tracker-aware ingest lane already owns it. The chain still closes: both
+predicates join on the commit IRI.</li>
+<li><strong>It is module-granular.</strong> "Touched" means the commit changed the file, which
+is exactly true; symbol-level touch would be a guess dressed as a fact.</li>
+<li><strong>It never points at an entity the same payload does not declare.</strong> Changed
+paths are filtered against the projection, so a changed <code>.md</code>, a lockfile, or a
+deleted file produces no edge.</li>
+</ul>
+<p>A merge commit reports what the merge brought in, relative to its first parent —
+the case a plain <code>git diff-tree</code> reports as touching nothing, which matters
+because merges are exactly what the default <code>promote_on</code> policy promotes.</p>
 <h2 id="branches--the-qualifier-fallback"><a class="header" href="#branches--the-qualifier-fallback">Branches — the qualifier fallback</a></h2>
 <p><code>[yupana.quipu] branch_model</code> selects how promoted facts are scoped to a branch
 (spec §9.4). One of the two designs is implemented:</p>
