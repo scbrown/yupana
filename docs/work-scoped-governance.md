@@ -9,8 +9,35 @@ off|advise|enforce` with the ambient mode as ceiling, and unknown scope
 advises once per session instead of allowing silently. The CONTEXT consumer
 is live too: `yupana hook session-start` (`src/brief.rs`) injects the item's
 ground, central entities (quipu pagerank), similar past items with outcomes,
-and the rules in force at assignment time. The `declared` graph vocabulary
-(phase 4), derived scopes, and the trace consumer remain design intent.
+and the rules in force at assignment time.
+
+**Two things this paragraph used to call design intent have since shipped**, and
+are named here because a reader who believes a capability is absent does not
+look for it (`docs/neuralamplifier-harness.md` §Status):
+
+- **Derived scopes** — the ladder's second rung. `src/hook/scope_derived.rs::derived_rung`
+  scopes an item with no observed ground of its own to its *parent's* ground,
+  called from `src/hook/scope_arm.rs`. It returns `None` only when it genuinely
+  cannot answer (no parent map projected, no parent recorded, or a parent with
+  no ground either), and it **always advises, never denies** — the answer is an
+  inference about where work belongs, not a record of it, which
+  `src/hook/scope_arm_test.rs::the_derived_rung_ADVISES_even_under_enforce`
+  pins even under `enforce`.
+- **The trace consumer.** `src/trace.rs` emits the Σ-derived
+  `ConstraintEvaluation` — which constraint applied, where it was evaluated,
+  its outcome and the response taken — so SARC I8's `T ⊨ Σ` check is decidable
+  from the record rather than from a `+`-joined list of rule names.
+  `src/hook/pre_bash.rs` supplies the action records (including the
+  abstentions, so the replay has a denominator), `src/attribution.rs` composes
+  the attribution tuple around it, and `scripts/spool-to-dogwood.py` plus
+  [reference/replay.md](book/src/reference/replay.md) are the replay runner
+  that turns the spool into the advise → enforce promotion gate.
+
+What genuinely remains design intent is the **`declared` graph vocabulary**
+(phase 4) — the ladder's top rung, where a work item states its own scope in
+quipu rather than having one projected from provenance or inherited from a
+parent.
+
 **Scope:** how yupana, Quipu and a work-item tracker combine to govern, trace, and
 contextualise what an autonomous agent does.
 
