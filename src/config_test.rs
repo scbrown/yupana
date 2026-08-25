@@ -236,8 +236,28 @@ fn every_config_key_is_read_or_explicitly_phased() {
         // high_fanin_threshold / overlay_eviction) are now LIVE — read by
         // TenantRegistry's FR-18 lifecycle (yupana #6) — so they are no longer
         // phased. The guard's "allowlist must not rot" check enforces that.
-        ("promote_on", "Phase 4 — Quipu promotion not built"),
-        ("shapes_path", "Phase 4 — Quipu promotion not built"),
+        // Both of these read "Phase 4 — Quipu promotion not built" until
+        // 2026-08. That was false: `src/promote.rs` is a working
+        // implementation with two CI arms, graded ✅ in the spec's Appendix D.
+        // The keys really are unread, so the guard was right to exempt them —
+        // but for reasons that had nothing to do with the ones stated, and a
+        // reason nobody can falsify is the same defect this guard exists to
+        // catch, one level up. The real blockers:
+        (
+            "promote_on",
+            "no trigger point is wired — promotion runs only on an explicit \
+             `yupana promote` / `yupana_promote` invocation, so there is \
+             nothing for commit|merge|manual to select between (GH #3)",
+        ),
+        (
+            "shapes_path",
+            "unhonourable as written — promotion validates against \
+             `promote::CODE_EDGE_SHAPES`, `include_str!`'d at promote.rs:43, \
+             so the shapes are compiled into the binary and no directory on \
+             disk can change what gates a write. Wiring this key would mean \
+             deciding to load shapes at runtime, which promote.rs:39-43 \
+             argues against on purpose (GH #8)",
+        ),
     ];
 
     let manifest = env!("CARGO_MANIFEST_DIR");

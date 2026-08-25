@@ -1058,9 +1058,9 @@ read_only = false          # write guard: when true, yupana REFUSES mutating ope
 
 [yupana.quipu]               # (Phase 4) promotion target (feature = "quipu")
 enabled = false
-promote_on = "merge"       # (Phase 4 — not yet read) "commit" | "merge" | "manual"
+promote_on = "merge"       # NOT READ — no commit/merge trigger is wired; promotion is invoked explicitly
 branch_model = "named_graph" # §9.4: "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback)
-shapes_path = "shapes/"    # (Phase 4 — not yet read) code-entities.ttl (+ code-edges.ttl)
+shapes_path = "shapes/"    # NOT READ — shapes are compiled in (include_str!), so a path cannot gate a write
 ```
 
 ---
