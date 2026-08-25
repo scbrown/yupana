@@ -1214,3 +1214,147 @@ fn a_degraded_plane_is_not_an_empty_one() {
         // ...and it is still honest that nothing is verified.
         .stdout(predicate::str::contains("\"verification\": \"unsigned\""));
 }
+
+/// A fixture repo with one ordinary commit and, on a side branch, a merge
+/// commit — the two shapes `promote_on` has to tell apart. Returns the dir and
+/// the merge commit's SHA.
+#[cfg(feature = "quipu")]
+fn repo_with_a_merge() -> (tempfile::TempDir, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(dir.path())
+            .assert()
+            .success();
+    };
+    std::fs::write(dir.path().join("x.rs"), "pub fn x() -> u32 { 1 }\n").unwrap();
+    git(&["init", "-q", "-b", "main"]);
+    git(&["config", "user.email", "t@t"]);
+    git(&["config", "user.name", "t"]);
+    git(&[
+        "remote",
+        "add",
+        "origin",
+        "https://example.com/o/realname.git",
+    ]);
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "base"]);
+    // A side branch with its own commit, merged back with --no-ff so the merge
+    // is a real two-parent commit and not a fast-forward.
+    git(&["checkout", "-qb", "side"]);
+    std::fs::write(dir.path().join("y.rs"), "pub fn y() -> u32 { 2 }\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "side work"]);
+    git(&["checkout", "-q", "main"]);
+    git(&["merge", "-q", "--no-ff", "-m", "merge side", "side"]);
+    let sha = String::from_utf8(
+        Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    (dir, sha)
+}
+
+/// FR-19's trigger, end to end (GH #3). `[yupana.quipu] promote_on` was parsed
+/// and read by nothing; these assertions are what make it a control.
+///
+/// The unreachable `--to` is the instrument: a DECLINED promotion never reaches
+/// the network, so it exits 0 fast; an ADMITTED one gets as far as the write and
+/// fails there. The difference between the two outcomes is the whole feature.
+// Gated on the feature rather than returning early inside the body: this test
+// needs the merge fixture above, which is itself `quipu`-only (a stub build's
+// `promote` prints its phase notice before any policy runs, so there is nothing
+// here to pin).
+#[cfg(feature = "quipu")]
+#[test]
+fn promote_on_gates_the_declared_trigger() {
+    let (dir, merge_sha) = repo_with_a_merge();
+    let cfg = dir.path().join("policy.toml");
+    let set = |value: &str| {
+        std::fs::write(&cfg, format!("[yupana.quipu]\npromote_on = \"{value}\"\n")).unwrap();
+    };
+    // A responder that 400s whatever arrives: an ADMITTED promotion reaches it
+    // and fails with a status, which is the proof it got past the gate. Bound
+    // once and left listening for the whole test.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        // Three runs below are ADMITTED and reach the wire; one spare so a
+        // fourth never falls into the transient-retry backoff and slows the test.
+        for stream in listener.incoming().take(4) {
+            let Ok(mut sock) = stream else { continue };
+            use std::io::{Read, Write};
+            let mut buf = [0u8; 8192];
+            let _ = sock.read(&mut buf);
+            let _ = sock.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
+        }
+    });
+    let run = |commit: &str, trigger: &str| {
+        Command::cargo_bin("yupana")
+            .unwrap()
+            .args(["promote", "--config"])
+            .arg(&cfg)
+            .args([
+                "--commit",
+                commit,
+                "--trigger",
+                trigger,
+                "--to",
+                &format!("http://{addr}"),
+            ])
+            .env("HOME", dir.path())
+            .current_dir(dir.path())
+            .assert()
+    };
+
+    // promote_on = "manual": NO automated event promotes. This is the criterion
+    // the issue names outright, and the one an inert key silently failed.
+    set("manual");
+    run("HEAD", "commit")
+        .success()
+        .stdout(predicate::str::contains("SKIPPED"))
+        .stdout(predicate::str::contains("Wrote nothing"));
+    run(&merge_sha, "merge")
+        .success()
+        .stdout(predicate::str::contains("SKIPPED"));
+
+    // ...but an explicit invocation still promotes: `promote_on` governs
+    // automation, not authorization. It gets to the write and fails THERE.
+    run("HEAD", "manual")
+        .failure()
+        .stdout(predicate::str::contains("SKIPPED").not());
+
+    // promote_on = "merge" (the default): a plain commit is declined, and the
+    // SAME `--trigger commit` on a merge commit is admitted — git supplies the
+    // distinction a post-commit hook cannot make.
+    set("merge");
+    let base = format!("{merge_sha}^1");
+    run(&base, "commit")
+        .success()
+        .stdout(predicate::str::contains("SKIPPED"));
+    run(&merge_sha, "commit")
+        .failure()
+        .stdout(predicate::str::contains("SKIPPED").not());
+
+    // promote_on = "commit": every event promotes, plain commits included.
+    set("commit");
+    run(&base, "commit")
+        .failure()
+        .stdout(predicate::str::contains("SKIPPED").not());
+
+    // An unrecognised value REFUSES rather than falling back to the default —
+    // a typo must not be indistinguishable from the key working.
+    set("on-merge");
+    run("HEAD", "commit")
+        .failure()
+        .stderr(predicate::str::contains("promote_on"))
+        .stderr(predicate::str::contains("commit | merge | manual"));
+    drop(server);
+}

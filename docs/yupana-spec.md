@@ -1067,7 +1067,10 @@ read_only = false          # write guard: when true, yupana REFUSES mutating ope
 
 [yupana.quipu]               # (Phase 4) promotion target (feature = "quipu")
 enabled = false
-promote_on = "merge"       # NOT READ — no commit/merge trigger is wired; promotion is invoked explicitly
+promote_on = "merge"       # §14.3: WHEN an automated promotion runs. The caller declares the event
+                           # (`yupana promote --trigger commit|merge`); this decides whether it promotes.
+                           # A `commit` event on a merge commit counts as a merge. `manual` (the default
+                           # trigger) always promotes — this governs automation, not authorization.
 branch_model = "named_graph" # §9.4: "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback)
 shapes_path = "shapes/"    # NOT READ — shapes are compiled in (include_str!), so a path cannot gate a write
 ```
@@ -1125,11 +1128,15 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
       `Section → references → CodeSymbol`. Not yet wired into the live edit hook.
 - [x] SHACL-validate (`rudof`) before every write (FR-20): `promote::validate` runs `rudof_lib` in-process against `code-edges.ttl` and refuses the whole promotion on any violation (all-or-nothing); a real `export` projection is round-trip-validated in the test suite so the emitter cannot drift from the gate (yupana #14).
 - [x] Promote via `quipu_knot` / `POST /knot`, bitemporal, committed-tree-only (FR-19, FR-21, FR-22): `src/promote.rs::promote` SHACL-validates the projection in-process against the compiled-in `code-edges.ttl`, refuses the whole promotion on any violation, then POSTs the Turtle to `/knot` (chunked under the body limit; deterministic IRIs, so a re-run supersedes rather than duplicating). `yupana promote <commit-ish> --to <url>` reads a commit, never the working tree, which is what keeps uncommitted churn out of the graph. Graded ✅ in Appendix D.
-- [ ] Promote **on commit/merge** — the trigger. `[yupana.quipu] promote_on` is
-      parsed and has no reader: nothing in the tree wires a commit or merge hook
-      to `promote::promote`, so today every promotion is an explicit CLI or
-      `yupana_promote` invocation. The key is exempted in
-      `src/config_test.rs`'s live-control guard for exactly this reason. GH #3.
+- [x] Promote **on commit/merge** — the trigger (FR-19, §14.3): `yupana promote
+      --trigger commit|merge` is the event a git hook or CI step declares, and
+      `[yupana.quipu] promote_on` decides whether that event promotes
+      (`src/promote_trigger.rs`, read by `cli_promote::trigger_admits`). Yupana
+      installs no git hooks and owns no commit event of its own, so the event
+      comes from the caller that has one; git supplies the merge/non-merge
+      distinction a `post-commit` hook cannot. `manual` (the default trigger)
+      always promotes — the key governs automation, not authorization. The key
+      is no longer exempted in `src/config_test.rs`'s live-control guard. GH #3.
 - [ ] Branch modeling per §9.4: promote each branch into a named graph if Quipu
       quad support (§9.5) has landed; else branch-as-qualifier fallback. SPARQL-
       over-code recipes.
@@ -1452,8 +1459,6 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 - **FR-32, the optional LSP *server* surface** — exposing Yupana *as* a
   language server to human editors. Distinct from FR-2 above: that one
   *consumes* language servers for precision, this one *is* one.
-- **The promotion trigger** — `promote_on` is parsed and read by nothing; every
-  promotion is an explicit invocation. GH #3.
 - **Branch modeling** (§9.4) — GH #4.
 
 **Phase 4 (graph-export → Quipu) — status (verified by mechanism against
@@ -1466,7 +1471,7 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 | FR-20 SHACL-validate before every write | ✅ Implemented | `src/promote.rs::validate` runs `rudof_lib` **in-process** against `CODE_EDGE_SHAPES` (`include_str!`, `:43`) and refuses the whole promotion on any violation. In-process on purpose: validating against the server you are about to write to proves only that the server agrees with itself. `tests/shape_agreement.rs` Layer 1 proves the shapes can both accept and refuse, on every `quipu` CI arm. |
 | FR-19/21/22 `yupana promote` (the write path) | ✅ Implemented (`quipu` feature) | `src/promote.rs::promote` (`:463`) — validate → `POST /knot`, all-or-nothing per chunk, deterministic IRIs so a re-run supersedes rather than duplicating. Reads the **committed** tree only (FR-22), asserted by `src/export_test.rs::to_turtle_at_promotes_the_committed_tree_not_working_churn` (`:248`). |
 | FR-21 full bitemporal fields | 🟡 Partial | `actor` + the resolved commit SHA as `source` on every transaction (`promote.rs:276-283`). `valid_from` is not set from the commit's author time; `/knot` times the transaction as *when learned*. `src/cli_promote.rs` says so inline. |
-| FR-19 promote **on commit/merge** | ⬜ Not built | `[yupana.quipu] promote_on` parses and has no reader; no trigger point is wired. GH #3. |
+| FR-19 promote **on commit/merge** | ✅ Implemented | `src/promote_trigger.rs::decide` is the `promote_on` × trigger decision table; `cli_promote::trigger_admits` reads the key and short-circuits before any tree is read. The caller declares the event (`yupana promote --trigger commit\|merge`) because yupana installs no git hooks; `git::is_merge_commit` upgrades a `commit` event on a two-parent commit to a merge, so the default policy works from the simplest hook. A decline exits **0** — a `post-commit` hook that failed every ordinary commit would be switched off — and prints `SKIPPED … Wrote nothing`. `promote_on` is delisted from `config_test.rs`'s phased allowlist. GH #3. |
 | §9.7 commit→touched-entities provenance edge | 🟡 Partial | Yupana emits only code structure — no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of yupana (an hourly commit-ingest job), so §9.7's *yupana-placement* is unmet; module-granularity only. GH #5. |
 | §9.4 branch modeling (named-graph vs qualifier) | ⬜ Planned | Config scaffold only — `config.rs::branch_model` (default `"named_graph"`); no code attaches `bobbin:onBranch` or a `GRAPH bobbin:branch/<b>` to any promoted edge. Qualifier fallback first. GH #4. |
 

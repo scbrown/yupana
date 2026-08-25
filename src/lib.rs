@@ -91,6 +91,11 @@ pub mod projection_cache;
 /// Phase-4 Quipu promotion: SHACL-validate a Turtle projection, then write it.
 #[cfg(feature = "quipu")]
 pub mod promote;
+/// When promotion runs: `[yupana.quipu] promote_on` × the declared trigger.
+/// Ungated on purpose — the policy is meaningful (and testable) in a build
+/// without `quipu`, where it decides whether the feature-off refusal is even
+/// reached.
+pub mod promote_trigger;
 pub mod reconcile;
 pub mod recurrence;
 mod render;

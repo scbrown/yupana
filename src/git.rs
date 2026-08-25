@@ -65,6 +65,23 @@ pub fn head_commit(root: &Path) -> Option<String> {
     resolve_commit(root, "HEAD")
 }
 
+/// Whether `reference` resolves to a MERGE commit — one with two or more
+/// parents. `false` when the ref does not resolve or this is not a repo, which
+/// is the safe direction: an unknown commit is not claimed to be a merge, so a
+/// `promote_on = "merge"` policy declines rather than promoting on a guess.
+///
+/// `rev-list --parents -n 1` prints `<sha> <parent>…`, so the parent count is
+/// the field count minus one.
+#[must_use]
+pub fn is_merge_commit(root: &Path, reference: &str) -> bool {
+    git(root, &["rev-list", "--parents", "-n", "1", reference])
+        .and_then(|out| {
+            let line = out.lines().next()?.trim().to_string();
+            Some(line.split_whitespace().count() >= 3)
+        })
+        .unwrap_or(false)
+}
+
 /// The paths changed between two commit-ish refs (`from..to`), relative to the
 /// repository root. Empty when either ref does not resolve, when there is no
 /// diff, or outside a repo — the promotion path treats an empty set as

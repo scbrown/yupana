@@ -47,14 +47,18 @@ read_only = false
 use_daemon = false
 
 # Quipu promotion. Promotion itself IS built (`yupana promote`, SHACL-gated,
-# committed-tree-only); two keys here are still inert, for reasons that are NOT
+# committed-tree-only); one key here is still inert, for a reason that is NOT
 # "promotion is unbuilt":
 [yupana.quipu]
 enabled = false
-# NOT READ. "commit" | "merge" | "manual". Nothing wires a commit or merge
-# trigger to promotion, so every promotion today is an explicit `yupana
-# promote` / `yupana_promote` invocation and there is nothing for this to
-# select between.
+# "commit" | "merge" | "manual" — WHEN an automated promotion runs. The caller
+# declares the event with `yupana promote --trigger commit|merge` (a git
+# post-commit / post-merge hook, or a CI step); this key decides whether that
+# event promotes. A `commit` event on a merge commit counts as a merge, so the
+# default works from the simplest possible hook. `--trigger manual` (the
+# default) always promotes: this governs automation, not authorization — `--to`
+# is still the only thing that authorizes a write. An unrecognised value is
+# REFUSED, not silently defaulted.
 promote_on = "merge"
 # "named_graph" (preferred, needs Quipu quads) | "qualifier" (fallback).
 branch_model = "named_graph"

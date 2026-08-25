@@ -259,6 +259,11 @@ enum Commands {
         /// mints wrong IRIs and fragments the graph).
         #[arg(long)]
         repo: Option<String>,
+        /// The event that invoked this promotion, for a git hook or CI step to
+        /// declare. `[yupana.quipu] promote_on` decides whether that event
+        /// promotes (FR-19); the default `manual` always does.
+        #[arg(long, value_enum, default_value_t = crate::promote_trigger::Trigger::Manual)]
+        trigger: crate::promote_trigger::Trigger,
         /// Directory to promote (defaults to current dir).
         #[arg(default_value = ".")]
         path: PathBuf,
@@ -442,6 +447,7 @@ impl Cli {
                 dry_run,
                 replace_snapshot,
                 repo,
+                trigger,
                 path,
             } => {
                 // THE WRITE GUARD, made real (aegis-ltjo). Promotion is the write
@@ -453,6 +459,11 @@ impl Cli {
                 // change to what `read_only` MEANS, and this arm is not the place to
                 // make it silently. Tracked on aegis-o2h97.
                 self.load_config(path)?.write_guard("promotion")?;
+                // FR-19's trigger: `promote_on` decides whether the DECLARED
+                // event promotes at all, before any tree is read.
+                if !self.trigger_admits(path, commit, *trigger)? {
+                    return Ok(());
+                }
                 self.promote(
                     path,
                     commit,

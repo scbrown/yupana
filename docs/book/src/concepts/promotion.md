@@ -29,6 +29,36 @@ than pretending. It emits the Turtle, SHACL-validates in-process against
 `shapes/`, and writes to `/knot` **only if it conforms** — a rejected promotion
 exits non-zero so a script can't read it as landed.
 
+## When promotion runs — `promote_on` and `--trigger`
+
+Yupana installs no git hooks and owns no commit event of its own, so it does not
+decide *when* a commit happened — the caller that has the event says so, and
+`[yupana.quipu] promote_on` decides whether that event promotes:
+
+```bash
+# .git/hooks/post-commit — fires on every commit, promotes per policy
+yupana promote --commit HEAD --trigger commit --to "$QUIPU_URL" .
+```
+
+| `promote_on` | `--trigger manual` (default) | `--trigger commit`, plain | `--trigger commit`, merge commit | `--trigger merge` |
+|---|---|---|---|---|
+| `manual` | promotes | skipped | skipped | skipped |
+| `commit` | promotes | promotes | promotes | promotes |
+| `merge` (default) | promotes | skipped | **promotes** | promotes |
+
+Two things worth knowing. A `commit` event on a **merge commit** counts as a
+merge — git knows (two or more parents) even when the hook does not — so the
+default policy works from the simplest possible `post-commit` hook. And
+`--trigger manual` always promotes: `promote_on` governs *automation*, not
+authorization. `--to` remains the only thing that authorizes a write, and
+`serve.read_only` the only thing that refuses one.
+
+A skipped promotion exits **0** and prints `SKIPPED … Wrote nothing`. That is
+deliberate: a hook that failed on every ordinary commit gets switched off within
+a day, and the sentence carries the fact the exit code would have. An
+unrecognised `promote_on` value is **refused**, not defaulted — a typo must not
+be indistinguishable from the key working.
+
 Large projections are **chunked**: Quipu's request body limit is ~2 MiB, so a
 projection over the line is split on entity-block boundaries and posted as
 multiple `/knot` writes (the output says so: `... in 3 chunks`). Validation is

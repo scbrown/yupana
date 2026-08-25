@@ -6,7 +6,47 @@
 
 use super::*;
 
+use crate::promote_trigger::{decide, Decision, Trigger};
+
 impl Cli {
+    /// Does `[yupana.quipu] promote_on` admit a promotion invoked by `trigger`?
+    ///
+    /// FR-19's trigger, and the reader `promote_on` did not have. Ungated by
+    /// feature on purpose: the policy answer must be the same whether or not
+    /// this binary can promote, so a `--trigger`-driven caller sees "skipped by
+    /// policy" rather than "built without the feature" when both are true.
+    ///
+    /// A decline returns `false` and the caller exits **0**. That is the one
+    /// place this repo's "a non-promotion must never read as a promotion" rule
+    /// is deliberately not applied, and the reason is that here the two are the
+    /// same thing: `promote_on = "merge"` skipping a plain commit IS the
+    /// configuration doing its job, and a `post-commit` hook that exited
+    /// non-zero on every ordinary commit would be turned off within a day. The
+    /// line printed says WROTE NOTHING in as many words so a log reader is never
+    /// left inferring it, which is the protection the exit code was carrying.
+    pub(super) fn trigger_admits(
+        &self,
+        path: &Path,
+        commit: &str,
+        trigger: Trigger,
+    ) -> anyhow::Result<bool> {
+        let promote_on = self.load_config(path)?.quipu.promote_on;
+        // Only asked when it can change the answer — a manual invocation never
+        // needs git, so a promotion outside a repo is unaffected by this gate.
+        let is_merge = match trigger {
+            Trigger::Manual => false,
+            _ => crate::git::is_merge_commit(path, commit),
+        };
+        match decide(&promote_on, trigger, is_merge)? {
+            Decision::Promote => Ok(true),
+            Decision::Declined(why) => {
+                if !self.quiet {
+                    println!("yupana promote: {why}");
+                }
+                Ok(false)
+            }
+        }
+    }
     /// Promote a tree's structural facts into Quipu: emit Turtle, SHACL-validate it
     /// in-process, and write it iff it conforms (FR-19/20/21).
     #[cfg(feature = "quipu")]
