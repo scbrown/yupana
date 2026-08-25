@@ -240,8 +240,23 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "src/export.rs",
         "src/project_exposure.rs",
         "src/project_queries.rs",
+        // §9.4's branch qualifier and §9.7's commit provenance both write into
+        // the promoted graph, so their fixtures and assertions are the same data
+        // contract `src/export.rs` and `src/promote_test.rs` already carry: a
+        // projection fixture is only a fixture if it uses the namespace the
+        // emitter emits, and a test that asserted on a stand-in namespace would
+        // pass while the emitter wrote to a graph nobody joins.
+        "src/promote_branch_test.rs",
+        "src/promote_provenance.rs",
+        "src/promote_provenance_test.rs",
         "src/promote_test.rs",
         "src/verdict.rs",
+        // The end-to-end promotion tests assert on the BYTES that reached a
+        // `/knot` stand-in. The commit IRI's base is the fact under test —
+        // the out-of-tree ingest lane minting under a DIFFERENT base is exactly
+        // what left its provenance edges unjoinable (GH #5) — so the literal
+        // has to be here or the assertion checks nothing.
+        "tests/cli.rs",
         "tests/no_internal_identifiers.rs",
     ]
     .iter()

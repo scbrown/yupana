@@ -105,6 +105,47 @@ bobbin:HasTierShape a sh:NodeShape ;
         sh:in ( "tree-sitter" "lsp" "cpg" ) ;
     ] .
 
+# --- commit provenance (§9.7) -------------------------------------------------
+#
+# `GitCommit --modifies--> CodeModule`: what work touched this entity. The other
+# half of the chain quipu's /cooccurrence joins on is `Bead <--implements--
+# GitCommit`, which yupana does NOT emit — the commit->work-item link needs a
+# declared project-prefix vocabulary yupana does not hold, and the tracker-aware
+# ingest lane owns it (see src/promote_provenance.rs). Both predicates join on
+# the COMMIT IRI, so the chain closes without yupana re-deriving that heuristic.
+#
+# SYNCED from quipu's aegis-ontology.shapes.ttl (GitCommitShape, ModifiesShape),
+# for the same reason the node shapes below are: quipu's persistent registry
+# validates independently, and a constraint yupana does not hold locally is one
+# it discovers as a live refusal instead of catching before the network.
+#
+# `modifies` is nodeKind-only, matching quipu — deliberately NOT sh:class. A
+# class constraint here would put the predicate into promote_chunk's
+# CLASS_CONSTRAINED_PREDICATES and force every chunk carrying a commit edge to
+# also carry each touched module's type declaration, for no gain: the emitter
+# already refuses to point at a module the same payload does not declare.
+
+bobbin:GitCommitShape a sh:NodeShape ;
+    rdfs:comment "a git commit, as the subject of provenance edges (§9.7)" ;
+    sh:targetClass bobbin:GitCommit ;
+    sh:property [ sh:path bobbin:hash ; sh:datatype xsd:string ; sh:maxCount 1 ] ;
+    sh:property [ sh:path bobbin:repo ; sh:datatype xsd:string ; sh:maxCount 1 ] ;
+    sh:property [ sh:path bobbin:author ; sh:datatype xsd:string ; sh:maxCount 1 ] ;
+    # xsd:dateTime, not a bare string: the commit's authored time is the
+    # valid-time this edge exists to carry, and an unparseable one is a date
+    # nobody can time-travel to.
+    sh:property [ sh:path bobbin:date ; sh:datatype xsd:dateTime ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ] .
+
+bobbin:ModifiesShape a sh:NodeShape ;
+    rdfs:comment "commit touched entity (§9.7 provenance, feeds quipu#37)" ;
+    sh:targetSubjectsOf bobbin:modifies ;
+    sh:property [
+        sh:path bobbin:modifies ;
+        sh:nodeKind sh:IRI ;
+        sh:minCount 1 ;
+    ] .
+
 # --- branch qualifier (§9.4) --------------------------------------------------
 #
 # The branch-as-qualifier fallback: each promoted entity carries the branch its

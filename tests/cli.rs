@@ -1484,3 +1484,79 @@ fn branch_model_qualifies_promoted_facts_and_refuses_named_graph() {
         "the branch must be the one promoted, not a placeholder: {body}"
     );
 }
+
+/// §9.7 (GH #5), end to end: the `commit → touched entities` provenance edge is
+/// produced INSIDE yupana at promotion time and reaches `/knot` in the same
+/// payload as the structure it refers to.
+///
+/// The placement is the point of the issue — the edge already existed, written
+/// by an out-of-tree hourly job — so the assertion is on the bytes that left
+/// this binary, not on the graph eventually containing them.
+#[cfg(feature = "quipu")]
+#[test]
+fn promotion_carries_the_commit_touched_entities_provenance() {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(dir.path())
+            .assert()
+            .success();
+    };
+    std::fs::write(dir.path().join("x.rs"), "pub fn x() -> u32 { 1 }\n").unwrap();
+    git(&["init", "-q", "-b", "main"]);
+    git(&["config", "user.email", "dev@example.com"]);
+    git(&["config", "user.name", "Dev"]);
+    git(&[
+        "remote",
+        "add",
+        "origin",
+        "https://example.com/o/realname.git",
+    ]);
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "base"]);
+    // A second commit that touches ONE of the two modules, so "exactly the
+    // touched entities" is a claim the fixture can distinguish.
+    std::fs::write(dir.path().join("y.rs"), "pub fn y() -> u32 { 2 }\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "add y"]);
+
+    let cfg = dir.path().join("prov.toml");
+    std::fs::write(&cfg, "[yupana.quipu]\nenabled = false\n").unwrap();
+    let (addr, rx) = capturing_knot();
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args(["promote", "--config"])
+        .arg(&cfg)
+        .args(["--to", &format!("http://{addr}")])
+        .env("HOME", dir.path())
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    let body = rx
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("the promotion posted nothing");
+
+    assert!(
+        body.contains("a bobbin:GitCommit"),
+        "no commit node reached the wire: {body}"
+    );
+    assert!(
+        body.contains("bobbin:modifies"),
+        "no provenance edge reached the wire: {body}"
+    );
+    // The touched module, and not the untouched one.
+    assert!(
+        body.contains(r"bobbin:modifies <http://aegis.gastown.local/ontology/code/realname/y.rs>"),
+        "{body}"
+    );
+    assert!(
+        !body.contains(r"bobbin:modifies <http://aegis.gastown.local/ontology/code/realname/x.rs>"),
+        "x.rs was not touched by this commit: {body}"
+    );
+    // The commit IRI shares the base every other promoted entity uses — the
+    // divergence that made the out-of-tree lane's edges unjoinable.
+    assert!(body.contains("ontology/code/realname/commit/"), "{body}");
+    // And yupana does not invent the work-item half of the chain.
+    assert!(!body.contains("implements"), "{body}");
+}

@@ -17,7 +17,7 @@ use crate::errors::Result;
 use crate::extract::{extract_structure, source_files};
 
 /// The code-ontology namespace (matches `shapes/code-entities.ttl`).
-const ONTO: &str = "http://aegis.gastown.local/ontology/";
+pub(crate) const ONTO: &str = "http://aegis.gastown.local/ontology/";
 
 /// Emit the referential structure of every source file this build can PARSE
 /// under `root` as Turtle, attributing entities to repository `repo`.
@@ -510,7 +510,7 @@ fn module_stem(rel: &str) -> String {
 
 /// Mint a `CodeModule` IRI: `{ONTO}code/{repo}/{path}` with `/` percent-encoded
 /// in the path segment (mirrors Quipu's `namespace.rs` construction).
-fn module_iri(repo: &str, rel: &str) -> String {
+pub(crate) fn module_iri(repo: &str, rel: &str) -> String {
     format!("{ONTO}code/{repo}/{}", rel.replace('/', "%2F"))
 }
 
@@ -589,7 +589,7 @@ fn rel_path(file: &Path, root: &Path) -> String {
 }
 
 /// Escape a Turtle string literal.
-fn esc(value: &str) -> String {
+pub(crate) fn esc(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 

@@ -140,6 +140,63 @@ pub fn changed_paths(root: &Path, from: &str, to: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+/// The paths a single commit CHANGED, relative to the repository root — the
+/// touched-entity half of §9.7's `commit → touched entities` provenance edge.
+///
+/// `git log -1 --name-only -m --first-parent`, which is the one incantation that
+/// answers correctly for all three shapes promotion meets:
+///
+/// * an ordinary commit — its diff against its parent;
+/// * a **merge** — its diff against its FIRST parent, i.e. what the merge
+///   brought in. A bare `diff-tree` on a merge prints nothing at all, which
+///   would have silently produced a merge commit that touched no entities under
+///   the very `promote_on = "merge"` policy that makes merges the interesting
+///   case;
+/// * the **root** commit — everything, rather than failing for want of a parent.
+///
+/// `-z` because a filename may contain a newline and a line-splitting parser
+/// would mis-attribute it.
+#[must_use]
+pub fn commit_touched_paths(root: &Path, reference: &str) -> Vec<PathBuf> {
+    let Some(out) = git(
+        root,
+        &[
+            "log",
+            "-1",
+            "--name-only",
+            "--format=",
+            "-m",
+            "--first-parent",
+            "-z",
+            reference,
+        ],
+    ) else {
+        return Vec::new();
+    };
+    out.split('\0')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(PathBuf::from)
+        .collect()
+}
+
+/// A commit's author identity and authored time (strict ISO-8601), or `None`
+/// when the ref does not resolve.
+///
+/// AUTHOR date, not committer date: it is when the change was MADE, which is
+/// §9.3's valid-time notion. A rebase rewrites the committer date and leaves the
+/// author date alone, so the author date is the one that survives history being
+/// replayed — and a provenance fact that moved because someone rebased would be
+/// a fact about the rebase, not about the work.
+#[must_use]
+pub fn commit_identity(root: &Path, reference: &str) -> Option<(String, String)> {
+    let out = git(root, &["log", "-1", "--format=%an <%ae>%n%aI", reference])?;
+    let mut lines = out.lines();
+    let author = lines.next()?.trim().to_string();
+    let date = lines.next()?.trim().to_string();
+    (!date.is_empty()).then_some((author, date))
+}
+
 /// The tracked file paths present in the tree at `reference`, relative to the
 /// repository root. Empty when the ref does not resolve or outside a repo — the
 /// caller treats an empty tree as "nothing to build" rather than an error.

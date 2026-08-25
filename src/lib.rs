@@ -94,6 +94,9 @@ pub mod promote;
 /// §9.4 branch modeling for promoted facts: the `bobbin:onBranch` qualifier
 /// fallback, and a loud refusal for the named-graph design blocked on quipu#36.
 pub mod promote_branch;
+/// §9.7's `commit → touched entities` provenance edge, produced inside yupana at
+/// promotion time (feeds quipu#37's work-item co-occurrence).
+pub mod promote_provenance;
 /// When promotion runs: `[yupana.quipu] promote_on` × the declared trigger.
 /// Ungated on purpose — the policy is meaningful (and testable) in a build
 /// without `quipu`, where it decides whether the feature-off refusal is even

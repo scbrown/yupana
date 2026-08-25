@@ -996,6 +996,44 @@ there — that stays Bobbin's). Tracked Quipu-side as
 [scbrown/quipu#37](https://github.com/scbrown/quipu/issues/37); Yupana's obligation
 is only to promote the provenance edge in Phase 4.
 
+**Status (GH #5): the edge is produced inside Yupana at promotion time.**
+`src/promote_provenance.rs` emits, per promoted commit, a `bobbin:GitCommit`
+node (`hash` / `repo` / `author` / `date` as a typed `xsd:dateTime` / `rdfs:label`)
+and one `bobbin:modifies` statement per touched `CodeModule`, gated by
+`GitCommitShape` + `ModifiesShape` in `shapes/code-edges.ttl`, synced from
+Quipu's registry. Three deliberate limits:
+
+- **`aegis:implements` is NOT emitted.** The commit → work-item link needs a
+  declared project-prefix vocabulary Yupana does not hold, and the tracker-aware
+  ingest lane already owns it with an abstention rule tuned against measured
+  false matches. Re-deriving that heuristic here is how two producers drift; the
+  chain still closes because both predicates join on the **commit IRI**.
+- **Module granularity.** "Touched" means the commit changed the file, which is
+  exactly true. Symbol-level touch would need a per-symbol diff and would
+  over-claim if guessed from a file-level one.
+- **Valid-time rides as a fact, not as a transaction field.** Verified against
+  Quipu `main`: `tool_knot` takes `turtle` / `timestamp` / `actor` / `source` /
+  `shapes` / `replace_snapshot` / `snapshot` / `graph` and has **no `valid_from`
+  parameter**, so the valid-time axis is not settable over `/knot`. The commit's
+  authored time therefore rides as `bobbin:date`. Putting it in `timestamp`
+  would falsify transaction time ("when learned"), which is the axis that IS
+  correct today.
+
+**Divergence with the pre-existing out-of-tree ingest lane, and the fix.**
+Measured, not assumed. camayoc's `scripts/ingest_git_provenance.py` mints under
+`BASE = http://aegis.gastown.local/code/`; Yupana mints under
+`http://aegis.gastown.local/ontology/code/…`, the base its own entities live at.
+Those are different IRIs for the same referents, so this is **not** a
+double-write — the two lanes produce disjoint populations that never collide and
+never join. Quipu's own `src/namespace.rs` records the measurement (2026-08-23):
+subjects under `CODE_BASE` number **0**, subjects under the ontology base
+**10,425**, and it warns that building against `CODE_BASE` forks the code graph.
+The resolution is a one-line `BASE` repoint on the camayoc side, which that note
+already asks for; afterwards both lanes mint identical commit and module IRIs and
+`/knot` supersedes per `(s, p, o)`, so they converge rather than duplicate.
+Yupana's `rdfs:label` spelling matches the ingest's (`<repo>@<sha[:12]>`) so that
+convergence does not leave two labels on one node.
+
 ### 9.8 Bounded transitive paths over the promoted graph (Quipu-side follow-up)
 
 > **Sketched Quipu-side in `quipu/docs/design/statement-identity.md`.** Nothing
@@ -1345,14 +1383,31 @@ bobbin:code/yupana/src%2Fauth.rs
     bobbin:filePath "src/auth.rs" ;
     bobbin:repo "yupana" ;
     bobbin:language "rust" .
+
+# §9.7 provenance, emitted by the same promotion:
+bobbin:code/yupana/commit/2f1c9a4b1d0e…
+    a bobbin:GitCommit ;
+    rdfs:label "yupana@2f1c9a4b1d0e" ;
+    bobbin:hash "2f1c9a4b1d0e…" ;
+    bobbin:repo "yupana" ;
+    bobbin:author "Dev <dev@example.com>" ;
+    bobbin:date "2026-08-25T09:14:02+00:00"^^xsd:dateTime .
+
+bobbin:code/yupana/commit/2f1c9a4b1d0e…
+    bobbin:modifies bobbin:code/yupana/src%2Fauth.rs .
+
+# §9.4 branch qualifier, under the (default, implemented) `qualifier` model:
+bobbin:code/yupana/src%2Fauth.rs bobbin:onBranch "main" .
 ```
 
-(Promoted with `valid_at` = commit time, `source` = commit SHA, via `quipu_knot`
-/ `Store::transact`, after SHACL validation against `code-entities.ttl` +
-`code-edges.ttl`. Under `branch_model = "named_graph"` (§9.4) these facts are
-written into the branch's named graph — e.g. `GRAPH bobbin:branch/main { … }` —
-once Quipu quad support (§9.5) has landed; under the `qualifier` fallback each
-edge instead carries a `bobbin:onBranch "main"` term.)
+(Promoted with `source` = commit SHA and `actor` = the promoting process, via
+`POST /knot`, after SHACL validation against `code-entities.ttl` +
+`code-edges.ttl`. The commit's authored time rides as `bobbin:date` rather than a
+`valid_from` transaction field, because `/knot` has no such parameter — see §9.7.
+Under `branch_model = "named_graph"` (§9.4) these facts would instead be written
+into the branch's named graph — `GRAPH bobbin:branch/main { … }` — once Quipu
+quad support (§9.5, quipu#36) has landed; until then that setting REFUSES rather
+than degrading to the qualifier.)
 
 ## Appendix C: Sample `yupana_impact` response (MCP)
 
@@ -1511,7 +1566,7 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 | FR-19/21/22 `yupana promote` (the write path) | ✅ Implemented (`quipu` feature) | `src/promote.rs::promote` (`:463`) — validate → `POST /knot`, all-or-nothing per chunk, deterministic IRIs so a re-run supersedes rather than duplicating. Reads the **committed** tree only (FR-22), asserted by `src/export_test.rs::to_turtle_at_promotes_the_committed_tree_not_working_churn` (`:248`). |
 | FR-21 full bitemporal fields | 🟡 Partial | `actor` + the resolved commit SHA as `source` on every transaction (`promote.rs:276-283`). `valid_from` is not set from the commit's author time; `/knot` times the transaction as *when learned*. `src/cli_promote.rs` says so inline. |
 | FR-19 promote **on commit/merge** | ✅ Implemented | `src/promote_trigger.rs::decide` is the `promote_on` × trigger decision table; `cli_promote::trigger_admits` reads the key and short-circuits before any tree is read. The caller declares the event (`yupana promote --trigger commit\|merge`) because yupana installs no git hooks; `git::is_merge_commit` upgrades a `commit` event on a two-parent commit to a merge, so the default policy works from the simplest hook. A decline exits **0** — a `post-commit` hook that failed every ordinary commit would be switched off — and prints `SKIPPED … Wrote nothing`. `promote_on` is delisted from `config_test.rs`'s phased allowlist. GH #3. |
-| §9.7 commit→touched-entities provenance edge | 🟡 Partial | Yupana emits only code structure — no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of yupana (an hourly commit-ingest job), so §9.7's *yupana-placement* is unmet; module-granularity only. GH #5. |
+| §9.7 commit→touched-entities provenance edge | ✅ Implemented (in yupana) | `src/promote_provenance.rs::commit_turtle` emits the `bobbin:GitCommit` node and one `bobbin:modifies` statement per touched `CodeModule`, appended to the projection at promotion time — §9.7's *placement* requirement, previously met only by an out-of-tree hourly job. `git::commit_touched_paths` uses `log -1 --name-only -m --first-parent` so an ordinary commit, a **merge** (a bare `diff-tree` on a merge prints nothing) and the **root** commit all answer correctly. Edges are filtered against the projection, so one can never point at an entity the same payload does not declare. `aegis:implements` deliberately NOT emitted (the work-item vocabulary belongs to the tracker-aware lane); module granularity; valid-time carried as `bobbin:date` because `/knot` has no `valid_from` parameter. GH #5. |
 | §9.4 branch modeling (named-graph vs qualifier) | 🟡 Qualifier implemented; named-graph refuses | `src/promote_branch.rs` attaches `bobbin:onBranch "<branch>"` to every entity a promotion declares (`git::branch_for` resolves it, or ABSTAINS — no qualifier rather than a guess), gated by `shapes/code-edges.ttl::OnBranchShape`. Default `branch_model` moved to `"qualifier"`, the implemented model. `"named_graph"` REFUSES the promotion naming quipu#36, rather than silently writing under the fallback's semantics. The qualifier answers branch MEMBERSHIP, not per-branch structure — promoted IRIs are branch-independent by design, so both branches' edges land on one subject; that gap is what quipu#36 closes. GH #4. |
 
 Pre-existing Phase 1/2 spec-gaps also remain open (out of the graph-export

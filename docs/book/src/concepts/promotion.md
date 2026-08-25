@@ -67,6 +67,43 @@ but IRIs are deterministic and `/knot` supersedes, so re-running a failed
 promotion converges instead of duplicating — the failure message names exactly
 how many chunks landed.
 
+## Commit provenance — what work touched this entity
+
+Every promotion also writes the commit it promoted, and one edge per code module
+that commit changed (spec §9.7):
+
+```turtle
+<…/code/myrepo/commit/2f1c…> a bobbin:GitCommit ;
+    rdfs:label "myrepo@2f1c9a4b1d0e" ;
+    bobbin:hash "2f1c9a4b1d0e…" ;
+    bobbin:repo "myrepo" ;
+    bobbin:author "Dev <dev@example.com>" ;
+    bobbin:date "2026-08-25T09:14:02+00:00"^^xsd:dateTime .
+
+<…/code/myrepo/commit/2f1c…> bobbin:modifies <…/code/myrepo/src%2Fauth.rs> .
+```
+
+That is the substrate for Quipu-side, *deterministic* work-item co-occurrence —
+"what work touched this, and what else did it touch" — as a SPARQL join, not a
+statistical mine (statistical co-change stays Bobbin's). Quipu aggregates it;
+Yupana only emits the raw edge.
+
+Three things it deliberately does not do:
+
+- **It does not emit `implements`** (the commit → work-item half of the chain).
+  That link needs a declared project-prefix vocabulary Yupana does not hold, and
+  the tracker-aware ingest lane already owns it. The chain still closes: both
+  predicates join on the commit IRI.
+- **It is module-granular.** "Touched" means the commit changed the file, which
+  is exactly true; symbol-level touch would be a guess dressed as a fact.
+- **It never points at an entity the same payload does not declare.** Changed
+  paths are filtered against the projection, so a changed `.md`, a lockfile, or a
+  deleted file produces no edge.
+
+A merge commit reports what the merge brought in, relative to its first parent —
+the case a plain `git diff-tree` reports as touching nothing, which matters
+because merges are exactly what the default `promote_on` policy promotes.
+
 ## Branches — the qualifier fallback
 
 `[yupana.quipu] branch_model` selects how promoted facts are scoped to a branch

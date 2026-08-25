@@ -135,7 +135,7 @@ impl Cli {
                 path.display()
             );
         }
-        let turtle = crate::export::to_turtle_at(path, &repo, commit)?;
+        let mut turtle = crate::export::to_turtle_at(path, &repo, commit)?;
         // A promotion that extracted NOTHING is not a promotion — it is a green
         // empty write (measured: a Python repo "promoted: 0 triples" with a
         // SUCCESS exit while analyze saw 1647 symbols, and the scheduler wrote
@@ -148,6 +148,14 @@ impl Cli {
                 path.display()
             );
             std::process::exit(2);
+        }
+        // §9.7 (GH #5): the `commit → touched entities` provenance edge, produced
+        // HERE because this is where both halves are already in hand — the
+        // commit being promoted and the entities just projected. Appended
+        // BEFORE the branch qualifier so the commit node is qualified too: the
+        // commit is on that branch as much as anything it touched.
+        if let Some(prov) = crate::promote_provenance::commit_turtle(path, &repo, commit, &turtle) {
+            turtle.push_str(&prov);
         }
         // §9.4's qualifier fallback: tag every promoted entity with the branch
         // its facts came from, so branch-scoped queries are answerable with no
