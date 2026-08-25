@@ -204,6 +204,30 @@ yupana promote --commit HEAD --to "$QUIPU_URL" .   # SHACL-validate + write it
 than pretending. It emits the Turtle, SHACL-validates in-process against
 <code>shapes/</code>, and writes to <code>/knot</code> <strong>only if it conforms</strong> — a rejected promotion
 exits non-zero so a script can't read it as landed.</p>
+<h2 id="when-promotion-runs--promote_on-and---trigger"><a class="header" href="#when-promotion-runs--promote_on-and---trigger">When promotion runs — <code>promote_on</code> and <code>--trigger</code></a></h2>
+<p>Yupana installs no git hooks and owns no commit event of its own, so it does not
+decide <em>when</em> a commit happened — the caller that has the event says so, and
+<code>[yupana.quipu] promote_on</code> decides whether that event promotes:</p>
+<pre><code class="language-bash"># .git/hooks/post-commit — fires on every commit, promotes per policy
+yupana promote --commit HEAD --trigger commit --to "$QUIPU_URL" .
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th><code>promote_on</code></th><th><code>--trigger manual</code> (default)</th><th><code>--trigger commit</code>, plain</th><th><code>--trigger commit</code>, merge commit</th><th><code>--trigger merge</code></th></tr></thead><tbody>
+<tr><td><code>manual</code></td><td>promotes</td><td>skipped</td><td>skipped</td><td>skipped</td></tr>
+<tr><td><code>commit</code></td><td>promotes</td><td>promotes</td><td>promotes</td><td>promotes</td></tr>
+<tr><td><code>merge</code> (default)</td><td>promotes</td><td>skipped</td><td><strong>promotes</strong></td><td>promotes</td></tr>
+</tbody></table>
+</div>
+<p>Two things worth knowing. A <code>commit</code> event on a <strong>merge commit</strong> counts as a
+merge — git knows (two or more parents) even when the hook does not — so the
+default policy works from the simplest possible <code>post-commit</code> hook. And
+<code>--trigger manual</code> always promotes: <code>promote_on</code> governs <em>automation</em>, not
+authorization. <code>--to</code> remains the only thing that authorizes a write, and
+<code>serve.read_only</code> the only thing that refuses one.</p>
+<p>A skipped promotion exits <strong>0</strong> and prints <code>SKIPPED … Wrote nothing</code>. That is
+deliberate: a hook that failed on every ordinary commit gets switched off within
+a day, and the sentence carries the fact the exit code would have. An
+unrecognised <code>promote_on</code> value is <strong>refused</strong>, not defaulted — a typo must not
+be indistinguishable from the key working.</p>
 <p>Large projections are <strong>chunked</strong>: Quipu's request body limit is ~2 MiB, so a
 projection over the line is split on entity-block boundaries and posted as
 multiple <code>/knot</code> writes (the output says so: <code>... in 3 chunks</code>). Validation is
