@@ -171,10 +171,10 @@ they do things neither does alone:
 ### Install
 
 ```bash
-# From source — puts the `yupana` binary on your PATH
-cargo install --path .                              # or: just install
-# with the MCP server and the extra language grammars:
-cargo install --path . --features "mcp langs-extra"
+# From source — builds every capability and installs one binary under both names
+just install
+# ~/.local/bin/yupana
+# ~/.local/bin/hank -> yupana
 ```
 
 ### Use

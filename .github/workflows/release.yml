@@ -120,8 +120,13 @@ jobs:
           bin=target/release/yupana
           test -x "$bin" || { echo "no binary at $bin"; exit 1; }
           "$bin" --version
+          # `hank` is the legacy command name still used by deployed hooks and
+          # scripts. Ship one build under both names: a relative symlink keeps
+          # the archive relocatable and makes feature/version drift impossible.
+          ln -sfn yupana target/release/hank
+          test "$(readlink target/release/hank)" = yupana
           tarball="yupana-${TAG}-x86_64-linux-gnu.tar.gz"
-          tar -czf "$tarball" -C target/release yupana
+          tar -czf "$tarball" -C target/release yupana hank
           sha256sum "$tarball" | tee "$tarball.sha256"
           echo "TARBALL=$tarball" >> "$GITHUB_ENV"
 

@@ -57,16 +57,10 @@ fmt:
 run *args="":
     cargo run -- {{args}}
 
-# Install `yupana` onto PATH; pass features e.g. `just install "mcp langs-extra"`
-install features="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -n "{{features}}" ]; then
-        cargo install --path . --locked --features "{{features}}"
-    else
-        cargo install --path . --locked
-    fi
-    echo "Installed: $(command -v yupana)"
+# Install the one feature-complete binary under both the current and legacy names.
+# Override YUPANA_INSTALL_ROOT for a non-default prefix.
+install:
+    scripts/install-local.sh
 
 # === End-to-end (Quipu integration) ===
 

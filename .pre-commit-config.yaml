@@ -77,3 +77,11 @@ repos:
         language: script
         files: ^docs/book/
         pass_filenames: false
+
+      - id: install-contract-test
+        name: local install contract (one full-feature binary, two names)
+        entry: scripts/selftest-install-local.sh
+        language: script
+        files: ^(scripts/(install-local|selftest-install-local)\.sh|justfile|Cargo\.(toml|lock)|\.github/workflows/release\.yml)$
+        pass_filenames: false
+        verbose: true
