@@ -1321,87 +1321,150 @@ edge instead carries a `bobbin:onBranch "main"` term.)
 ## Appendix D: Implementation Status
 
 A snapshot of what is actually built, reconciled against the source tree
-2026-07-20 (aegis-0hq0). The body of this spec (§§1–11) is the *design*; this
-appendix is the *state* — so its numbers are checked against `wc`/`find`, not
-carried forward. The MCP tool count is pinned by a test (`tests/docs_drift.rs`).
+2026-08-25. The body of this spec (§§1–11) is the *design*; this appendix is
+the *state* — so its numbers are **recomputed** from `find`/`wc` and
+`cargo test -- --list`, never carried forward from the previous revision.
 
-**Phases:** Phase 1 (single-tenant structure + MCP) and Phase 2 (call graph,
-blast radius, intra-procedural dataflow, co-change reconciliation) are
-**complete**. Phase 3 (multi-tenancy) is next and unstarted.
+**Two of those numbers are now pinned by tests**, because this appendix had
+rotted by roughly 4× on the file count and 29× on the test count before anyone
+noticed: `tests/docs_drift.rs` pins the MCP tool count by name, and
+`tests/appendix_d_drift.rs` pins the source-file, source-line and test counts
+below within a tolerance band. A band rather than an equality, deliberately —
+an exact pin would make every commit that adds one test edit this appendix,
+which trains people to bump the number without re-deriving anything else. The
+band catches the failure that actually happened (order-of-magnitude drift) and
+resets to reality every time it fires.
 
-**Source layout (`src/`, ~10,300 LOC across 39 `.rs` files):** the 400-line soft
-cap (`AGENTS.md`) is a warn-not-fail target and 9 files currently exceed it
-(`cli.rs`, `config.rs`, `hook/pre_edit.rs`, `export.rs`, `docref.rs`,
-`policy.rs`, `change.rs`, `mcp/server.rs`, `graph/mod.rs`). `extract` and `graph`
-have grown from single files into modules.
+**Phases:** Phase 1 (single-tenant structure + MCP) is complete **except the
+LSP tier** (§12, GH #1) — everything it promised serves at the tree-sitter
+tier. Phase 2 (call graph, blast radius, intra-procedural dataflow, co-change
+reconciliation) is complete. **Phase 3 (multi-tenancy) is complete** — §12
+marks its exit met: shared base + copy-on-write overlays, content-hash
+structural sharing, frontier-bounded incremental update, the file-watcher, and
+overlay lifecycle/eviction all ship, with `tests/overlay_isolation_tests.rs`
+holding the isolation property. Phase 4 (promotion) is complete but for the
+commit/merge *trigger* and branch modeling; Phase 5 is partial. Two capability
+drops landed outside the phase numbering entirely — the game-state harness
+(FR-35..FR-39) and the golden-path guard (FR-40..FR-42) — each behind its own
+Cargo feature and its own addendum.
+
+**Source layout (`src/`, 162 `.rs` files, ~42,950 lines):** the 400-line soft
+cap is a warn-not-fail target and 24 non-test files currently exceed it, led by
+`promote.rs` (625), `export.rs` (605) and `hook/rule_planes.rs` (567). Those
+three are the only entries in `scripts/file-size-baseline.txt`: the ratchet
+freezes them **at exactly their current size** — they may shrink but never grow
+— while any file not listed must stay under the hard limit outright. Tests are
+exempt from the check (`*_test.rs`, `*tests.rs`, `tests/`).
 
 | Module | Role | Status |
 |---|---|---|
-| `extract/` | tree-sitter symbol + call-site extraction (Rust) | done |
-| `graph/` | `CodeGraph` (petgraph) + `reachable()` primitive (FR-12) | done |
-| `dataflow.rs` | intra-procedural data dependence (Rust-native) | done |
+| `extract/` | tree-sitter symbol + call-site extraction | done (Rust always; 6 more behind `langs-extra`) |
+| `graph/` | `CodeGraph` + `reachable()` (FR-12), `symbol_at` position lookup, tenant base/overlay/view | done |
+| `daemon/` | the resident engine + REST API (FR-27): `/status` `/callers` `/callees` `/impact` `/references` `/symbols` `/dataflow` `/measure` `/edit` `/health`, plus `/ingest` `/guard` `/whatif` and `/path/check` behind their features | done |
+| `watch/` | `notify` watcher + debounce + tiered scheduling (FR-17), per-file code-fact freshness | done |
+| `dataflow.rs` | intra-procedural data dependence | done |
 | `reconcile.rs` | structural-vs-co-change partition (FR-11) | done |
-| `export.rs` | referential structure → Turtle in `bobbin:` ontology (FR-34) | code side done |
-| `hook/` | Claude Code adapters: `post_edit` advisory + `pre_edit` blocking guard (FR-30) | done |
-| `policy.rs` | capability scopes + blast-radius ceilings (§5.8/FR-25) | done |
-| `verify/` | proposed-buffer verdicts (FR-23/FR-24) | tree-sitter tier done |
-| `mcp/` | `rmcp` server (`server`/`tools`/`transport`) | done (`mcp` feature) |
-| `config.rs` | `[yupana]` config table | done |
-| `cli.rs` / `cli_cmds.rs` / `render.rs` | CLI surface | done |
+| `export.rs` / `docref.rs` | referential structure → Turtle (FR-34) incl. `Section → references → CodeSymbol` (FR-33) | done |
+| `promote.rs` (+ `_chunk`, `_payload`) | SHACL-validate in-process, then `POST /knot`, chunked (FR-19/20/21/22) | done (`quipu` feature) |
+| `hook/` | harness adapters: `post-edit`, `pre-edit` guard, `pre-bash` action record, `session-start` briefing; the scope ladder (observed + derived rungs), rule planes, tripwire arm | done |
+| `policy.rs` / `policy_items.rs` / `rules.rs` / `textrules.rs` | capability scopes, blast-radius ceilings, rule catalogue (§5.8/FR-25) | done |
+| `project*.rs` | the Quipu projections the guard reads: rules, scopes, exposure, grounding, tripwires, queries | done (`quipu` feature) |
+| `projection_cache.rs` | durable projection cache with a TTL past which the guard fails open loudly | done |
+| `trace.rs` / `attribution.rs` / `constraint.rs` / `action.rs` / `plate.rs` | the Σ-derived trace record: `ConstraintEvaluation`, the SARC §9.6 attribution tuple, action resolution | done |
+| `verdict.rs` / `verdict_spool.rs` / `audit.rs` | signed verdicts, local spool, deferred promotion (`yupana verdicts`) | done (`quipu` feature) |
+| `brief*.rs` / `grounding*.rs` / `turn_grounding.rs` / `recurrence.rs` / `exemplar.rs` | the work-item briefing (CONTEXT consumer) and turn-grounding evidence | done (`quipu` feature) |
+| `tripwire.rs` / `project_tripwire.rs` | governed path-boundary tripwires projected from quipu | done (`quipu` feature) |
+| `state/` | game-state ingestion, `graph-pattern` policy plane, order guard, what-if, per-(game, faction) tenancy (FR-35..FR-39) | done (`game-state` feature) |
+| `goldenpath/` | blessed-trajectory projections + plan/progress conformance under `gp-grammar/1` (FR-40..FR-42) | done (`golden-path` feature) |
+| `verify/` | proposed-buffer verdicts (FR-23/FR-24) | tree-sitter tier done; `type-violation` reported unchecked pending LSP |
+| `mcp/` | `rmcp` server (`server`/`tools`/`handlers`/`transport`) | done (`mcp` feature) |
+| `config.rs` | `[yupana]` config table + the phased-key anti-drift guard | done |
+| `cli*.rs` / `render.rs` | CLI surface | done |
 | `types.rs` / `errors.rs` | fact model (Tier/Freshness/…) + errors | done |
 
-**CLI commands:** `analyze`, `refs`, `callers`, `impact` (`--cochange`),
-`dataflow`, `export`, `verify`, `hook post-edit`, `hook pre-edit`, `status`,
-`serve` (`mcp` feature), `completions` — all live. `promote` — live behind
-the `quipu` feature (SHACL-validate, then write); a phase notice without it.
+**CLI commands:** `analyze`, `refs` (`--at FILE:LINE`), `callers`, `impact`
+(`--cochange`), `communities`, `census`, `changed`, `dataflow`, `export`,
+`verify`, `exemplar`, `status`, `watch`, `completions`, `hook <post-edit |
+pre-edit | pre-bash | session-start>`, `serve` (`mcp` feature), `daemon`
+(`mcp` feature), `promote` / `verifier` / `verdicts` (`quipu` feature).
 
 **MCP tools (15, `mcp` feature):** `yupana_status`, `yupana_symbols`,
-`yupana_references`, `yupana_analyze`, `yupana_callers`, `yupana_callees`, `yupana_impact`
-(with `cochange`), `yupana_communities`, `yupana_dataflow`, `yupana_verify`,
-`yupana_promote` (writes to Quipu; needs the `quipu` feature), `yupana_ingest`,
-`yupana_guard`, `yupana_whatif` (the game-state harness; need the `game-state`
-feature), `yupana_path_check` (the golden-path conformance guard, FR-41/FR-42;
-needs the `golden-path` feature). Over stdio + streamable-HTTP.
+`yupana_references`, `yupana_analyze`, `yupana_callers`, `yupana_callees`,
+`yupana_impact` (with `cochange`), `yupana_communities`, `yupana_dataflow`,
+`yupana_verify`, `yupana_promote` (writes to Quipu; needs the `quipu` feature),
+`yupana_ingest`, `yupana_guard`, `yupana_whatif` (the game-state harness; need
+the `game-state` feature), `yupana_path_check` (the golden-path conformance
+guard, FR-41/FR-42; needs the `golden-path` feature). Over stdio +
+streamable-HTTP. **This count is pinned by name** in `tests/docs_drift.rs`.
 
-**Cargo features:** `default = []`; `mcp`, `langs-extra`, `quipu`, `game-state`
-(all off by default; `mcp`, `quipu` and `game-state` in the CI matrix).
+**Cargo features:** `default = []`; `mcp`, `langs-extra`, `quipu`,
+`game-state`, `golden-path` — all off by default. **Every one of them except
+`langs-extra` is in the CI matrix**, and as both a solo and an `mcp`-combined
+arm: nine arms on clippy and nine on test (`default`, `mcp`, `langs-extra`,
+`quipu`, `mcp+quipu`, `game-state`, `mcp+game-state`, `golden-path`,
+`mcp+golden-path`). That is the dark-feature rule from §14.10 made mechanical:
+a feature joins the matrix in the same change that wires it.
+
 `langs-extra` gates REAL extractors — TypeScript, TSX, Python, Go, Java and C++
 all produce modules, symbols and call edges (measured 2026-08-04 against a
 7-language probe repo, 3–4 symbols each). A build WITHOUT it is Rust-only and
-says so in `yupana status` (`languages`); it does not error on the other five, it
-silently extracts nothing from them, which is why the deployed binary was
+says so in `yupana status` (`languages`); it does not error on the other five,
+it silently extracts nothing from them, which is why the deployed binary was
 Rust-only for an undated period without anyone noticing. This paragraph
 previously read "deps are declared but extractors are Rust-only so far" — that
 was true early in Phase 1, went stale, and is the likeliest reason a release was
-hand-built without the flag. `cpg` and
-`lsp` are planned but are NOT features yet — an empty feature that gates nothing
-lets a build advertise a tier it cannot serve; each returns when it
-gates a real extractor. `game-state` is not that shape: it gates `src/state/`,
-the ingestion engine itself, which is why `Tier::served()` may key the
-`engine-state` tier on it.
+hand-built without the flag.
 
-**Tests:** 27 (19 unit + 8 integration via `assert_cmd`), green on `default` and
-`mcp`. Quality gate green: `cargo fmt`, `clippy -D warnings` (both arms),
-markdownlint, mdBook.
+`cpg` and `lsp` are planned but are **NOT features yet** — they were once
+`cpg = []` / `lsp = []`, empty features that gated nothing, so `--features lsp`
+produced a binary whose `yupana status` advertised a precision tier it did not
+have. A feature that can be enabled without the code existing is a way to
+advertise a lie, so each returns only when it gates a real extractor, and
+`Tier::served()` must move in the same change. `game-state` and `golden-path`
+are not that shape: each gates a real engine (`src/state/`, `src/goldenpath/`).
 
-**Not yet built:** the resident daemon / per-tenant overlays (Phase 3); LSP
-precision tier (planned `lsp` feature); CPG control-dependence + inter-procedural
-taint (planned `cpg` feature); doc→code reference extraction
-(FR-33); `pre-edit` guard; position-based tool variants.
+**Tests: 788** (`cargo test --all-features -- --list`), of which 2 are
+`#[ignore]`d and both declare why in the attribute: `shape_agreement`'s Layer 2
+verdict-agreement test needs a live `QUIPU_URL`, and `promote_test`'s chunk
+soak needs `YUPANA_CHUNK_SOAK_PAYLOAD` and runs in minutes. `cargo test` on
+default features runs 474. The
+Rust-free replay-converter suite (`tests/spool_to_dogwood.py`, 8 tests) runs
+under the `replay-converter-tests` pre-commit hook, so `just check` and CI's
+pre-commit job both cover it. Quality gate green: `cargo fmt`, `clippy -D
+warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 
-**Phase 4 (graph-export → Quipu) — status (2026-07-23, harding; verified by
-mechanism against `src/`, cross-refs the open GitHub issues):**
+**Not yet built:**
+
+- **LSP precision tier** (FR-2/FR-4; planned `lsp` feature) — GH #1. This is
+  the one open Phase 1 item, and it is what `verify`'s `type-violation` and
+  column-granularity position lookup are both waiting on.
+- **CPG control-dependence + inter-procedural taint** (FR-7, remainder of
+  FR-8; planned `cpg` feature) — GH #6.
+- **FR-32, the optional LSP *server* surface** — exposing Yupana *as* a
+  language server to human editors. Distinct from FR-2 above: that one
+  *consumes* language servers for precision, this one *is* one.
+- **The promotion trigger** — `promote_on` is parsed and read by nothing; every
+  promotion is an explicit invocation. GH #3.
+- **Branch modeling** (§9.4) — GH #4.
+
+**Phase 4 (graph-export → Quipu) — status (verified by mechanism against
+`src/`; issue cross-refs renumbered to the post-rename range, which is 1–9):**
 
 | Section | Status | Evidence |
 |---|---|---|
-| FR-34 `yupana export` (Turtle) | ✅ Implemented | `src/export.rs::to_turtle` (`:32`), tested |
-| FR-19/21/22 `yupana promote` / `export --to quipu` | ✅ Implemented (behind `quipu` feature) | `src/promote.rs::promote` (`:229`) — SHACL-validate → `quipu_knot`/`POST /knot`, all-or-nothing, reads the committed tree only (FR-22); tested (`:335`). GH #15. *(Supersedes the earlier "Quipu promotion wiring — not built" line above: it is built, and behind the feature — a separate refinery/rig copy still stubs `promote`, which is not this crate.)* |
-| §9.7 commit→touched-entities provenance edge | 🟡 Partial | Yupana emits only code structure — grep finds no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of yupana (an hourly commit-ingest job), so §9.7's *yupana-placement* is unmet; module-granularity only. GH #18. |
-| §9.4 branch modeling (named-graph vs qualifier) | ⬜ Planned | Config scaffold only — `config.rs::branch_model` (`:147`, default `"named_graph"`); no code attaches `bobbin:onBranch` or a `GRAPH bobbin:branch/<b>` to any promoted edge. Lands with the Phase-4 promote emit point; qualifier fallback first. GH #17. |
+| FR-34 `yupana export` (Turtle) | ✅ Implemented | `src/export.rs::to_turtle` (`:32`) and `to_turtle_at` (`:57`), tested |
+| FR-33 doc→code references | ✅ Implemented | `src/docref.rs` scans markdown for code-symbol mentions; `src/export.rs` emits `Section → references → CodeSymbol`. Ticked at §12 Phase 4. Not wired into the live edit hook. |
+| FR-20 SHACL-validate before every write | ✅ Implemented | `src/promote.rs::validate` runs `rudof_lib` **in-process** against `CODE_EDGE_SHAPES` (`include_str!`, `:43`) and refuses the whole promotion on any violation. In-process on purpose: validating against the server you are about to write to proves only that the server agrees with itself. `tests/shape_agreement.rs` Layer 1 proves the shapes can both accept and refuse, on every `quipu` CI arm. |
+| FR-19/21/22 `yupana promote` (the write path) | ✅ Implemented (`quipu` feature) | `src/promote.rs::promote` (`:463`) — validate → `POST /knot`, all-or-nothing per chunk, deterministic IRIs so a re-run supersedes rather than duplicating. Reads the **committed** tree only (FR-22), asserted by `src/export_test.rs::to_turtle_at_promotes_the_committed_tree_not_working_churn` (`:248`). |
+| FR-21 full bitemporal fields | 🟡 Partial | `actor` + the resolved commit SHA as `source` on every transaction (`promote.rs:276-283`). `valid_from` is not set from the commit's author time; `/knot` times the transaction as *when learned*. `src/cli_promote.rs` says so inline. |
+| FR-19 promote **on commit/merge** | ⬜ Not built | `[yupana.quipu] promote_on` parses and has no reader; no trigger point is wired. GH #3. |
+| §9.7 commit→touched-entities provenance edge | 🟡 Partial | Yupana emits only code structure — no `GitCommit`/`modifies` emission in `promote`/`export`. The edge is produced OUT of yupana (an hourly commit-ingest job), so §9.7's *yupana-placement* is unmet; module-granularity only. GH #5. |
+| §9.4 branch modeling (named-graph vs qualifier) | ⬜ Planned | Config scaffold only — `config.rs::branch_model` (default `"named_graph"`); no code attaches `bobbin:onBranch` or a `GRAPH bobbin:branch/<b>` to any promoted edge. Qualifier fallback first. GH #4. |
 
 Pre-existing Phase 1/2 spec-gaps also remain open (out of the graph-export
-scope): FR-2/FR-4 LSP precision (#7), §10/FR-4 position-based variants (#8),
-FR-7/FR-8 CPG (#22).
+scope): FR-2/FR-4 LSP precision (GH #1), §10/FR-4 column-granularity position
+variants (GH #2 — the *line* half shipped, see `graph/lookup.rs::symbol_at`),
+FR-7/FR-8 CPG (GH #6).
 
 ## Appendix E: Design Decision Log
 
