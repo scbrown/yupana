@@ -4,20 +4,35 @@
 //! tag FR-3 requires so a consumer never mistakes a tree-sitter approximation
 //! for an LSP-precise fact.
 //!
-//! [`Freshness`] (how current a fact is) is FR-3's OTHER half, and it is **not
-//! yet served**. Freshness state (fresh/stale/recomputing) is a property of the
-//! Phase-3 resident graph + file-watcher (FR-16/17); the current serve path
-//! rebuilds the graph on demand per request from the working copy, where there
-//! is no cached fact that could be stale. So [`Freshness`] and [`Fact`] (the
-//! subject–edge–object carrier that pairs a value with both tags) are defined
-//! here as the Phase-3 carrier but have no caller on the served path yet.
+//! [`Freshness`] (how current a fact is) is FR-3's OTHER half, and CODE-FACT
+//! freshness **is served** — since Phase 3 (bobbin-052) — on the resident
+//! daemon's tenant-scoped `/symbols` reply. The watcher tracks real
+//! `Recomputing → Fresh` transitions per file
+//! (`watch::overlay_refresh::freshness_of`), the daemon keys them by tenant
+//! (`daemon::ResidentEngine::freshness_of`), and `daemon::tenanted::symbols_for`
+//! reads the note before composing the view so the tag describes the state the
+//! symbols came from. The wire carrier there is `daemon::wire::FileSymbols`.
 //!
-//! This docstring previously asserted that every served fact carried a freshness
-//! tag. It did not — freshness was served nowhere (aegis-8yrn). Correcting the
-//! claim, rather than stamping a hardcoded `fresh` that would imply a tracking
-//! system that does not exist, is the FR-3 honesty rule applied to the spec
-//! itself: a fact that cannot state its own freshness says so, it does not
-//! default to looking current.
+//! **Where freshness is unknown it is OMITTED — never `"fresh"`, never
+//! `"unknown"`.** Three paths cannot answer: an untenanted query has no tenant
+//! to key the map by; a tenant that never had an edit absorbed has no note to
+//! report; and the on-demand (non-daemon) serve path rebuilds the graph per
+//! request from the working copy, so no cached fact could be stale and nothing
+//! tracked one. A fabricated tag would be indistinguishable from a measured
+//! one, which is exactly what FR-3 exists to prevent.
+//!
+//! Do not confuse this with PROJECTION freshness — how current the projected
+//! policy registry a verdict enforced is (`hook::rule_planes`,
+//! [`crate::verdict`]). Different question, different subject, and the two can
+//! disagree.
+//!
+//! This docstring has now been wrong in both directions. It once asserted every
+//! served fact carried a freshness tag when none did (aegis-8yrn); the
+//! correction then outlived the wiring and claimed freshness was served nowhere
+//! after `/symbols` began serving it. Both errors are the same error: a status
+//! claim stated once and never re-derived from the code. The FR-3 honesty rule
+//! applies to this file's prose too — say what the serve path does, cite it, and
+//! omit rather than guess.
 
 use serde::{Deserialize, Serialize};
 
@@ -223,9 +238,13 @@ pub struct Symbol {
 
 /// A single structural fact: `subject —edge→ object`, tagged with provenance.
 ///
-/// The Phase-3 freshness carrier (see the module docs): it pairs a value with
-/// both a [`Tier`] and a [`Freshness`], but nothing on the served path constructs
-/// one yet — freshness lands with the resident graph + watcher (FR-16/17).
+/// The typed freshness carrier (see the module docs): it pairs a value with
+/// both a [`Tier`] and a [`Freshness`]. Note that this struct requires a
+/// freshness — it cannot express "unknown" — so the served surfaces that must
+/// be able to omit the tag (the daemon's `/symbols`, whose wire type carries an
+/// `Option<String>`) do not use it. Code-fact freshness itself IS served as of
+/// Phase 3 (bobbin-052); what has no served constructor is this particular
+/// always-tagged shape.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fact {
     /// The subject identifier.

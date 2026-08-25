@@ -223,17 +223,29 @@ a numbered capability from the vision (§"The concrete capability set").
   `freshness` ∈ {`fresh`, `stale`, `recomputing`}. Agents must be able to tell a
   tree-sitter-fast-but-approximate fact from an LSP-precise one.
 - **Status (aegis-8yrn):** the `tier` half is served on every response.
-  **The `freshness` half splits in two, and only one half is Phase 3:**
+  **The `freshness` half splits in two, and both halves are now served — but
+  they answer different questions and can disagree, so they must never be
+  conflated:**
   - **Code-fact freshness** (is this structural fact current with the file it
-    came from?) is *tracked but not served*. The watch path maintains real
-    `Recomputing → Fresh` transitions per file
-    (`src/watch/overlay_refresh.rs::freshness_of`), but no query surface reads
-    them yet: the on-demand serve path rebuilds per request, so no cached code
-    fact can be stale. Until the Phase 3 resident-graph serve path wires the
-    tracked map into query responses, a response omits `freshness` rather than
-    stamping a constant `fresh` that would imply a tracking system the serve
-    path does not consult. `types::Fact`/`types::Freshness` are the defined
-    carrier.
+    came from?) is *tracked AND served*, since Phase 3 (bobbin-052). The watch
+    path maintains real `Recomputing → Fresh` transitions per file
+    (`src/watch/overlay_refresh.rs::freshness_of`, tenant-keyed through
+    `src/daemon/mod.rs::freshness_of`), and the resident daemon's
+    tenant-scoped `/symbols` reply serves the tracked value — read BEFORE the
+    view is composed (`src/daemon/tenanted.rs::symbols_for`) so the tag
+    describes the state those symbols came from rather than one that moved
+    underneath the read. The wire field is
+    `daemon::wire::FileSymbols::freshness`, and
+    `src/daemon/http_test.rs::symbols_serve_code_fact_freshness_and_omit_it_when_unknown`
+    pins the rule.
+    **Wherever it is unknown the field is omitted — never `"fresh"`, never
+    `"unknown"`.** Three paths cannot answer and all three say so by absence:
+    the untenanted `/symbols` query has no tenant to key the map by; a tenant
+    that never had an edit absorbed has no note to report; and the on-demand
+    (non-daemon) serve path rebuilds per request, so no cached code fact can
+    be stale and nothing tracked it. A fabricated tag would be
+    indistinguishable from a measured one, which is the failure FR-3 exists to
+    prevent. `types::Fact`/`types::Freshness` remain the typed carrier.
   - **Projection freshness** (are the governed rules this verdict enforced still
     the current ones?) is *already served* on the verdict surface: the pre-edit
     guard states `fresh` / `stale` (with the cache age in seconds) /
