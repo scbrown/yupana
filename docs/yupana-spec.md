@@ -1073,14 +1073,15 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
 
 ### Phase 1 — Yupana, single-tenant *(explained retrieval, no new store)*
 
-- [ ] Project scaffold: Cargo (edition 2021), `[lints]` block, `just` + pre-commit + CI (both feature arms), mdBook skeleton.
-- [ ] Tree-sitter extraction (Bobbin's grammar set): symbol tree + intra-file calls.
-- [ ] LSP client (multilspy-style) for ≥ Rust + one more language: defs/refs/types.
-- [ ] Tier tagging (FR-3) on every served response from day one. (Freshness
-      tagging is Phase 3 — it needs the resident graph + watcher, FR-16/17.)
-- [ ] Single-tenant in-memory graph; `yupana_definition` / `yupana_references` / `yupana_symbols` / `yupana_callers` over MCP (stdio + HTTP).
-- [ ] CLI: `serve`, `analyze`, `refs`, `status`.
-- **Exit:** Bobbin fuses Yupana's precise references with its co-change/embeddings; "probably relevant" becomes "provably connected."
+- [x] Project scaffold: Cargo (edition 2021), `[lints]` block, `just` + pre-commit + CI (now nine feature arms), mdBook skeleton.
+- [x] Tree-sitter extraction (Bobbin's grammar set): symbol tree + intra-file calls (`src/extract/`).
+- [ ] LSP client (multilspy-style) for ≥ Rust + one more language: defs/refs/types. **The one Phase 1 item still open** (yupana #1); everything Phase 1 promised degrades to the tree-sitter tier per FR-2 until it lands.
+- [x] Tier tagging (FR-3) on every served response from day one — pinned by `tests/tier_tags.rs`. (Freshness
+      tagging was Phase 3; code-fact freshness now serves on the daemon's
+      tenant-scoped `/symbols`, see FR-3's status block above.)
+- [x] Single-tenant in-memory graph; `yupana_references` / `yupana_symbols` / `yupana_callers` over MCP (stdio + HTTP). Definition-site lookup shipped *as* `yupana_references` ("find the definition site(s) of a symbol by name") rather than a separate `yupana_definition`, so there are three tools here, not four.
+- [x] CLI: `serve`, `analyze`, `refs`, `status` (`src/cli.rs`).
+- **Exit (met, at the tree-sitter tier):** Bobbin fuses Yupana's references with its co-change/embeddings; "probably relevant" becomes "provably connected." *Precision* awaits the LSP rung above.
 
 ### Phase 2 — Dataflow & blast radius
 
@@ -1114,7 +1115,12 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
       scans markdown for code-symbol mentions and `src/export.rs` emits
       `Section → references → CodeSymbol`. Not yet wired into the live edit hook.
 - [x] SHACL-validate (`rudof`) before every write (FR-20): `promote::validate` runs `rudof_lib` in-process against `code-edges.ttl` and refuses the whole promotion on any violation (all-or-nothing); a real `export` projection is round-trip-validated in the test suite so the emitter cannot drift from the gate (yupana #14).
-- [ ] Promote on commit/merge via `quipu_knot` / `Store::transact`, bitemporal (FR-19, FR-21, FR-22).
+- [x] Promote via `quipu_knot` / `POST /knot`, bitemporal, committed-tree-only (FR-19, FR-21, FR-22): `src/promote.rs::promote` SHACL-validates the projection in-process against the compiled-in `code-edges.ttl`, refuses the whole promotion on any violation, then POSTs the Turtle to `/knot` (chunked under the body limit; deterministic IRIs, so a re-run supersedes rather than duplicating). `yupana promote <commit-ish> --to <url>` reads a commit, never the working tree, which is what keeps uncommitted churn out of the graph. Graded ✅ in Appendix D.
+- [ ] Promote **on commit/merge** — the trigger. `[yupana.quipu] promote_on` is
+      parsed and has no reader: nothing in the tree wires a commit or merge hook
+      to `promote::promote`, so today every promotion is an explicit CLI or
+      `yupana_promote` invocation. The key is exempted in
+      `src/config_test.rs`'s live-control guard for exactly this reason. GH #3.
 - [ ] Branch modeling per §9.4: promote each branch into a named graph if Quipu
       quad support (§9.5) has landed; else branch-as-qualifier fallback. SPARQL-
       over-code recipes.
