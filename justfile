@@ -33,6 +33,13 @@ test *args="":
     # The python-side tests. Small and few, but a converter that silently
     # dropped records would misreport the false-positive rate that gates
     # advise -> enforce promotion, so it does not get to sit outside the gate.
+    #
+    # This line was, for a while, the ONLY thing that ran them: CI ran
+    # `cargo test` and nothing more, so the suite executed only when a human
+    # typed `just test`. It is now also a pre-commit hook
+    # (`replay-converter-tests`), which puts it inside `just check` and inside
+    # CI's pre-commit job. Kept here too so `just test` stays the one command
+    # that runs every test.
     python3 tests/spool_to_dogwood.py
 
 # Run the linter (matches CI: deny warnings, allow missing-docs)

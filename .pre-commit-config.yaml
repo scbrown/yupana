@@ -49,6 +49,28 @@ repos:
         # the whole defect.
         verbose: true
 
+      - id: replay-converter-tests
+        name: replay converter tests (python)
+        entry: python3 tests/spool_to_dogwood.py
+        language: system
+        # The ONLY Rust-free test suite in the repo, and until now the only one
+        # no gate ran. `just test` invoked it, so it passed whenever a human
+        # typed that; CI ran `cargo test` and nothing else, and AGENTS.md says
+        # the quality gates are the only gate. A converter that silently dropped
+        # records would misreport the false-positive rate that gates the
+        # advise -> enforce promotion, so it does not get to sit outside them.
+        #
+        # Placed here rather than in the CI test matrix on purpose: it has no
+        # feature dependence, so the matrix would run it nine identical times,
+        # while this covers `just check` (the stated pre-push gate) and CI's
+        # pre-commit job at once.
+        files: ^(tests/spool_to_dogwood\.py|scripts/spool-to-dogwood\.py)$
+        pass_filenames: false
+        # Same reason the file-size hook is verbose: show the test count in a
+        # GREEN log. "OK" with no number cannot be told from a suite that
+        # collected nothing.
+        verbose: true
+
       - id: mdbook-build
         name: mdbook build
         entry: scripts/precommit-mdbook.sh

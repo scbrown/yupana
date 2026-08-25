@@ -111,6 +111,13 @@ jobs:
   # `mcp,game-state` is the only arm that compiles the /ingest, /guard and
   # /whatif surfaces plus the three MCP tools. The engine is pure in-memory —
   # no network, no fixtures — so both are self-contained.
+  #
+  # This matrix is NOT the whole test suite. `tests/spool_to_dogwood.py` (the
+  # replay converter) is Rust-free and has no feature dependence, so it runs
+  # once in the `check` job below via the `replay-converter-tests` pre-commit
+  # hook rather than nine identical times here. If that hook is ever added to
+  # this workflow's SKIP list, the suite must move into this matrix instead —
+  # it gated nothing at all until 2026-08.
 
   build:
     name: Build
