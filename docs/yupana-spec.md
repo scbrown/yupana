@@ -219,9 +219,18 @@ a numbered capability from the vision (§"The concrete capability set").
 
 **FR-3: Confidence / freshness tier tags (crux — see risk §14.5).**
 
-- Every served fact MUST carry a `tier` ∈ {`treesitter`, `lsp`, `cpg`} and a
-  `freshness` ∈ {`fresh`, `stale`, `recomputing`}. Agents must be able to tell a
-  tree-sitter-fast-but-approximate fact from an LSP-precise one.
+- Every served fact MUST carry a `tier` ∈ {`treesitter`, `lsp`, `cpg`,
+  `engine-state`} and a `freshness` ∈ {`fresh`, `stale`, `recomputing`}. Agents
+  must be able to tell a tree-sitter-fast-but-approximate fact from an
+  LSP-precise one.
+  - `engine-state` (FR-35) is a fact an engine ADAPTER stated, not one Yupana
+    derived from source; `src/types.rs::Tier` ships it and
+    `docs/neuralamplifier-harness.md` fixes that hyphenated spelling as the
+    wire value (`game-state` is the Cargo feature, `engine-state` is the tier).
+    It is a **peer** of the code tiers, not a rung above or below them: nothing
+    it carries is span-anchored, so a consumer reading one as if it pointed at
+    a `file:line` is wrong in exactly the way FR-3 exists to prevent — and the
+    confusion must be impossible in both directions.
 - **Status (aegis-8yrn):** the `tier` half is served on every response.
   **The `freshness` half splits in two, and both halves are now served — but
   they answer different questions and can disagree, so they must never be

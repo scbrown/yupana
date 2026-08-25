@@ -38,6 +38,8 @@
 - [SARC Conformance](design/sarc-conformance.md)
 - [Governed Relations](design/governed-relations.md)
 - [Workflow-Gated Edits](design/workflow-gated-edits.md)
+- [Game-State Harness (addendum)](design/game-state-harness.md)
+- [Golden-Path Guard (addendum)](design/golden-path-guard.md)
 
 # Operations
 
