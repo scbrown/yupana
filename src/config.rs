@@ -428,6 +428,12 @@ fn user_config_path() -> Option<PathBuf> {
 
 /// Read the raw `[yupana]` table from a config file, if the file exists.
 ///
+/// `[hank]` is accepted as a legacy fallback after the binary rename. It is
+/// consulted only when `[yupana]` is absent: a stale legacy table must never
+/// override an operator's canonical configuration. Keeping this compatibility
+/// here (rather than in the installer) also protects package-manager upgrades
+/// and copied configs that never run `scripts/install-local.sh`.
+///
 /// Returns the un-deserialized [`toml::Value`] so callers can merge tables
 /// before building the struct — deserializing each file separately would bake
 /// in defaults for its absent keys, and those defaults would then overwrite
@@ -443,12 +449,17 @@ fn read_yupana_table(path: &Path) -> Result<Option<toml::Value>> {
     let text = std::fs::read_to_string(path)?;
     let root: toml::Value =
         toml::from_str(&text).map_err(|e| Error::Config(format!("{}: {e}", path.display())))?;
-    match root.get("yupana") {
+    let (section_name, section) = if let Some(section) = root.get("yupana") {
+        ("yupana", Some(section))
+    } else {
+        ("hank", root.get("hank"))
+    };
+    match section {
         Some(section) => {
             let _: YupanaConfig = section
                 .clone()
                 .try_into()
-                .map_err(|e| Error::Config(format!("{}: [yupana]: {e}", path.display())))?;
+                .map_err(|e| Error::Config(format!("{}: [{section_name}]: {e}", path.display())))?;
             Ok(Some(section.clone()))
         }
         None => Ok(None),

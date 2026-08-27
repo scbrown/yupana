@@ -40,6 +40,37 @@ fn load_reads_yupana_table() {
     assert_eq!(config.serve.mcp_http_port, 3040);
 }
 
+#[test]
+fn load_reads_legacy_hank_table_after_the_binary_rename() {
+    let dir = tempfile::tempdir().unwrap();
+    let bobbin = dir.path().join(".bobbin");
+    std::fs::create_dir_all(&bobbin).unwrap();
+    std::fs::write(
+        bobbin.join("config.toml"),
+        "[hank.policy]\nmode = \"advise\"\n[hank.quipu]\nenabled = true\n",
+    )
+    .unwrap();
+
+    let config = YupanaConfig::load(dir.path()).unwrap();
+    assert_eq!(config.policy.mode, crate::policy::Mode::Advise);
+    assert!(config.quipu.enabled);
+}
+
+#[test]
+fn canonical_yupana_table_wins_over_stale_legacy_hank_table() {
+    let dir = tempfile::tempdir().unwrap();
+    let bobbin = dir.path().join(".bobbin");
+    std::fs::create_dir_all(&bobbin).unwrap();
+    std::fs::write(
+        bobbin.join("config.toml"),
+        "[hank.policy]\nmode = \"off\"\n[yupana.policy]\nmode = \"advise\"\n",
+    )
+    .unwrap();
+
+    let config = YupanaConfig::load(dir.path()).unwrap();
+    assert_eq!(config.policy.mode, crate::policy::Mode::Advise);
+}
+
 /// The shape a fleet actually deploys: capability scopes live in ONE
 /// user-level config so six workspaces cannot drift, and each workspace
 /// sets its own unrelated keys. The workspace file must not take the policy
