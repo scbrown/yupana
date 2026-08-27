@@ -57,6 +57,17 @@ yupana status
 > golden-path conformance guard (`golden-path`, FR-40..FR-42). Promotion lands
 > per the [phasing](docs/yupana-spec.md#12-milestones--phasing).
 
+The v0.6.4 installed surface includes both halves of that description. The
+structural half is `analyze` / `refs` / `callers` / `impact` / `dataflow` /
+`verify`. The change-time policy half is live in `yupana status`: the current
+fleet projection reports **7 Quipu-sourced text rules in `advise` mode**. Rules
+remain advisory until their own enforcement gates are satisfied. `yupana
+exemplar` drafts selector and predicate candidates from a denied example
+(policy-by-example); `yupana verifier` exposes the ed25519 public identity used
+to bind signed verdicts to the verifier registered in Quipu. Status also says
+when the projected rule digest is unsigned, so transport trust is never
+misreported as a signed resident cache.
+
 ## 🤔 Why Yupana? — and how it's different
 
 Structural code intelligence isn't new; the strongest tools each prove out **one**
