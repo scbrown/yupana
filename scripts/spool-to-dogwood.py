@@ -109,8 +109,23 @@ def action_name(rec: dict) -> str | None:
     return None
 
 
+def cedar_string(value: object) -> str:
+    """Render a value as a Cedar/Dogwood string literal."""
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def input_fields(rec: dict) -> dict[str, str]:
+    """Policy-visible fields, absent when the spool did not resolve them."""
+    keys = ("session", "item", "tenant", "result", "target_class", "rule", "tool", "mode")
+    return {key: str(rec[key]) for key in keys if rec.get(key) is not None}
+
+
+def record_literal(fields: dict[str, str]) -> str:
+    return "{ " + ", ".join(f"{key}: {cedar_string(value)}" for key, value in fields.items()) + " }"
+
+
 def convert(lines, out) -> Counter:
-    """Write one trace event per replayable record. Returns the drop tally."""
+    """Write one Dogwood `.log` event per replayable record. Returns the drop tally."""
     tally: Counter = Counter()
     for line in lines:
         line = line.strip()
@@ -140,23 +155,20 @@ def convert(lines, out) -> Counter:
             tally["no-timestamp"] += 1
             continue
 
-        event = {
-            "timestamp": ts,
-            "principal": f'Yupana::Agent::"{rec.get("agent") or "unknown"}"',
-            "action": action,
-            "resource": f'Yupana::Target::"{rec.get("target") or rec.get("path") or "unknown"}"',
-            "context": {
-                "session": session,
-                # Absent rather than blank when unresolved, matching the spool's
-                # own omit-never-fake rule. A replayed rule that keyed on
-                # item == "" would be reasoning about a value nobody wrote.
-                **({"item": rec["item"]} if rec.get("item") else {}),
-                **({"tenant": rec["tenant"]} if rec.get("tenant") else {}),
-                **({"result": rec["result"]} if rec.get("result") else {}),
-                **({"target_class": rec["target_class"]} if rec.get("target_class") else {}),
-            },
-        }
-        out.write(json.dumps(event) + "\n")
+        fields = input_fields(rec)
+        inputs = record_literal(fields)
+        principal = f'Yupana::Agent::{cedar_string(rec.get("agent") or "unknown")}'
+        resource = f'Yupana::Target::{cedar_string(rec.get("target") or rec.get("path") or "unknown")}'
+        request_id = cedar_string(f"{session}-{tally['written']}")
+        # Mirror input into both bags. Dogwood's reference interpreter warns
+        # that supplying a field to only the request or logged bag silently
+        # weakens Cedar or temporal checks respectively.
+        out.write(
+            f"@{ts} scope(principal: {principal}, resource: {resource}) "
+            f"request_context(input: {inputs}) {action}::request("
+            f"input: {inputs}, callerPrincipal: {principal}, "
+            f"callerResource: {resource}, requestId: {request_id})\n"
+        )
         tally["written"] += 1
     return tally
 

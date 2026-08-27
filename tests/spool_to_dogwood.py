@@ -23,18 +23,10 @@ _spec.loader.exec_module(mod)
 
 
 def convert(lines):
-    """Return (parsed events, drop tally).
-
-    PARSED, not raw text: the action and resource are JSON string VALUES that
-    contain quotes, so `Yupana::Action::"Edit"` appears in the line as
-    `Yupana::Action::\\"Edit\\"`. A substring assertion against the raw line
-    would have to encode that escaping, which makes the test about serialisation
-    when it is about content.
-    """
-    import json
+    """Return (`.log` event lines, drop tally)."""
     out = io.StringIO()
     tally = mod.convert(lines, out)
-    events = [json.loads(l) for l in out.getvalue().splitlines() if l.strip()]
+    events = [line for line in out.getvalue().splitlines() if line.strip()]
     return events, tally
 
 
@@ -44,17 +36,17 @@ class ConversionTests(unittest.TestCase):
             '{"kind":"guard","ts":1,"agent":"a","session":"s","item":"i","path":"src/a.rs"}'
         ])
         self.assertEqual(tally["written"], 1)
-        self.assertEqual(events[0]["action"], 'Yupana::Action::"Edit"')
-        self.assertEqual(events[0]["context"]["session"], "s")
-        self.assertEqual(events[0]["context"]["item"], "i")
+        self.assertIn('Yupana::Action::"Edit"::request', events[0])
+        self.assertEqual(events[0].count('session: "s"'), 2)
+        self.assertEqual(events[0].count('item: "i"'), 2)
 
     def test_a_resolved_action_carries_its_verb(self):
         events, _ = convert([
             '{"kind":"action","ts":1,"agent":"a","session":"s","verb":"ssh",'
             '"target":"build-01","target_class":"host"}'
         ])
-        self.assertEqual(events[0]["action"], 'Yupana::Action::"Ssh"')
-        self.assertEqual(events[0]["resource"], 'Yupana::Target::"build-01"')
+        self.assertIn('Yupana::Action::"Ssh"::request', events[0])
+        self.assertIn('resource: Yupana::Target::"build-01"', events[0])
 
 
 class DenominatorTests(unittest.TestCase):
@@ -112,15 +104,22 @@ class OmissionTests(unittest.TestCase):
         events, _ = convert([
             '{"kind":"guard","ts":1,"agent":"a","session":"s","path":"src/a.rs"}'
         ])
-        self.assertNotIn("item", events[0]["context"])
+        self.assertNotIn("item:", events[0])
 
     def test_the_control_an_item_that_IS_present_appears(self):
         """Without this the assertion above would pass against a converter that
         had simply stopped emitting the field."""
         events, _ = convert([
-            '{"kind":"guard","ts":1,"agent":"a","session":"s","item":"aegis-9"}'
+            '{"kind":"guard","ts":1,"agent":"a","session":"s","item":"work-9"}'
         ])
-        self.assertEqual(events[0]["context"]["item"], "aegis-9")
+        self.assertEqual(events[0].count('item: "work-9"'), 2)
+
+    def test_strings_are_escaped_as_cedar_literals(self):
+        events, _ = convert([
+            '{"kind":"guard","ts":1,"agent":"a\\\"b","session":"s",'
+            '"path":"src/a.rs"}'
+        ])
+        self.assertIn('Yupana::Agent::"a\\"b"', events[0])
 
 
 if __name__ == "__main__":
