@@ -599,6 +599,14 @@ stem, so they over-connect on shared names like any tree-sitter-tier fact; the
 <pre><code class="language-bash">yupana export src --repo myrepo --format turtle    # dump the referential graph
 yupana promote --commit HEAD --to "$QUIPU_URL" .   # SHACL-validate + write it
 </code></pre>
+<h3 id="--repo-is-data-identity-not-a-label"><a class="header" href="#--repo-is-data-identity-not-a-label"><code>--repo</code> is data identity, not a label</a></h3>
+<p>The repository name is a <strong>segment of every entity IRI</strong> (<code>.../code/&lt;repo&gt;/&lt;path&gt;</code>),
+so it decides whether two exports of the same code describe one graph or two.
+<code>--repo</code> wins; otherwise the <code>origin</code> remote names the repository. With neither,
+<code>promote</code> refuses, and plain <code>export</code> falls back to the directory basename and
+<strong>says so on stderr</strong> — the same source under <code>myrepo/</code> and <code>myrepo-worktree/</code>
+shares zero entities, which a consumer imports as a parallel graph rather than as
+a conflict. Pass <code>--repo</code> for any export that is captured, shared, or imported.</p>
 <p><code>yupana promote</code> needs <code>--features quipu</code>; without it the binary says so rather
 than pretending. It emits the Turtle, SHACL-validates in-process against
 <code>shapes/</code>, and writes to <code>/knot</code> <strong>only if it conforms</strong> — a rejected promotion
