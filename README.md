@@ -205,6 +205,8 @@ yupana dataflow <function> src --var <variable>
 
 # Export the referential structure (code + docs) as governed RDF Turtle
 yupana export src --repo myrepo --format turtle
+# ...and on into a git-storable Quipu share bundle another store can import:
+# docs/book/src/reference/share-bundles.md (hash the canonical form, not this Turtle)
 
 # Serve over MCP (stdio) for an agent
 yupana serve
