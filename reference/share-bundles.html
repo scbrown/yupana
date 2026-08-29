@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>E2E Grounding Eval - Yupana — Live Code Structure</title>
+        <title>Code Slices as Share Bundles - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/e2e-grounding-eval.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/share-bundles.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,115 +181,103 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="e2e-grounding-eval"><a class="header" href="#e2e-grounding-eval">E2E Grounding Eval</a></h1>
-<p><code>just e2e</code> stands up the real pair — a <code>quipu-server</code> on a freshly seeded
-store, and this repo's <code>yupana</code> pre-edit guard pointed at it — and proves
-the grounding-integrity loop end to end: governed policy projected from
-Quipu, hallucinated references rejected in the agent's loop at a declared
-tier, and every verdict returned to Quipu as a signed fact.</p>
-<p>It needs the sibling checkouts <code>../quipu</code> (the governed store) and
-<code>../camayoc</code> (the policy pack <code>shapes/policies/edit-grounding.ttl</code> that the
-harness loads). Both sides are built in release automatically.</p>
-<h2 id="the-eval-just-e2e-run"><a class="header" href="#the-eval-just-e2e-run">The eval (<code>just e2e run</code>)</a></h2>
-<p><code>scripts/e2e/harness.py</code> seeds the store with the camayoc pack, two
-<code>aegis:WorkItem</code> records, and yupana's registered verifier key, then drives
-the guard through eight scenarios. Each maps to an aspect of the grounding
-cluster disclosure:</p>
-<div class="table-wrapper"><table><thead><tr><th>scenario</th><th>proves</th></tr></thead><tbody>
-<tr><td>clean, cited edit</td><td>a bounded pass — the guard does not cry wolf</td></tr>
-<tr><td>hallucinated call</td><td>a reference that exists nowhere is denied, tier declared</td></tr>
-<tr><td>fabricated work-item citation</td><td>id-shaped but resolving to nothing is its own violation class</td></tr>
-<tr><td>uncited edit</td><td>the <code>must-ground</code> discipline denies untracked work</td></tr>
-<tr><td>freshness declared</td><td>a live projection says <code>verdict freshness: fresh</code></td></tr>
-<tr><td>quipu down, cache warm</td><td>last-known policy still enforced, cache age named</td></tr>
-<tr><td>quipu down, no cache</td><td>loud fail-open — never a silent allow</td></tr>
-<tr><td>verdict return</td><td>spooled verdicts land in quipu signed, with tier + freshness</td></tr>
+                        <h1 id="code-slices-as-quipu-share-bundles"><a class="header" href="#code-slices-as-quipu-share-bundles">Code slices as Quipu share bundles</a></h1>
+<p>A Quipu <strong>share bundle</strong> is a git-storable, content-addressed directory holding a canonical RDF
+graph, the shapes that describe it, and a lineage manifest. This page is the measured workflow for
+turning a Yupana code-graph slice into one, and for importing it into somebody else's store.</p>
+<p>Yupana is the <strong>producer of structural code facts and nothing more</strong>. It does not write manifests,
+compute share ids, or canonicalize RDF: Quipu authors the bundle from the graph it holds, so a
+bundle built this way carries <code>producer.name = "quipu"</code>. That is by design, not a gap — one
+implementation of the hashing rules means one set of rules.</p>
+<h2 id="the-pipeline"><a class="header" href="#the-pipeline">The pipeline</a></h2>
+<pre><code class="language-bash"># 1. Yupana emits the governed code projection. --repo is REQUIRED for anything shared:
+#    the repo name is a segment of every entity IRI (see "Promotion to Quipu").
+yupana export src --repo myrepo --format turtle &gt; slice.ttl
+
+# 2. Quipu ingests it and holds it.
+quipu knot slice.ttl --db store.db
+quipu shapes load code-entities &lt;quipu&gt;/shapes/code-entities.ttl --db store.db
+
+# 3. Quipu AUTHORS the bundle. Always pass --shapes (see the warning below).
+quipu share --output ./bundle \
+  --construct 'CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }' \
+  --shapes code-entities --db store.db
+</code></pre>
+<p>That writes <code>bundle/</code> containing exactly:</p>
+<div class="table-wrapper"><table><thead><tr><th>file</th><th>what</th></tr></thead><tbody>
+<tr><td><code>manifest.json</code></td><td>schema <code>…/share-manifest/v1</code>, <code>share_id</code>, <code>store_id</code>, <code>tx_anchor</code>, <code>graph_hash</code>, <code>shapes_hash</code>, <code>scope</code>, <code>parent_share</code>, <code>producer</code></td></tr>
+<tr><td><code>export.nt</code></td><td>canonical N-Triples — the bytes <code>graph_hash</code> covers</td></tr>
+<tr><td><code>shapes.ttl</code></td><td>the shape sets named by <code>--shapes</code></td></tr>
 </tbody></table>
 </div>
-<p>A second group proves work-item scope isolation — the provenance ladder of
-<code>docs/work-scoped-governance.md</code>, driven by the tracker's plate and the
-observed scope projected from quipu's commit-provenance chain:</p>
-<div class="table-wrapper"><table><thead><tr><th>scenario</th><th>proves</th></tr></thead><tbody>
-<tr><td>declared deny</td><td>a static <code>[yupana.policy.scopes.*]</code> entry hard-denies outside itself</td></tr>
-<tr><td>observed in-scope</td><td>the item's own ground admits the edit silently</td></tr>
-<tr><td>observed advise</td><td>out-of-scope is named (rung, item, right move) without blocking</td></tr>
-<tr><td>unknown scope</td><td>no rung answers → one advisory per session, never a silent allow</td></tr>
-<tr><td>observed enforce</td><td><code>work_item_scope = "enforce"</code> denies outside the item's boundary</td></tr>
-<tr><td>enforce in-scope</td><td>the hard boundary does not over-block the item's own ground</td></tr>
-<tr><td>assignment briefing</td><td><code>session-start</code> injects ground, central entities, similar successful work, and rules before the first edit</td></tr>
+<p>A code slice selected by CONSTRUCT records <code>scope.kind = "construct"</code>.</p>
+<p>Import is <strong>REST-only</strong> — there is no <code>quipu import</code> subcommand:</p>
+<pre><code class="language-bash">curl -s http://your-quipu/import -X POST -H 'Content-Type: application/json' -d @- &lt;&lt;JSON
+{"manifest": …, "export_ntriples": "…", "shapes_turtle": "…", "source": "yupana-code-slice:myrepo"}
+JSON
+</code></pre>
+<p>The importer verifies the schema, the three payload basenames, both content hashes and the
+<code>share_id</code> <strong>before parsing any RDF</strong>, then stages into a per-source named graph. It never writes
+ROOT directly. A second byte-identical import returns <code>unchanged</code>, which is a success.</p>
+<h2 id="hash-the-canonical-form-never-the-producers-turtle"><a class="header" href="#hash-the-canonical-form-never-the-producers-turtle">Hash the canonical form, never the producer's Turtle</a></h2>
+<p><code>yupana export</code> serializes in <strong>filesystem traversal order</strong>. The same code, checked out twice into
+differently-named directories, produces the same triples in a <strong>different byte order</strong> — measured.
+So:</p>
+<blockquote>
+<p><strong>A <code>graph_hash</code> taken over Yupana's raw Turtle is not stable across checkouts. Taken over
+Quipu's canonical <code>export.nt</code>, it is.</strong></p>
+</blockquote>
+<p>Two independently-created checkouts of identical content yield byte-differing <code>slice.ttl</code> and an
+<strong>identical <code>graph_hash</code></strong>. Hashing the producer's output is the obvious shortcut and it is exactly
+the thing that breaks; it is written down here so nobody re-derives it as an optimization.</p>
+<p>This is also why "export twice and compare bytes" is a <strong>weak</strong> test — it passes for a canonical
+producer <em>and</em> for a path-dependent one, so it cannot tell them apart. The discriminating test is
+cross-condition: same content, two checkout paths, same hash required.</p>
+<h2 id="local-shapes-decide-admission--bundled-shapes-are-evidence"><a class="header" href="#local-shapes-decide-admission--bundled-shapes-are-evidence">Local shapes decide admission — bundled shapes are evidence</a></h2>
+<p>The bundled <code>shapes.ttl</code> does <strong>not</strong> grant a bundle the right to assert its vocabulary in a
+stranger's store. Measured, one variable at a time:</p>
+<div class="table-wrapper"><table><thead><tr><th>bundle <code>shapes.ttl</code></th><th>consumer's local shapes</th><th>result</th></tr></thead><tbody>
+<tr><td>present</td><td><code>code-entities</code> loaded</td><td><code>staged</code>, all triples accepted</td></tr>
+<tr><td><strong>empty</strong></td><td><code>code-entities</code> loaded</td><td><code>staged</code> — <strong>identical</strong>; the bundled shapes changed nothing</td></tr>
+<tr><td>present</td><td>none</td><td><strong><code>quarantined</code></strong>, 0 accepted, blocker <code>off_vocabulary</code> naming <code>CodeModule</code>/<code>CodeSymbol</code></td></tr>
+<tr><td>present, then adopted with <code>quipu shapes load</code></td><td>now loaded</td><td><code>staged</code></td></tr>
 </tbody></table>
 </div>
-<p>Everything observable is captured under the workdir (default <code>target/e2e</code>):
-per-scenario guard stdout/stderr with <code>RUST_LOG=debug</code>, the metrics spool,
-the verdict spool, quipu's Prometheus <code>/metrics</code> snapshots, and a scored
-<code>report.md</code>/<code>report.json</code>. The run exits nonzero if any check fails.</p>
-<h2 id="the-bench-just-e2e-bench"><a class="header" href="#the-bench-just-e2e-bench">The bench (<code>just e2e bench</code>)</a></h2>
-<p><code>scripts/e2e/bench.py</code> answers the capacity question: how many concurrent
-agents can share one Yupana against one Quipu? Each simulated agent is what
-a deployment actually runs — a <code>yupana hook pre-edit</code> process per edit,
-every guard projecting policy live from the single quipu-server — under its
-own tenant id.</p>
-<p>The sweep reports, per concurrency level, guard latency (p50/p95/max),
-aggregate edits/second, and the projection serving split:</p>
-<ul>
-<li><strong>live</strong> — projected from quipu on this guard</li>
-<li><strong>cached</strong> — quipu could not answer in time; the durable cache enforced
-last-known policy and the verdict declared its age</li>
-<li><strong>fail-open</strong> — no servable projection; the edit went unguarded, loudly</li>
-</ul>
-<p>The split is the honest capacity signal: the guard degrades live → cached →
-fail-open by design, so "how many agents fit" has two answers — how many
-keep fully-live projections, and how many stay enforced at all.</p>
-<h2 id="the-retrieval-eval-just-e2e-f1"><a class="header" href="#the-retrieval-eval-just-e2e-f1">The retrieval eval (<code>just e2e f1</code>)</a></h2>
-<p><code>scripts/e2e/eval_f1.py</code> scores the briefing's similar/related-item
-retrieval against a labeled corpus organized as <strong>problem classes</strong>, so the
-report says not just how good the scores are but <em>where</em> retrieval breaks.
-Core classes (gated, default floor 0.9 macro-F1): a mixed composite,
-phrase match, term overlap, provenance-only linkage, a single-term
-distractor that corroboration must prune, a hub-entity trap that the
-provenance rung's hub-degree cap must ignore, a crowded cluster larger
-than the briefing cap, and a no-neighbors probe where the only correct
-answer is silence. Hard classes (reported, not gated — the lexical
-frontier): multi-term collisions and a paraphrase, the two shapes only a
-semantic backend separates.</p>
-<p>The semantic arm runs when the model bundle is provisioned, which
-<code>just e2e f1</code> does best-effort: the all-MiniLM-L6-v2 ONNX bundle from
-qdrant's fastembed mirror on <code>storage.googleapis.com</code> and the ONNX
-Runtime dylib extracted from the <code>onnxruntime</code> PyPI wheel
-(<code>scripts/e2e/extract_ort.py</code>, quipu's <code>ort</code> is <code>load-dynamic</code> via
-<code>$ORT_DYLIB_PATH</code>) — both hosts commonly allowed where HuggingFace's LFS
-CDN is not. With it, the briefing gains a fourth retrieval source (quipu
-<code>/search</code>, query embedded server-side, supporting hits within 80% of the
-query's top non-self score) and term probes retire — measured, they cost
-more precision on a semantic store than the recall they add. Measured
-macros: lexical overall 0.845; semantic overall 0.954, with the
-multi-term-FP and paraphrase classes both at 1.0. The full write-up —
-per-problem tables, the no-veto and term-probe-retirement findings, and
-threats to validity — is the eval note at
-<code>docs/briefing-retrieval-eval.md</code> (repo root docs, outside this book).</p>
-<p>Each arm re-runs the shipped binary; ablations remove one retrieval source
-via <code>$YUPANA_BRIEF_ABLATE</code> — feature removal against the real code path,
-never a reimplementation. The gate fails the run unless the full arm's
-core macro-F1 clears the floor and every ablation scores strictly below
-it, so each retrieval source has to measurably earn its place.</p>
-<p>Retrieval is corroboration-scored: sources vote (phrase hit 2, each term
-hit 1, provenance co-occurrence 2) and single-vote candidates are pruned
-whenever anything better exists — a lone shared term is how a lexical
-distractor sneaks in. Measured effect: full-arm macro-F1 0.87 → 0.94.
-The residual false-positive class is the multi-term lexical collision,
-which only a semantic backend separates: configure quipu's embeddings
-(<code>[embedding] model_path</code>/<code>tokenizer_path</code>, <code>--embed-backfill</code>) and the
-same probes ride the vector path with no yupana changes.</p>
+<p>The consumer's own shapes always decide. That is deliberate: a bundle must not be able to widen a
+stranger's vocabulary just by shipping a file that says it may.</p>
+<p><strong>Receiving a quarantined slice</strong> — the recovery path is the last row: read the bundle's
+<code>shapes.ttl</code>, review what it would admit, <code>quipu shapes load</code> it deliberately, re-import. Quarantine
+is not a rejection; the triples are staged and named, and the response tells you which types
+blocked promotion.</p>
+<blockquote>
+<p>⚠️ <strong>Always pass <code>--shapes</code>.</strong> <code>quipu share</code> with no <code>--shapes</code> writes a <strong>zero-byte
+<code>shapes.ttl</code> and exits 0</strong>. That bundle passes every integrity check and imports cleanly on any
+consumer that already holds the shapes — i.e. on your own team, who will never see the problem —
+while being the one bundle a fresh consumer can <strong>never</strong> adopt, because the recovery path above
+needs a file with content in it. Filed upstream against Quipu; until it refuses, passing
+<code>--shapes</code> is the whole mitigation.</p>
+</blockquote>
+<h2 id="outward-sharing"><a class="header" href="#outward-sharing">Outward sharing</a></h2>
+<p>Every entity IRI embeds the ontology base host. That host <strong>is entity identity</strong>, not decorative
+metadata: rewriting or stripping it changes what the bundle asserts and breaks merging against any
+store holding the unrewritten form. Publishing a bundle outside the network it names is therefore a
+governance decision, not a scrub — do not automate it here.</p>
+<h2 id="regression"><a class="header" href="#regression">Regression</a></h2>
+<p>The whole pipeline — cross-condition hash, bundle integrity, the four refusal arms, quarantine, and
+idempotence — is pinned by an end-to-end regression that stands up two independent Quipu stores and
+round-trips a real slice between them. Reproduce it with the commands on this page; the arms that
+matter are the cross-condition hash and the bare-consumer quarantine, because each fails in the
+reassuring direction if you only run the easy version.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../reference/share-bundles.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/enforcement-trace.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../design/specification.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../reference/e2e-grounding-eval.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -299,11 +287,11 @@ same probes ride the vector path with no yupana changes.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../reference/share-bundles.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/enforcement-trace.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../design/specification.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../reference/e2e-grounding-eval.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
