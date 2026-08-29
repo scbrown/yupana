@@ -1560,3 +1560,77 @@ fn promotion_carries_the_commit_touched_entities_provenance() {
     // And yupana does not invent the work-item half of the chain.
     assert!(!body.contains("implements"), "{body}");
 }
+
+/// The `--repo` dir-name guess is a segment of every entity IRI, so the same
+/// source exported from two checkout paths yields two DISJOINT graphs — which
+/// imports as a parallel alias set, not as a conflict, and so is silent at every
+/// later stage. Plain `export` keeps the guess (reading a non-git tree is a real
+/// use) but must announce it on stderr, and must leave stdout untouched so every
+/// existing capture keeps working. Both halves are pinned here: the notice fires
+/// with no origin, is absent when `--repo` is explicit, and the two directory
+/// names really do produce non-overlapping IRIs.
+#[test]
+fn export_announces_a_directory_name_identity_guess() {
+    let src = "pub fn a() -> u32 { b() }\nfn b() -> u32 { 1 }\n";
+    let parent = tempfile::tempdir().unwrap();
+    let one = parent.path().join("fixture");
+    let two = parent.path().join("fixture-renamed");
+    for d in [&one, &two] {
+        std::fs::create_dir(d).unwrap();
+        std::fs::write(d.join("x.rs"), src).unwrap();
+    }
+
+    // No --repo, no origin remote: the guess is used, and it says so.
+    let guessed = Command::cargo_bin("yupana")
+        .unwrap()
+        .arg("export")
+        .current_dir(&one)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("DIRECTORY NAME"))
+        .stderr(predicate::str::contains("fixture"))
+        .stdout(predicate::str::contains("CodeSymbol"));
+    let one_ttl = String::from_utf8(guessed.get_output().stdout.clone()).unwrap();
+
+    let two_ttl = String::from_utf8(
+        Command::cargo_bin("yupana")
+            .unwrap()
+            .arg("export")
+            .current_dir(&two)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .unwrap();
+
+    // The defect the notice exists for: identical source, zero shared entities.
+    assert!(one_ttl.contains("ontology/code/fixture/x.rs"), "{one_ttl}");
+    assert!(
+        two_ttl.contains("ontology/code/fixture-renamed/x.rs"),
+        "{two_ttl}"
+    );
+    assert!(
+        !two_ttl.contains("ontology/code/fixture/x.rs"),
+        "the two checkouts must not be silently merged: {two_ttl}"
+    );
+
+    // An explicit --repo is the remedy: same identity from either path, and no
+    // notice, so the warning cannot become background noise people filter out.
+    let mut named = Vec::new();
+    for d in [&one, &two] {
+        let out = Command::cargo_bin("yupana")
+            .unwrap()
+            .args(["export", "--repo", "fixture"])
+            .current_dir(d)
+            .assert()
+            .success()
+            .stderr(predicate::str::contains("DIRECTORY NAME").not());
+        named.push(String::from_utf8(out.get_output().stdout.clone()).unwrap());
+    }
+    assert_eq!(
+        named[0], named[1],
+        "explicit --repo must be path-independent"
+    );
+}

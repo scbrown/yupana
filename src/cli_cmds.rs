@@ -9,7 +9,6 @@ use std::path::Path;
 use colored::Colorize;
 
 use crate::dataflow::{Dataflow, FlowDir};
-use crate::export;
 use crate::graph::{CodeGraph, Dir};
 use crate::reconcile::reconcile;
 use crate::render::{print_reached, reached_json};
@@ -391,27 +390,6 @@ pub(crate) fn census(json: bool, quiet: bool, path: &Path) -> anyhow::Result<()>
             );
         }
     }
-    Ok(())
-}
-
-pub(crate) fn export(path: &Path, repo: Option<&str>) -> anyhow::Result<()> {
-    // Identity chain: explicit --repo, else the origin remote's repo name, else
-    // the directory basename. The dir-name fallback survives ONLY here — plain
-    // `export` prints locally and writes nothing — while the promote paths refuse
-    // instead: a guessed identity in a WRITE fragments the shared graph.
-    let repo = repo.map_or_else(
-        || {
-            crate::git::origin_repo_name(path).unwrap_or_else(|| {
-                path.canonicalize()
-                    .ok()
-                    .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-                    .unwrap_or_else(|| "repo".to_string())
-            })
-        },
-        str::to_string,
-    );
-    let turtle = export::to_turtle(path, &repo)?;
-    print!("{turtle}");
     Ok(())
 }
 

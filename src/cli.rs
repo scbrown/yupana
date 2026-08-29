@@ -25,6 +25,8 @@ mod cli_analyze;
 #[path = "cli_use.rs"]
 mod cli_use;
 use cli_use::deliberate_use_name;
+#[path = "cli_export.rs"]
+mod cli_export;
 #[path = "cli_hook.rs"]
 mod cli_hook;
 #[path = "cli_promote.rs"]
@@ -178,6 +180,9 @@ enum Commands {
         /// Repository name to attribute entities to. Defaults to the `origin`
         /// remote's repo name, else the dir name (print-only); a promotion via
         /// `--to` refuses the dir-name guess and wants `--repo` or an origin.
+        /// The dir-name guess announces itself on stderr: it is a segment of
+        /// every IRI, so output captured from two checkout paths describes two
+        /// disjoint graphs. Pass `--repo` for anything shared or imported.
         #[arg(long)]
         repo: Option<String>,
         /// Output format.
@@ -408,7 +413,7 @@ impl Cli {
                         self.load_config(path)?.write_guard("promotion")?;
                         self.promote(path, "HEAD", to.as_deref(), repo.as_deref(), false, false)
                     }
-                    None => cli_cmds::export(path, repo.as_deref()),
+                    None => cli_export::export(path, repo.as_deref()),
                 }
             }
             Commands::Dataflow {

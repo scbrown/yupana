@@ -24,6 +24,16 @@ yupana export src --repo myrepo --format turtle    # dump the referential graph
 yupana promote --commit HEAD --to "$QUIPU_URL" .   # SHACL-validate + write it
 ```
 
+### `--repo` is data identity, not a label
+
+The repository name is a **segment of every entity IRI** (`.../code/<repo>/<path>`),
+so it decides whether two exports of the same code describe one graph or two.
+`--repo` wins; otherwise the `origin` remote names the repository. With neither,
+`promote` refuses, and plain `export` falls back to the directory basename and
+**says so on stderr** — the same source under `myrepo/` and `myrepo-worktree/`
+shares zero entities, which a consumer imports as a parallel graph rather than as
+a conflict. Pass `--repo` for any export that is captured, shared, or imported.
+
 `yupana promote` needs `--features quipu`; without it the binary says so rather
 than pretending. It emits the Turtle, SHACL-validates in-process against
 `shapes/`, and writes to `/knot` **only if it conforms** — a rejected promotion
