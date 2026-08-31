@@ -283,6 +283,73 @@ fn impact_reports_transitive_callers() {
         .stdout(predicate::str::contains("\"count\": 2"));
 }
 
+#[test]
+fn impact_json_marks_a_same_named_symbol_as_ambiguous() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("a.rs"),
+        "fn shared() {}\nfn from_a() { shared(); }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("b.rs"),
+        "fn shared() {}\nfn from_b() { shared(); }\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args([
+            "impact",
+            "shared",
+            dir.path().to_str().unwrap(),
+            "--hops",
+            "1",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"ambiguous\": true")
+                .and(predicate::str::contains("\"definition_count\": 2"))
+                .and(predicate::str::contains("\"file\": \"a.rs\""))
+                .and(predicate::str::contains("\"file\": \"b.rs\"")),
+        );
+}
+
+#[test]
+fn impact_human_output_warns_that_ambiguous_definitions_are_merged() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("a.rs"),
+        "fn shared() {}\nfn from_a() { shared(); }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("b.rs"),
+        "fn shared() {}\nfn from_b() { shared(); }\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args([
+            "impact",
+            "shared",
+            dir.path().to_str().unwrap(),
+            "--hops",
+            "1",
+        ])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("resolves to 2 definitions")
+                .and(predicate::str::contains("impact merges every site"))
+                .and(predicate::str::contains("a.rs:1"))
+                .and(predicate::str::contains("b.rs:1")),
+        );
+}
+
 // ── The pre-edit policy guard (§5.8/FR-25, FR-30) ────────────────────────
 //
 // These drive the real binary end to end, because the guard's contract is about

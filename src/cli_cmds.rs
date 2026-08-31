@@ -111,6 +111,8 @@ pub(crate) fn impact(
     if !graph.has_symbol(symbol) {
         return not_found(json, quiet, symbol, "call graph");
     }
+    let definitions = graph.definitions(symbol);
+    let ambiguous = definitions.len() > 1;
     let reached = graph.reachable(symbol, Dir::Callers, hops);
     let structural_files: BTreeSet<String> = reached.iter().map(|r| r.file.clone()).collect();
     let cochange_set = cochange.map(read_cochange).transpose()?;
@@ -123,6 +125,13 @@ pub(crate) fn impact(
             "count": reached.len(),
             "reachable": reached_json(&reached),
             "structural_files": structural_files.iter().collect::<Vec<_>>(),
+            "ambiguous": ambiguous,
+            "definition_count": definitions.len(),
+            "definitions": definitions.iter().map(|d| serde_json::json!({
+                "file": d.file,
+                "line": d.start_line,
+                "kind": d.kind,
+            })).collect::<Vec<_>>(),
             // Blast radius is the trust-boundary surface (FR-25); serving it
             // unlabelled is exactly what FR-3 forbids. tree-sitter tier, tagged.
             "tier": "treesitter",
@@ -137,6 +146,20 @@ pub(crate) fn impact(
         }
         println!("{}", serde_json::to_string_pretty(&out)?);
         return Ok(());
+    }
+
+    if ambiguous && !quiet {
+        eprintln!(
+            "{} `{symbol}` resolves to {} definitions; this impact merges every site at the tree-sitter tier:",
+            "warning:".yellow().bold(),
+            definitions.len(),
+        );
+        for definition in &definitions {
+            eprintln!(
+                "  {}:{} {}",
+                definition.file, definition.start_line, definition.kind
+            );
+        }
     }
 
     if reached.is_empty() {
