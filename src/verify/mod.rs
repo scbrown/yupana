@@ -101,28 +101,36 @@ pub fn verify_buffer(
     baseline: Option<&str>,
 ) -> Result<Verdict> {
     let facts = buffer::analyze(proposed)?;
-    let mut existing: BTreeMap<(String, usize), usize> = match baseline {
-        Some(text) => buffer::analyze(text)
-            .map(|b| {
-                let mut counts = BTreeMap::new();
-                for call in b.calls.into_iter().filter(|c| c.form == CallForm::Free) {
-                    *counts.entry((call.name, call.arity)).or_insert(0) += 1;
-                }
-                counts
-            })
-            .unwrap_or_default(),
-        None => BTreeMap::new(),
-    };
+    let baseline_facts = baseline.and_then(|text| buffer::analyze(text).ok());
+    let mut existing: BTreeMap<(String, usize), usize> = BTreeMap::new();
+    if let Some(baseline) = &baseline_facts {
+        for call in baseline.calls.iter().filter(|c| c.form == CallForm::Free) {
+            *existing.entry((call.name.clone(), call.arity)).or_insert(0) += 1;
+        }
+    }
 
     // The base graph supplies names defined elsewhere in the tree.
     let graph = CodeGraph::build(root).ok();
     let defined_here: BTreeSet<&str> = facts.functions.iter().map(|f| f.name.as_str()).collect();
+    let removed_here: BTreeSet<&str> = baseline_facts
+        .iter()
+        .flat_map(|b| &b.functions)
+        .map(|f| f.name.as_str())
+        .filter(|name| !defined_here.contains(name))
+        .collect();
+    let current_file = file
+        .strip_prefix(root)
+        .unwrap_or(file)
+        .to_string_lossy()
+        .replace('\\', "/");
 
     let mut violations = Vec::new();
     check_calls(
         &facts,
         &mut existing,
         &defined_here,
+        &removed_here,
+        &current_file,
         graph.as_ref(),
         &mut violations,
     );
@@ -142,6 +150,8 @@ fn check_calls(
     facts: &BufferFacts,
     existing: &mut BTreeMap<(String, usize), usize>,
     defined_here: &BTreeSet<&str>,
+    removed_here: &BTreeSet<&str>,
+    current_file: &str,
     graph: Option<&CodeGraph>,
     out: &mut Vec<Violation>,
 ) {
@@ -151,10 +161,12 @@ fn check_calls(
             continue;
         }
         // Unchanged call sites are not this edit's problem.
-        if let Some(remaining) = existing.get_mut(&(call.name.clone(), call.arity)) {
-            if *remaining > 0 {
-                *remaining -= 1;
-                continue;
+        if !removed_here.contains(call.name.as_str()) {
+            if let Some(remaining) = existing.get_mut(&(call.name.clone(), call.arity)) {
+                if *remaining > 0 {
+                    *remaining -= 1;
+                    continue;
+                }
             }
         }
         // Imports, locals, closures, and fn-typed parameters are all in scope.
@@ -163,7 +175,11 @@ fn check_calls(
         }
 
         let in_buffer = defined_here.contains(call.name.as_str());
-        let in_graph = graph.is_some_and(|g| g.has_symbol(&call.name));
+        let in_graph = graph.is_some_and(|g| {
+            g.definitions(&call.name)
+                .iter()
+                .any(|definition| definition.file != current_file)
+        });
 
         if !in_buffer && !in_graph {
             out.push(Violation {
@@ -347,6 +363,39 @@ mod tests {
         assert_eq!(
             verdict.violations[0].kind,
             ViolationKind::IdentifierDoesNotExist
+        );
+    }
+
+    #[test]
+    fn removing_a_local_definition_breaks_its_retained_call() {
+        let dir = tempfile::tempdir().unwrap();
+        let baseline = "fn local_only() {}\nfn f() { local_only(); }\n";
+        std::fs::write(dir.path().join("a.rs"), baseline).unwrap();
+        let proposed = "fn f() { local_only(); }\n";
+
+        let verdict = verify(dir.path(), proposed, Some(baseline));
+
+        assert!(
+            !verdict.ok,
+            "the deleted definition survived through the base graph"
+        );
+        assert_eq!(verdict.violations.len(), 1);
+        assert_eq!(verdict.violations[0].symbol, "local_only");
+    }
+
+    #[test]
+    fn removing_one_definition_is_safe_when_another_file_defines_the_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let baseline = "fn shared() {}\nfn f() { shared(); }\n";
+        std::fs::write(dir.path().join("a.rs"), baseline).unwrap();
+        std::fs::write(dir.path().join("b.rs"), "fn shared() {}\n").unwrap();
+        let proposed = "fn f() { shared(); }\n";
+
+        let verdict = verify(dir.path(), proposed, Some(baseline));
+
+        assert!(
+            verdict.ok,
+            "the other file still defines shared: {verdict:?}"
         );
     }
 
