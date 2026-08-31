@@ -462,8 +462,9 @@ projection is that seam's sequencing step 2. Effects this seam cannot enforce
 (<code>require-approval</code>, <code>record</code>, …) refuse the projection loudly rather than
 decode into an inert wire.</p>
 <h2 id="the-action-surface-pre-bash"><a class="header" href="#the-action-surface-pre-bash">The action surface (<code>pre-bash</code>)</a></h2>
-<p><code>yupana hook pre-bash</code> is <strong>record-only by default</strong> and stays that way unless a
-deployment sets <code>[yupana.policy] action_scope</code>, which is <code>off</code> out of the box.</p>
+<p><code>yupana hook pre-bash</code> always records resolved actions. Its target-scope arm is
+<strong>record-only by default</strong> and stays that way unless a deployment sets
+<code>[yupana.policy] action_scope</code>, which is <code>off</code> out of the box.</p>
 <pre><code class="language-toml">[yupana.policy]
 action_scope = "advise"          # off | advise | enforce; `mode` is a ceiling
 
@@ -488,6 +489,24 @@ deliberately small.</p>
 and nothing is refused; at <code>enforce</code> the command is denied. The spool's
 <code>action_scope</code> records say what would have been refused, which is what a
 deployment should read before arming the boundary.</p>
+<h3 id="governed-host-memory-policy"><a class="header" href="#governed-host-memory-policy">Governed host-memory policy</a></h3>
+<p>The same hook projects memory-heavy command policies from Quipu. A policy owns
+all of the tunable data: a live command regex in its <code>Selector</code>/<code>Predicate</code>, and
+a <code>deterministic_threshold</code> <code>OperatingPoint</code> whose <code>threshold</code> is interpreted
+against the declared calibration basis <code>MemAvailable GiB</code>. Yupana reads
+<code>MemAvailable</code> and <code>MemTotal</code> from <code>/proc/meminfo</code>; it does not substitute
+<code>MemFree</code> when the signal is absent.</p>
+<p>A matching command below the floor reports the measured available, total, and
+governed threshold values. Under <code>mode = "advise"</code> it emits a system message and
+records a <code>memory_policy</code> metric without stopping the command. A hard policy can
+deny only under <code>mode = "enforce"</code>; changing the floor or matcher is a graph
+write and needs no Yupana rebuild. A missing projection, stale cache past its
+TTL, unreadable memory signal, or threshold larger than the host's total memory
+is loud fail-open.</p>
+<p>This event is an agent-harness execution seam. Non-harness launchers must invoke
+the same hook contract before execution (for example from a scheduler wrapper);
+installing the binary alone does not interpose on arbitrary processes. Do not
+claim cron coverage until the cron entry itself is wired through that seam.</p>
 <h2 id="what-the-guard-checks"><a class="header" href="#what-the-guard-checks">What the guard checks</a></h2>
 <ol>
 <li><strong>Path scope</strong> (FR-25) — is the edited file inside this tenant's writable
