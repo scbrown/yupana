@@ -112,11 +112,26 @@ pub fn verify_buffer(
     // The base graph supplies names defined elsewhere in the tree.
     let graph = CodeGraph::build(root).ok();
     let defined_here: BTreeSet<&str> = facts.functions.iter().map(|f| f.name.as_str()).collect();
-    let removed_here: BTreeSet<&str> = baseline_facts
-        .iter()
-        .flat_map(|b| &b.functions)
-        .map(|f| f.name.as_str())
-        .filter(|name| !defined_here.contains(name))
+    let signatures = |buffer: &BufferFacts| {
+        let mut by_name: BTreeMap<String, Vec<(usize, bool)>> = BTreeMap::new();
+        for function in &buffer.functions {
+            by_name
+                .entry(function.name.clone())
+                .or_default()
+                .push((function.params, function.takes_self));
+        }
+        for variants in by_name.values_mut() {
+            variants.sort_unstable();
+        }
+        by_name
+    };
+    let proposed_signatures = signatures(&facts);
+    let baseline_signatures = baseline_facts.as_ref().map(signatures).unwrap_or_default();
+    let changed_here: BTreeSet<String> = baseline_signatures
+        .keys()
+        .chain(proposed_signatures.keys())
+        .filter(|&name| baseline_signatures.get(name) != proposed_signatures.get(name))
+        .cloned()
         .collect();
     let current_file = file
         .strip_prefix(root)
@@ -129,7 +144,7 @@ pub fn verify_buffer(
         &facts,
         &mut existing,
         &defined_here,
-        &removed_here,
+        &changed_here,
         &current_file,
         graph.as_ref(),
         &mut violations,
@@ -150,7 +165,7 @@ fn check_calls(
     facts: &BufferFacts,
     existing: &mut BTreeMap<(String, usize), usize>,
     defined_here: &BTreeSet<&str>,
-    removed_here: &BTreeSet<&str>,
+    changed_here: &BTreeSet<String>,
     current_file: &str,
     graph: Option<&CodeGraph>,
     out: &mut Vec<Violation>,
@@ -161,7 +176,7 @@ fn check_calls(
             continue;
         }
         // Unchanged call sites are not this edit's problem.
-        if !removed_here.contains(call.name.as_str()) {
+        if !changed_here.contains(call.name.as_str()) {
             if let Some(remaining) = existing.get_mut(&(call.name.clone(), call.arity)) {
                 if *remaining > 0 {
                     *remaining -= 1;
@@ -297,6 +312,33 @@ mod tests {
         // The message must carry both numbers to be actionable.
         assert!(violation.message.contains("1 argument(s)"));
         assert!(violation.message.contains("taking 2"));
+    }
+
+    #[test]
+    fn changing_a_local_signature_rechecks_a_retained_call() {
+        let dir = project();
+        let baseline = "fn target(x: u8) {}\nfn f() { target(1); }\n";
+        let proposed = "fn target(x: u8, y: u8) {}\nfn f() { target(1); }\n";
+
+        let verdict = verify(dir.path(), proposed, Some(baseline));
+
+        assert!(!verdict.ok, "the baseline call hid the changed arity");
+        assert_eq!(verdict.violations.len(), 1);
+        assert_eq!(verdict.violations[0].kind, ViolationKind::WrongArity);
+    }
+
+    #[test]
+    fn retaining_a_local_signature_still_exempts_its_retained_call() {
+        let dir = project();
+        let baseline = "fn target(x: u8) {}\nfn f() { target(1); }\n";
+
+        let verdict = verify(dir.path(), baseline, Some(baseline));
+
+        assert!(
+            verdict.ok,
+            "unchanged code was attributed: {:?}",
+            verdict.violations
+        );
     }
 
     #[test]
