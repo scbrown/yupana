@@ -25,7 +25,7 @@
 
 mod buffer;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use serde::Serialize;
@@ -101,16 +101,17 @@ pub fn verify_buffer(
     baseline: Option<&str>,
 ) -> Result<Verdict> {
     let facts = buffer::analyze(proposed)?;
-    let existing: BTreeSet<(String, usize)> = match baseline {
+    let mut existing: BTreeMap<(String, usize), usize> = match baseline {
         Some(text) => buffer::analyze(text)
             .map(|b| {
-                b.calls
-                    .into_iter()
-                    .map(|c| (c.name, c.arity))
-                    .collect::<BTreeSet<_>>()
+                let mut counts = BTreeMap::new();
+                for call in b.calls.into_iter().filter(|c| c.form == CallForm::Free) {
+                    *counts.entry((call.name, call.arity)).or_insert(0) += 1;
+                }
+                counts
             })
             .unwrap_or_default(),
-        None => BTreeSet::new(),
+        None => BTreeMap::new(),
     };
 
     // The base graph supplies names defined elsewhere in the tree.
@@ -120,7 +121,7 @@ pub fn verify_buffer(
     let mut violations = Vec::new();
     check_calls(
         &facts,
-        &existing,
+        &mut existing,
         &defined_here,
         graph.as_ref(),
         &mut violations,
@@ -139,7 +140,7 @@ pub fn verify_buffer(
 /// Check the call sites the edit introduces.
 fn check_calls(
     facts: &BufferFacts,
-    existing: &BTreeSet<(String, usize)>,
+    existing: &mut BTreeMap<(String, usize), usize>,
     defined_here: &BTreeSet<&str>,
     graph: Option<&CodeGraph>,
     out: &mut Vec<Violation>,
@@ -150,8 +151,11 @@ fn check_calls(
             continue;
         }
         // Unchanged call sites are not this edit's problem.
-        if existing.contains(&(call.name.clone(), call.arity)) {
-            continue;
+        if let Some(remaining) = existing.get_mut(&(call.name.clone(), call.arity)) {
+            if *remaining > 0 {
+                *remaining -= 1;
+                continue;
+            }
         }
         // Imports, locals, closures, and fn-typed parameters are all in scope.
         if facts.bound_names.contains(&call.name) {
@@ -310,6 +314,40 @@ mod tests {
         let verdict = verify(dir.path(), proposed, Some(baseline));
         assert!(!verdict.ok);
         assert_eq!(verdict.violations[0].symbol, "newly_bad");
+    }
+
+    #[test]
+    fn an_additional_occurrence_of_pre_existing_breakage_is_new() {
+        let dir = project();
+        let baseline = "fn f() { already_broken(); }\n";
+        let proposed = "fn f() { already_broken(); already_broken(); }\n";
+
+        let verdict = verify(dir.path(), proposed, Some(baseline));
+
+        assert!(!verdict.ok, "the added occurrence was silently exempted");
+        assert_eq!(verdict.violations.len(), 1);
+        assert_eq!(verdict.violations[0].symbol, "already_broken");
+        assert_eq!(
+            verdict.violations[0].kind,
+            ViolationKind::IdentifierDoesNotExist
+        );
+    }
+
+    #[test]
+    fn a_pre_existing_method_does_not_exempt_a_new_free_call() {
+        let dir = project();
+        let baseline = "fn f(x: Thing) { x.ghost(); }\n";
+        let proposed = "fn f(x: Thing) { x.ghost(); ghost(); }\n";
+
+        let verdict = verify(dir.path(), proposed, Some(baseline));
+
+        assert!(!verdict.ok, "the method call exempted a new bare call");
+        assert_eq!(verdict.violations.len(), 1);
+        assert_eq!(verdict.violations[0].symbol, "ghost");
+        assert_eq!(
+            verdict.violations[0].kind,
+            ViolationKind::IdentifierDoesNotExist
+        );
     }
 
     #[test]
