@@ -22,6 +22,7 @@
 //! (exit 101, a non-blocking error to the harness) lets the edit through.
 
 mod measure;
+mod memory_guard;
 pub mod paa;
 mod post_edit;
 mod pre_bash;

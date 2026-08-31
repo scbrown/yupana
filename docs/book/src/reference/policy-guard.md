@@ -338,8 +338,9 @@ decode into an inert wire.
 
 ## The action surface (`pre-bash`)
 
-`yupana hook pre-bash` is **record-only by default** and stays that way unless a
-deployment sets `[yupana.policy] action_scope`, which is `off` out of the box.
+`yupana hook pre-bash` always records resolved actions. Its target-scope arm is
+**record-only by default** and stays that way unless a deployment sets
+`[yupana.policy] action_scope`, which is `off` out of the box.
 
 ```toml
 [yupana.policy]
@@ -370,6 +371,28 @@ deliberately small.
 and nothing is refused; at `enforce` the command is denied. The spool's
 `action_scope` records say what would have been refused, which is what a
 deployment should read before arming the boundary.
+
+### Governed host-memory policy
+
+The same hook projects memory-heavy command policies from Quipu. A policy owns
+all of the tunable data: a live command regex in its `Selector`/`Predicate`, and
+a `deterministic_threshold` `OperatingPoint` whose `threshold` is interpreted
+against the declared calibration basis `MemAvailable GiB`. Yupana reads
+`MemAvailable` and `MemTotal` from `/proc/meminfo`; it does not substitute
+`MemFree` when the signal is absent.
+
+A matching command below the floor reports the measured available, total, and
+governed threshold values. Under `mode = "advise"` it emits a system message and
+records a `memory_policy` metric without stopping the command. A hard policy can
+deny only under `mode = "enforce"`; changing the floor or matcher is a graph
+write and needs no Yupana rebuild. A missing projection, stale cache past its
+TTL, unreadable memory signal, or threshold larger than the host's total memory
+is loud fail-open.
+
+This event is an agent-harness execution seam. Non-harness launchers must invoke
+the same hook contract before execution (for example from a scheduler wrapper);
+installing the binary alone does not interpose on arbitrary processes. Do not
+claim cron coverage until the cron entry itself is wired through that seam.
 
 ## What the guard checks
 

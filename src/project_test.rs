@@ -619,6 +619,7 @@ fn stub_quipu(serve: usize) -> String {
             let body = if request.contains("aegis:TextRule")
                 || request.contains("candidateSource")
                 || request.contains("?selector ?predicate")
+                || request.contains("aegis:MemoryHeavyCommand")
             {
                 empty_results_json()
             } else {
@@ -656,6 +657,7 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
             policies: decode_policies(&catalog_json()).unwrap(),
             text_rules: Vec::new(),
             tripwires: Vec::new(),
+            memory_policies: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -760,11 +762,11 @@ fn no_cache_and_no_quipu_fails_open_rather_than_serving_an_empty_catalogue() {
 fn a_successful_refresh_persists_the_projection_for_the_next_process() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
-    // Four requests per refresh: the structural catalogue, the text rules,
-    // the grounded-predicate catalogue and the tripwire catalogue. (An empty
-    // grounded catalogue asks for no grounding set — a fifth request would
-    // hang the refresh here.)
-    let endpoint = stub_quipu(4);
+    // Five requests per refresh: the structural catalogue, the text rules,
+    // the grounded-predicate catalogue, the tripwire catalogue, and the
+    // memory-policy catalogue. (An empty grounded catalogue asks for no
+    // grounding set — a sixth request would hang the refresh here.)
+    let endpoint = stub_quipu(5);
 
     let mut registry = ProjectionRegistry::new(&endpoint);
     assert_eq!(

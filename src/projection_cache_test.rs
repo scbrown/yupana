@@ -52,6 +52,7 @@ fn a_projection(endpoint: &str, written_at: u64) -> CachedProjection {
         policies: vec![a_policy("no-todo")],
         text_rules: vec![a_text_rule("internal-hostname")],
         tripwires: Vec::new(),
+        memory_policies: Vec::new(),
         grounded_rules: Vec::new(),
         grounding: None,
         work_item_scopes: None,

@@ -26,12 +26,11 @@
 //! wired into the settings THAT SESSION loads — which is a settings-scope
 //! question, not a yupana one.
 //!
-//! RECORD-ONLY BY DEFAULT, and that default is the contract. This prints
-//! NOTHING unless a deployment has explicitly set `[yupana.policy]
-//! action_scope`, which is `off` out of the box. Enforcement on the action path
-//! was always meant to be a later phase gated on evidence, and a hook that
-//! started advising the moment the code landed would be enforcement arriving
-//! without its gate.
+//! ACTION SCOPE IS RECORD-ONLY BY DEFAULT. Governed command policies are a
+//! separate arm: they project their selector and operating point from Quipu,
+//! and the deployment's `[yupana.policy] mode` remains their ceiling. Thus a
+//! newly published hard memory policy advises under the fleet's `advise` mode
+//! and cannot deny merely because its graph facts landed.
 //!
 //! When it IS armed, the source is the DECLARED scope's `allow_targets` /
 //! `deny_targets` and nothing else. There is no observed rung here: nothing in
@@ -46,32 +45,22 @@
 //! resolver's recognised set is deliberately small.
 //!
 //! It shares the Bash matcher with the deployment's guard chain, so it stays
-//! silent on every allow: anything printed would interleave with a guard whose
-//! refusals are load-bearing.
+//! silent on every allow.
 //!
-//! ALWAYS EXIT 0. A bookkeeping hook that can fail a command is worse than no
-//! bookkeeping: it converts an observability feature into an outage. Every path
-//! here returns Ok, and the emit itself is fail-silent by construction.
+//! ALWAYS EXIT 0. Harness denial is expressed through the hook JSON envelope,
+//! never through process status. Projection and signal failures are loud
+//! fail-open; only a valid governed policy under `enforce` can emit denial.
 //!
-//! WHAT IS RECORDED, and why `target_class` is present even when unknown:
-//!
-//! ```text
-//! {"kind":"action","target_class":"host","verb":"ssh","target":"build-01",
-//!  "agent":"…","tenant":"…","item":"…","ts":…}
-//! ```
-//!
-//! `verb` and `target` are OMITTED when the resolver abstained — an absent field
-//! is honestly silent, whereas `""` or `"unknown"` would be replayed later as if
-//! it were a value. But `target_class` is ALWAYS written, including
+//! `verb` and `target` are OMITTED on abstention; empty values would replay as facts.
+//! But `target_class` is ALWAYS written, including
 //! `"unknown"`, because the replay in the next phase needs to divide resolved
 //! actions by TOTAL actions. Without a row for the abstentions the denominator
 //! is invisible and a resolver covering 5% of traffic looks identical to one
 //! covering 95%.
 
-use std::io::Read;
-
 use super::pre_bash_grounding::action_fields;
 use crate::action;
+use std::io::Read;
 
 /// Handle a Claude Code `PreToolUse` payload for the Bash tool.
 ///
@@ -103,10 +92,21 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
             });
         let resolved = action::resolve(&cmd);
         record(&resolved, grounding);
+        let memory = super::memory_guard::check(&buf, &cmd);
         // The scope check rides AFTER the record, deliberately: the trace is
         // the product and must not depend on a policy decision succeeding.
         if let Some(text) = scope_refusal(&buf, &resolved) {
             println!("{}", super::deny_envelope(&text));
+        } else {
+            match memory {
+                super::pre_edit::Outcome::Allow => {}
+                super::pre_edit::Outcome::Deny(reason) => {
+                    println!("{}", super::deny_envelope(&reason));
+                }
+                super::pre_edit::Outcome::Notify(message) => {
+                    println!("{}", super::system_message(&message));
+                }
+            }
         }
     }
     Ok(())

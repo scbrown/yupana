@@ -75,6 +75,9 @@ pub mod project_exposure;
 /// with it.
 #[cfg(feature = "quipu")]
 pub mod project_grounding;
+/// Governed host-memory command policies, projected from Quipu.
+#[cfg(feature = "quipu")]
+pub mod project_memory;
 pub mod project_queries;
 /// Observed work-item scope projection (work-scoped-governance ladder), split
 /// from `project` for size and gated with it.

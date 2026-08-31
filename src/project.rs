@@ -212,11 +212,9 @@ pub struct ProjectionRegistry {
     policies: Vec<ProjectedPolicy>,
     /// Last-known governed text rules (aegis-mqnl catalogue).
     text_rules: Vec<TextRule>,
-    /// Last-known governed tripwires (path-boundary policies, no selector).
     pub(crate) tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
-    /// Last-known entity-grounded rules (bobbin-tvn; see [`crate::grounding`]).
+    pub(crate) memory_policies: Vec<crate::project_memory::MemoryPolicy>,
     pub(crate) grounded_rules: Vec<crate::grounding::GroundedRule>,
-    /// The projected work-item id set the grounded rules evaluate against.
     /// `None` when the grounding projection is missing or failed — which
     /// renders every grounded rule UNEVALUATED (loud), never satisfied-by-
     /// empty-set. A `Some` empty set is a real answer ("no work items").
@@ -267,6 +265,7 @@ impl ProjectionRegistry {
             policies: Vec::new(),
             text_rules: Vec::new(),
             tripwires: Vec::new(),
+            memory_policies: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -310,22 +309,21 @@ impl ProjectionRegistry {
             fetch_text_rules(&self.endpoint),
             crate::project_grounding::fetch_grounded_rules(&self.endpoint),
             crate::project_tripwire::fetch_tripwires(&self.endpoint),
+            crate::project_memory::fetch_memory_policies(&self.endpoint),
         ) {
-            (Ok(policies), Ok(text_rules), Ok(grounded_rules), Ok(tripwires)) => {
-                // I6, at the seam where both halves are known at once: what the
-                // catalog CLAIMS about its hosting layer, against the layer that
-                // will actually evaluate it. Once per refresh rather than per
-                // edit — a metadata defect repeated on every guard line is a
-                // notice people learn to scroll past.
+            (
+                Ok(policies),
+                Ok(text_rules),
+                Ok(grounded_rules),
+                Ok(tripwires),
+                Ok(memory_policies),
+            ) => {
                 report_overclaims(&policies);
                 self.policies = policies;
                 self.text_rules = text_rules;
                 self.tripwires = tripwires;
+                self.memory_policies = memory_policies;
                 self.grounded_rules = grounded_rules;
-                // The grounding SET is fetched apart from the catalogues: its
-                // failure must not disable the whole guard, and a grounded rule
-                // without its set is UNEVALUATED (loud) at the seam, never
-                // satisfied by an empty set (bobbin-tvn).
                 self.grounding = crate::project_grounding::fetch_grounding_set(
                     &self.endpoint,
                     &self.grounded_rules,
@@ -339,7 +337,11 @@ impl ProjectionRegistry {
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
-            (Err(e), _, _, _) | (_, Err(e), _, _) | (_, _, Err(e), _) | (_, _, _, Err(e)) => {
+            (Err(e), _, _, _, _)
+            | (_, Err(e), _, _, _)
+            | (_, _, Err(e), _, _)
+            | (_, _, _, Err(e), _)
+            | (_, _, _, _, Err(e)) => {
                 self.freshness = Freshness::Stale;
                 Err(e)
             }
@@ -389,6 +391,7 @@ impl ProjectionRegistry {
                             policies: self.policies.clone(),
                             text_rules: self.text_rules.clone(),
                             tripwires: self.tripwires.clone(),
+                            memory_policies: self.memory_policies.clone(),
                             grounded_rules: self.grounded_rules.clone(),
                             grounding: self.grounding.clone(),
                             work_item_scopes: self.work_item_scopes.clone(),
@@ -412,9 +415,8 @@ impl ProjectionRegistry {
                 let age_secs = cached.age_secs(now);
                 self.policies = cached.policies;
                 self.text_rules = cached.text_rules;
-                // A cache written before tripwires existed restores an empty
-                // set — those caches never held wires, honestly.
                 self.tripwires = cached.tripwires;
+                self.memory_policies = cached.memory_policies;
                 self.grounded_rules = cached.grounded_rules;
                 // A cache written before grounding existed restores `None`,
                 // which is the honest answer: that cache never held a set, so

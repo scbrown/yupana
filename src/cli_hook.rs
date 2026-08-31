@@ -12,8 +12,8 @@ pub(crate) enum HookEvent {
     /// Claude Code `PreToolUse` on Edit/Write: deny an edit that exceeds the
     /// tenant's capability scope. Opt-in, and always fails open.
     PreEdit,
-    /// Claude Code `PreToolUse` on Bash: RECORD the action (verb, target,
-    /// `target_class`) for the trace. Never denies, never prints, always exits 0.
+    /// Claude Code `PreToolUse` on Bash: record the action and evaluate governed
+    /// command policies. Advises first; denial requires enforce mode.
     PreBash,
     /// Claude Code `SessionStart`: print the work-item briefing — the graph's
     /// knowledge of the tracked item's ground, related work, and governed

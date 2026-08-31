@@ -52,7 +52,7 @@ use crate::textrules::TextRule;
 /// The on-disk format version. Bumped when the persisted shape changes; a cache
 /// written by another version is REFUSED rather than parsed leniently, because
 /// a half-understood policy set is the one thing this cache must never serve.
-pub const CACHE_VERSION: u32 = 1;
+pub const CACHE_VERSION: u32 = 2;
 
 /// A persisted projection: both catalogues, the endpoint they came from, and
 /// when they were last CONFIRMED against quipu.
@@ -80,6 +80,10 @@ pub struct CachedProjection {
     /// that cache never held a wire.
     #[serde(default)]
     pub tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
+    /// Last-known command-memory policies. Version 2 made this a complete
+    /// catalogue member; version 1 caches are refused rather than served as if
+    /// they had checked this plane.
+    pub memory_policies: Vec<crate::project_memory::MemoryPolicy>,
     /// Last-known entity-grounded rules (bobbin-tvn). Defaulted so a cache
     /// written before grounding existed still loads.
     #[serde(default)]
