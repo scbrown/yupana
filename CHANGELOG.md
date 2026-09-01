@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Changed
+### Migration note
 
 - **Project renamed: hank → yupana.** Crate, binary, env-var prefixes,
   docs, and assets; full history preserved. Migration map for sibling
