@@ -18,7 +18,7 @@
 //! that the server agrees with itself. FR-20 wants yupana to hold its own copy of the
 //! shapes and check independently, so a shape drift between yupana and Quipu is caught
 //! at yupana rather than discovered as bad data already in the graph. rudof_lib is
-//! that independent checker; `scripts/check-code-shapes.sh` is the cross-check that
+//! that independent checker; `tests/shape_agreement.rs` is the cross-check that
 //! the two engines still agree.
 //!
 //! WHY `/knot` OVER HTTP, NOT THE `quipu` CRATE. FR-21 names three promotion
@@ -38,7 +38,7 @@ use promote_payload::{dump_payload, with_payload};
 
 /// The code-edge SHACL shapes yupana ships and validates against. Compiled in so a
 /// promotion can never run against shapes that drift from the binary — the file on
-/// disk is for humans and `check-code-shapes.sh`; THIS is what actually gates a
+/// disk is for humans and the shape-agreement test; THIS is what actually gates a
 /// write.
 pub const CODE_EDGE_SHAPES: &str = include_str!("../shapes/code-edges.ttl");
 

@@ -102,6 +102,7 @@ fn a_conforming_plan_reports_no_effect_and_its_freshness() {
         false,
     ));
     assert_eq!(r.matched, 3);
+    assert_eq!(r.tier, "engine-state");
     assert_eq!(r.first_deviation, None);
     assert_eq!(r.effect, "none");
     assert_eq!(r.projected_at.as_deref(), Some("2026-08-20T00:00:00Z"));

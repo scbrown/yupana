@@ -13,11 +13,12 @@
 //! `conforming.ttl`. A validator that has never been seen rejecting is
 //! indistinguishable from no validator.
 //!
-//! Layer 2 (`#[ignore]`, needs live quipu — run with
+//! Layer 2 (`#[ignore]`, needs live quipu — run explicitly with
 //! `QUIPU_URL=… cargo test --test shape_agreement -- --ignored`):
 //! POST the same fixtures + the same compiled shapes to quipu's `/validate`
 //! and assert BOTH engines return the SAME verdict on BOTH fixtures. Verdict
-//! agreement, not just each-side sanity.
+//! agreement, not just each-side sanity. This is intentionally a manual/live
+//! integration test: public CI cannot reach an operator's Quipu endpoint.
 
 #![cfg(feature = "quipu")]
 
@@ -69,7 +70,9 @@ fn rudof_refuses_the_violating_fixture() {
     );
 }
 
-/// The agreement assertion proper. Ignored by default: requires a reachable
+/// The agreement assertion proper. Ignored by default, but wired as an
+/// explicitly runnable Rust test rather than a second dormant shell harness:
+/// requires a reachable
 /// quipu (`QUIPU_URL`, e.g. <http://quipu.example>). A verdict MISMATCH here is
 /// shape drift between the engines — fix the shapes sync before promoting.
 #[test]
