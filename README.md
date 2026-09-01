@@ -5,7 +5,7 @@
 <h1 align="center">yupana</h1>
 
 <p align="center">
-  <em>🧵 Live, per-tenant code structure — the missing structural signal for the Bobbin × Quipu stack</em>
+  <em>🧵 Live, per-tenant code structure and a change-time policy engine — the structural signal for the Bobbin × Quipu stack, evaluating Quipu-governed rules where the edit happens</em>
 </p>
 
 <p align="center">
@@ -25,6 +25,13 @@ time without corrupting each other's view. It answers the questions embeddings
 and git-history can't — *what calls this, what does this flow into, what will
 this change break* — and it answers them **per tenant**, correctly, while the
 code is still in flight.
+
+The same graph is where architectural rules get enforced. Constraints are authored
+as ontology rules in [Quipu](https://github.com/scbrown/quipu) (SHACL over the code
+graph), and Yupana evaluates a proposed edit against them **before it lands**, warning
+or blocking, and emitting a signed verdict bound to what was actually checked. A new
+rule is a graph assertion rather than another bespoke linter, which is why the policy
+layer grows without the tooling growing with it.
 
 ## 🧶 See It In Action
 
