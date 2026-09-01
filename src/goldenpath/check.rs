@@ -46,6 +46,10 @@ pub struct HazardNote {
 /// The conformance verdict.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PathCheckReport {
+    /// Provenance tier of this verdict. Golden-path checks are derived from
+    /// the resident projected policy, so they are served as engine state like
+    /// the guard and what-if reports.
+    pub tier: String,
     /// The grammar version this verdict applied — equal to the path's, by
     /// construction (a mismatch is a refusal, not a verdict).
     pub grammar: String,
@@ -151,6 +155,7 @@ pub fn check(
     };
 
     CheckOutcome::Evaluated(Box::new(PathCheckReport {
+        tier: crate::types::Tier::EngineState.as_str().to_string(),
         grammar: path.grammar.clone(),
         path: path.path.clone(),
         level: path.level,
