@@ -219,8 +219,8 @@ it is absent — a tool that accepted a board and silently did nothing would be
 worse than one that is missing, because the caller would believe it had guarded.
 See <a href="../concepts/game-state.html">The Game-State Harness</a>.</p>
 <h2 id="yupana_references"><a class="header" href="#yupana_references"><code>yupana_references</code></a></h2>
-<p>Give it <code>symbol</code> <strong>or</strong> a position (<code>at_file</code> + <code>at_line</code>), not both concerns at
-once.</p>
+<p>Give it <code>symbol</code> <strong>or</strong> a position (<code>at_file</code> + <code>at_line</code>, plus optional
+<code>at_col</code>), not both concerns at once.</p>
 <p>Names over-connect: a real tree has twelve <code>build</code>s, and asking by name gets all
 twelve. When you are reading code you know <em>where</em> you are, so point at it:</p>
 <pre><code class="language-json">{ "at_file": "src/beta.rs", "at_line": 7 }
@@ -228,12 +228,12 @@ twelve. When you are reading code you know <em>where</em> you are, so point at i
 <p>The position resolves to the innermost symbol enclosing that line, and the reply
 holds <strong>that symbol alone</strong> — it does not re-expand to every symbol sharing its
 name, which would restore the ambiguity the position was given to remove.</p>
-<p><code>at_line</code> is a <strong>line, not a (line, column)</strong>. The tree-sitter extractor records
-lines, so a column would be accepted and silently ignored — an approximation
-served as the finer tier, which FR-3 forbids. Column precision arrives with the
-LSP tier (FR-2). Passing only one of <code>at_file</code>/<code>at_line</code> is an error rather than
-a quiet downgrade to a name lookup, since that would answer "which one is here?"
-with "all of them".</p>
+<p><code>at_col</code> is one-based and requests LSP precision. An LSP result carries complete
+start/end line+column spans and <code>tier: "lsp"</code>. With no language server or
+resolvable build, the request degrades to the <strong>name-based</strong> tree-sitter result,
+which may intentionally contain multiple same-named definitions and carries
+<code>tier: "treesitter"</code>. It never ignores the column while claiming precision.
+Passing a partial position is an error.</p>
 <p>Position requests always take the transient build, never the resident daemon:
 <code>/references</code> does not carry the node spans a position needs.</p>
 <h2 id="yupana_verify"><a class="header" href="#yupana_verify"><code>yupana_verify</code></a></h2>

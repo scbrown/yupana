@@ -388,16 +388,16 @@ answers with that symbol alone — it does not re-expand to every symbol sharing
 its name, which would restore the ambiguity the position was given to remove.
 <code>FILE</code> is relative to the search path; with <code>--at</code>, the positional argument is
 the search path rather than a symbol name.</p>
-<p>A <strong>column is refused, not ignored</strong>:</p>
+<p>A column is accepted by builds carrying the <code>lsp</code> feature:</p>
 <pre><code class="language-console">$ yupana refs --at a.rs:3:9
-error: --at takes FILE:LINE, not FILE:LINE:COL (got column `9`). The tree-sitter
-tier resolves to the innermost symbol on a LINE; column-precise resolution needs
-the LSP tier (FR-2), which is not built. Retry as `a.rs:3`.
+a.rs:3:4-3:9 [Lsp]
 </code></pre>
-<p>Accepting the column and answering for the line would serve a line-precise
-answer to a column-precise question — an approximation presented as the finer
-tier, which FR-3 forbids. Two symbols on one line are not separable at the
-tree-sitter tier, and you are told so rather than handed a guess.</p>
+<p>The LSP adapter supports Rust (<code>rust-analyzer</code>) and TypeScript/JavaScript
+(<code>typescript-language-server --stdio</code>) behind the same protocol client. Servers
+are optional. If no server or resolvable build is available, Yupana degrades to
+the <strong>name-based</strong> tree-sitter result and labels the response <code>treesitter</code>; it
+never accepts the column and quietly answers at line precision. Without the
+<code>lsp</code> build feature, <code>FILE:LINE:COL</code> remains a loud refusal.</p>
 <p>A position that resolves to nothing explains which kind of nothing it is,
 rather than borrowing the vocabulary of "no such symbol":</p>
 <pre><code class="language-console">$ yupana refs --at a.rs:3

@@ -543,10 +543,10 @@ mistakes an approximation for ground truth.</p>
 <h2 id="tier--how-a-fact-was-derived"><a class="header" href="#tier--how-a-fact-was-derived">Tier — how a fact was derived</a></h2>
 <ul>
 <li><code>treesitter</code> — fast, build-free, approximate. Always-on breadth; works on a
-syntactically-broken buffer. <strong>This is the only tier served today</strong> — every fact
-Yupana currently produces is <code>treesitter</code>, and <code>yupana status</code> advertises only it.</li>
-<li><code>lsp</code> — precise defs/refs/types where a build resolves. <em>Planned (FR-2); not yet
-implemented or served.</em></li>
+syntactically-broken buffer.</li>
+<li><code>lsp</code> — precise definitions/references where a build resolves. Available with
+the <code>lsp</code> feature for Rust and TypeScript/JavaScript; runtime server absence
+degrades to explicitly tagged tree-sitter facts (FR-2/FR-4).</li>
 <li><code>cpg</code> — control/data dependence from the code property graph. <em>Planned (Phase 2,
 FR-7); not yet implemented or served.</em></li>
 </ul>
@@ -1153,16 +1153,16 @@ answers with that symbol alone — it does not re-expand to every symbol sharing
 its name, which would restore the ambiguity the position was given to remove.
 <code>FILE</code> is relative to the search path; with <code>--at</code>, the positional argument is
 the search path rather than a symbol name.</p>
-<p>A <strong>column is refused, not ignored</strong>:</p>
+<p>A column is accepted by builds carrying the <code>lsp</code> feature:</p>
 <pre><code class="language-console">$ yupana refs --at a.rs:3:9
-error: --at takes FILE:LINE, not FILE:LINE:COL (got column `9`). The tree-sitter
-tier resolves to the innermost symbol on a LINE; column-precise resolution needs
-the LSP tier (FR-2), which is not built. Retry as `a.rs:3`.
+a.rs:3:4-3:9 [Lsp]
 </code></pre>
-<p>Accepting the column and answering for the line would serve a line-precise
-answer to a column-precise question — an approximation presented as the finer
-tier, which FR-3 forbids. Two symbols on one line are not separable at the
-tree-sitter tier, and you are told so rather than handed a guess.</p>
+<p>The LSP adapter supports Rust (<code>rust-analyzer</code>) and TypeScript/JavaScript
+(<code>typescript-language-server --stdio</code>) behind the same protocol client. Servers
+are optional. If no server or resolvable build is available, Yupana degrades to
+the <strong>name-based</strong> tree-sitter result and labels the response <code>treesitter</code>; it
+never accepts the column and quietly answers at line precision. Without the
+<code>lsp</code> build feature, <code>FILE:LINE:COL</code> remains a loud refusal.</p>
 <p>A position that resolves to nothing explains which kind of nothing it is,
 rather than borrowing the vocabulary of "no such symbol":</p>
 <pre><code class="language-console">$ yupana refs --at a.rs:3
@@ -1492,8 +1492,8 @@ it is absent — a tool that accepted a board and silently did nothing would be
 worse than one that is missing, because the caller would believe it had guarded.
 See <a href="reference/../concepts/game-state.html">The Game-State Harness</a>.</p>
 <h2 id="yupana_references"><a class="header" href="#yupana_references"><code>yupana_references</code></a></h2>
-<p>Give it <code>symbol</code> <strong>or</strong> a position (<code>at_file</code> + <code>at_line</code>), not both concerns at
-once.</p>
+<p>Give it <code>symbol</code> <strong>or</strong> a position (<code>at_file</code> + <code>at_line</code>, plus optional
+<code>at_col</code>), not both concerns at once.</p>
 <p>Names over-connect: a real tree has twelve <code>build</code>s, and asking by name gets all
 twelve. When you are reading code you know <em>where</em> you are, so point at it:</p>
 <pre><code class="language-json">{ "at_file": "src/beta.rs", "at_line": 7 }
@@ -1501,12 +1501,12 @@ twelve. When you are reading code you know <em>where</em> you are, so point at i
 <p>The position resolves to the innermost symbol enclosing that line, and the reply
 holds <strong>that symbol alone</strong> — it does not re-expand to every symbol sharing its
 name, which would restore the ambiguity the position was given to remove.</p>
-<p><code>at_line</code> is a <strong>line, not a (line, column)</strong>. The tree-sitter extractor records
-lines, so a column would be accepted and silently ignored — an approximation
-served as the finer tier, which FR-3 forbids. Column precision arrives with the
-LSP tier (FR-2). Passing only one of <code>at_file</code>/<code>at_line</code> is an error rather than
-a quiet downgrade to a name lookup, since that would answer "which one is here?"
-with "all of them".</p>
+<p><code>at_col</code> is one-based and requests LSP precision. An LSP result carries complete
+start/end line+column spans and <code>tier: "lsp"</code>. With no language server or
+resolvable build, the request degrades to the <strong>name-based</strong> tree-sitter result,
+which may intentionally contain multiple same-named definitions and carries
+<code>tier: "treesitter"</code>. It never ignores the column while claiming precision.
+Passing a partial position is an error.</p>
 <p>Position requests always take the transient build, never the resident daemon:
 <code>/references</code> does not carry the node spans a position needs.</p>
 <h2 id="yupana_verify"><a class="header" href="#yupana_verify"><code>yupana_verify</code></a></h2>

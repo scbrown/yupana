@@ -188,10 +188,10 @@ mistakes an approximation for ground truth.</p>
 <h2 id="tier--how-a-fact-was-derived"><a class="header" href="#tier--how-a-fact-was-derived">Tier — how a fact was derived</a></h2>
 <ul>
 <li><code>treesitter</code> — fast, build-free, approximate. Always-on breadth; works on a
-syntactically-broken buffer. <strong>This is the only tier served today</strong> — every fact
-Yupana currently produces is <code>treesitter</code>, and <code>yupana status</code> advertises only it.</li>
-<li><code>lsp</code> — precise defs/refs/types where a build resolves. <em>Planned (FR-2); not yet
-implemented or served.</em></li>
+syntactically-broken buffer.</li>
+<li><code>lsp</code> — precise definitions/references where a build resolves. Available with
+the <code>lsp</code> feature for Rust and TypeScript/JavaScript; runtime server absence
+degrades to explicitly tagged tree-sitter facts (FR-2/FR-4).</li>
 <li><code>cpg</code> — control/data dependence from the code property graph. <em>Planned (Phase 2,
 FR-7); not yet implemented or served.</em></li>
 </ul>
