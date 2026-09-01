@@ -190,7 +190,7 @@ pub(super) fn references(
     // transient path, like a `path`-scoped one. Slower, and correct;
     // answering it from a name lookup would hand back every same-named
     // symbol, which is the ambiguity the position was given to resolve.
-    let by_position = req.at_file.is_some() || req.at_line.is_some();
+    let by_position = req.at_file.is_some() || req.at_line.is_some() || req.at_col.is_some();
     if req.path.is_none() && !by_position {
         if let Some(symbol) = req.symbol.as_deref() {
             if let Some(response) =
@@ -218,41 +218,109 @@ pub(super) fn references(
         name: symbol.name.clone(),
         kind: symbol.kind.clone(),
         start_line: symbol.start_line,
+        start_column: None,
+        end_line: Some(symbol.end_line),
+        end_column: None,
         tier: symbol.tier.as_str().to_string(),
     };
-    let (queried, definitions): (String, Vec<RefItem>) =
-        match (&req.symbol, &req.at_file, req.at_line) {
-            // Position wins when given: it is the more specific request.
-            (_, Some(file), Some(line)) => {
-                let hit = graph.symbol_at(file, line);
-                (
-                    hit.map_or_else(|| format!("{file}:{line}"), |n| n.name.clone()),
-                    hit.into_iter().map(to_item).collect(),
-                )
+    #[cfg(feature = "lsp")]
+    if let (Some(file), Some(line), Some(column)) = (&req.at_file, req.at_line, req.at_col) {
+        if line == 0 || column == 0 {
+            return Err(McpError::invalid_params(
+                "at_line and at_col are one-based and must be greater than zero".to_string(),
+                None,
+            ));
+        }
+        let position = crate::extract::lsp::Position {
+            file: file.clone(),
+            line,
+            column,
+        };
+        if let Some(locations) =
+            crate::extract::lsp::query(&base, &position, crate::extract::lsp::Query::Definition)
+        {
+            if !locations.is_empty() {
+                let definitions = locations
+                    .into_iter()
+                    .map(|location| RefItem {
+                        file: location.file,
+                        name: format!("{file}:{line}:{column}"),
+                        kind: "definition".to_string(),
+                        start_line: location.start_line,
+                        start_column: Some(location.start_column),
+                        end_line: Some(location.end_line),
+                        end_column: Some(location.end_column),
+                        tier: crate::types::Tier::Lsp.as_str().to_string(),
+                    })
+                    .collect::<Vec<_>>();
+                return json_result(&ReferencesResponse {
+                    symbol: format!("{file}:{line}:{column}"),
+                    count: definitions.len(),
+                    definitions,
+                    searched_symbols: None,
+                    tier: crate::types::Tier::Lsp.as_str().to_string(),
+                });
             }
-            // Half a position is not a position. Refuse rather than quietly
-            // dropping to a name lookup the caller did not ask for — a silent
-            // downgrade would answer a "which one is here" question with "all
-            // of them", the exact over-connection this parameter exists to cut.
-            (_, Some(_), None) | (_, None, Some(_)) => {
-                return Err(McpError::invalid_params(
-                    "at_file and at_line go together: give both for a position-based lookup, \
-                     or neither and use `symbol`."
+        }
+    }
+
+    let (queried, definitions): (String, Vec<RefItem>) = match (
+        &req.symbol,
+        &req.at_file,
+        req.at_line,
+        req.at_col,
+    ) {
+        // Position wins when given: it is the more specific request.
+        (_, Some(file), Some(line), None) => {
+            let hit = graph.symbol_at(file, line);
+            (
+                hit.map_or_else(|| format!("{file}:{line}"), |n| n.name.clone()),
+                hit.into_iter().map(to_item).collect(),
+            )
+        }
+        // LSP unavailable or unable to resolve this build: degrade a
+        // column request to NAME-based tree-sitter results, preserving the
+        // ambiguity rather than claiming the column selected one.
+        (_, Some(file), Some(line), Some(column)) => {
+            let hit = graph.symbol_at(file, line);
+            (
+                hit.map_or_else(
+                    || format!("{file}:{line}:{column}"),
+                    |node| node.name.clone(),
+                ),
+                hit.map_or_else(Vec::new, |node| {
+                    graph
+                        .definitions(&node.name)
+                        .into_iter()
+                        .map(to_item)
+                        .collect()
+                }),
+            )
+        }
+        // Half a position is not a position. Refuse rather than quietly
+        // dropping to a name lookup the caller did not ask for — a silent
+        // downgrade would answer a "which one is here" question with "all
+        // of them", the exact over-connection this parameter exists to cut.
+        (_, Some(_), None, _) | (_, None, Some(_), _) | (_, None, None, Some(_)) => {
+            return Err(McpError::invalid_params(
+                "at_file and at_line go together; at_col additionally requires both. Give a \
+                     complete position, or omit all position fields and use `symbol`."
+                    .to_string(),
+                None,
+            ));
+        }
+        (Some(name), None, None, None) => (
+            name.clone(),
+            graph.definitions(name).into_iter().map(to_item).collect(),
+        ),
+        (None, None, None, None) => {
+            return Err(McpError::invalid_params(
+                    "give `symbol`, or `at_file` + `at_line` (+ optional `at_col`) to resolve by position."
                         .to_string(),
                     None,
                 ));
-            }
-            (Some(name), None, None) => (
-                name.clone(),
-                graph.definitions(name).into_iter().map(to_item).collect(),
-            ),
-            (None, None, None) => {
-                return Err(McpError::invalid_params(
-                    "give `symbol`, or `at_file` + `at_line` to resolve by position.".to_string(),
-                    None,
-                ));
-            }
-        };
+        }
+    };
     let response = ReferencesResponse {
         symbol: queried,
         count: definitions.len(),

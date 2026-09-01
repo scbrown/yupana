@@ -1150,6 +1150,7 @@ fn refs_at_a_position_resolves_one_symbol_where_the_name_resolves_many() {
 }
 
 #[test]
+#[cfg(not(feature = "lsp"))]
 fn refs_at_refuses_a_column_rather_than_resolving_it_as_a_line() {
     // FR-3, in the parser. The extractor records LINES, so accepting
     // `a.rs:3:9` and answering for line 3 would serve a line-precise answer to
@@ -1165,6 +1166,30 @@ fn refs_at_refuses_a_column_rather_than_resolving_it_as_a_line() {
             predicate::str::contains("FILE:LINE:COL")
                 .and(predicate::str::contains("LSP tier"))
                 .and(predicate::str::contains("a.rs:3")),
+        );
+}
+
+#[test]
+#[cfg(feature = "lsp")]
+fn refs_at_column_degrades_to_name_lookup_when_no_build_resolves() {
+    // No Cargo project => rust-analyzer cannot resolve. The column request must
+    // not crash and must not pretend line precision is LSP precision: it falls
+    // back to the ambiguous name class, explicitly tagged treesitter.
+    let dir = project_with("a.rs", "fn build() {}\n\nfn build() {}\n");
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args([
+            "--json",
+            "refs",
+            "--at",
+            "a.rs:3:4",
+            dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"count\": 2")
+                .and(predicate::str::contains("\"tier\": \"treesitter\"")),
         );
 }
 

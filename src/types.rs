@@ -133,6 +133,8 @@ impl Tier {
         // default build fails `-D warnings` on an unused `mut`.
         #[allow(unused_mut)]
         let mut tiers = vec![Tier::TreeSitter.as_str().to_string()];
+        #[cfg(feature = "lsp")]
+        tiers.push(Tier::Lsp.as_str().to_string());
         #[cfg(feature = "game-state")]
         tiers.push(Tier::EngineState.as_str().to_string());
         tiers
@@ -270,7 +272,10 @@ mod tests {
         // `lsp`/`cpg`, which have no implementation. A push of an unimplemented
         // tier here (or a re-introduced empty feature) fails this.
         assert!(Tier::served().contains(&"treesitter".to_string()));
-        assert!(!Tier::served().contains(&"lsp".to_string()));
+        assert_eq!(
+            Tier::served().contains(&"lsp".to_string()),
+            cfg!(feature = "lsp")
+        );
         assert!(!Tier::served().contains(&"cpg".to_string()));
     }
 

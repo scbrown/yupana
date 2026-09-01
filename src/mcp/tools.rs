@@ -47,6 +47,14 @@ pub struct ReferencesRequest {
     /// the LSP tier (FR-2).
     #[schemars(description = "1-based line for a position-based lookup. Requires at_file.")]
     pub at_line: Option<usize>,
+
+    /// One-based UTF-16 column. With `at_file` + `at_line`, asks the LSP tier
+    /// for a precise answer; when no server/build resolves, the response falls
+    /// back to name-based tree-sitter facts and says so in `tier`.
+    #[schemars(
+        description = "Optional 1-based UTF-16 column for LSP-precise resolution. Requires at_file and at_line."
+    )]
+    pub at_col: Option<usize>,
 }
 
 /// Request for `yupana_analyze` — a structural summary of a subtree.
@@ -96,6 +104,15 @@ pub struct RefItem {
     pub kind: String,
     /// 1-based start line.
     pub start_line: usize,
+    /// One-based start column when an LSP answer provides it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_column: Option<usize>,
+    /// One-based end line when an LSP answer provides it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_line: Option<usize>,
+    /// One-based end column when an LSP answer provides it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_column: Option<usize>,
     /// Provenance tier.
     pub tier: String,
 }
@@ -474,26 +491,5 @@ pub struct PromoteResponse {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// FR-3's tier-on-every-envelope invariant: `PromoteResponse` was the one
-    /// served response without a `tier`. A write outcome still names the
-    /// precision of the facts it moved.
-    #[test]
-    fn promote_response_carries_tier() {
-        let v = serde_json::to_value(PromoteResponse {
-            wrote: true,
-            count: Some(1),
-            tx_id: Some(1),
-            chunks: Some(1),
-            violations: Vec::new(),
-            tier: crate::types::Tier::TreeSitter.as_str().to_string(),
-        })
-        .unwrap();
-        assert_eq!(
-            v["tier"], "treesitter",
-            "PromoteResponse lost its tier: {v}"
-        );
-    }
-}
+#[path = "tools_test.rs"]
+mod tests;

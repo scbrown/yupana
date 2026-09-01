@@ -166,6 +166,9 @@ pub(super) fn references(
                     name: symbol.to_string(),
                     kind: d.kind.clone(),
                     start_line: d.start_line,
+                    start_column: None,
+                    end_line: None,
+                    end_column: None,
                     tier: reply.tier.clone(),
                 })
                 .collect(),

@@ -122,6 +122,9 @@ ring = { version = "0.17", optional = true }
 
 [features]
 default = []
+# Phase 1 precision engine (FR-2/FR-4). Unlike the historical empty feature,
+# this gates the actual JSON-RPC client and position resolver.
+lsp = []
 # Phase 1: MCP (stdio + streamable-HTTP) and the local HTTP API.
 mcp = ["dep:rmcp", "dep:schemars", "dep:axum", "dep:tower", "dep:tower-http", "dep:tokio-util"]
 # Bobbin's full grammar set beyond Rust.
@@ -132,14 +135,9 @@ langs-extra = [
     "dep:tree-sitter-java",
     "dep:tree-sitter-cpp",
 ]
-# NB: the `cpg` (FR-7) and `lsp` (FR-2) tiers are NOT Cargo features yet. They
-# were `cpg = []` / `lsp = []` — EMPTY features that gated no code, so building
-# `--features lsp` produced a binary whose `yupana status` advertised a precision
-# tier it did not have while every fact stayed tree-sitter (aegis-qe5z). A feature
-# that can be enabled without the code existing is a way to advertise a lie, so it
-# is removed until it gates a real extractor. When the LSP or CPG tier lands,
-# re-introduce the feature HERE alongside the code it gates AND add the tier to
-# `Tier::served()` (src/types.rs) — the two must move together.
+# NB: `cpg` (FR-7) is still not a feature: its former empty flag advertised a
+# tier with no engine. `lsp` returned only alongside its real JSON-RPC client,
+# `Tier::served()` arm, tests, and CI matrix. Keep those four pieces atomic.
 # Phase 4: promote committed facts into Quipu, SHACL-validated.
 quipu = ["dep:oxrdf", "dep:oxttl", "dep:oxrdfio", "dep:rudof_lib", "dep:ureq", "dep:ring"]
 # FR-35..FR-39: the game-state harness — generic (non-code) fact ingestion, the

@@ -129,12 +129,41 @@ impl Cli {
         let graph = crate::graph::CodeGraph::build(&root)?;
         let (nodes, _) = graph.stats();
 
+        // A column-bearing position is an LSP question. When this build can
+        // answer it precisely, return the server's concrete location directly.
+        // When it cannot, degrade to the existing name-based tree-sitter answer
+        // and label it as such — never quietly treat the column as line-only.
+        #[cfg(feature = "lsp")]
+        let column_fallback = if let Some(at) = at {
+            if let Some(position) = Self::column_position(at)? {
+                if let Some(locations) = crate::extract::lsp::query(
+                    &root,
+                    &position,
+                    crate::extract::lsp::Query::Definition,
+                ) {
+                    if !locations.is_empty() {
+                        self.render_lsp_locations(at, &locations)?;
+                        return Ok(());
+                    }
+                }
+                graph
+                    .symbol_at(&position.file, position.line)
+                    .map(|node| (node.name.clone(), graph.definitions(&node.name)))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // `--at FILE:LINE` names the symbol by POSITION (FR-4, yupana #8), and
         // answers with THAT symbol — not with every symbol sharing its name.
         // Resolving the position to a name and then looking the name up would
         // hand back all twelve `build`s again, which is the exact
         // over-connection the position form exists to cut through.
         let (symbol, hits) = match (symbol, at) {
+            #[cfg(feature = "lsp")]
+            (_, Some(_)) if column_fallback.is_some() => column_fallback.unwrap(),
             (_, Some(at)) => match self.resolve_at(&graph, at, nodes)? {
                 Some(node) => (node.name.clone(), vec![node]),
                 None => return Ok(()),
@@ -203,6 +232,75 @@ impl Cli {
                     sym.name.cyan(),
                     sym.kind,
                     sym.tier
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "lsp")]
+    fn column_position(at: &str) -> anyhow::Result<Option<crate::extract::lsp::Position>> {
+        let parts: Vec<&str> = at.rsplitn(3, ':').collect();
+        let [column, line, file] = parts.as_slice() else {
+            return Ok(None);
+        };
+        if !column.chars().all(|c| c.is_ascii_digit()) {
+            return Ok(None);
+        }
+        let line = line
+            .parse::<usize>()
+            .map_err(|_| anyhow::anyhow!("--at wants a line number, got `{line}`"))?;
+        let column = column
+            .parse::<usize>()
+            .map_err(|_| anyhow::anyhow!("--at wants a column number, got `{column}`"))?;
+        if line == 0 || column == 0 {
+            anyhow::bail!("--at uses one-based positions; got `{at}`");
+        }
+        Ok(Some(crate::extract::lsp::Position {
+            file: (*file).to_string(),
+            line,
+            column,
+        }))
+    }
+
+    #[cfg(feature = "lsp")]
+    fn render_lsp_locations(
+        &self,
+        at: &str,
+        locations: &[crate::extract::lsp::Location],
+    ) -> anyhow::Result<()> {
+        if self.json {
+            let definitions: Vec<_> = locations
+                .iter()
+                .map(|location| {
+                    serde_json::json!({
+                        "file": location.file,
+                        "start_line": location.start_line,
+                        "start_column": location.start_column,
+                        "end_line": location.end_line,
+                        "end_column": location.end_column,
+                        "tier": "lsp",
+                    })
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "position": at,
+                    "count": definitions.len(),
+                    "definitions": definitions,
+                    "tier": "lsp",
+                }))?
+            );
+        } else {
+            for location in locations {
+                println!(
+                    "{}:{}:{}-{}:{} [Lsp]",
+                    location.file,
+                    location.start_line,
+                    location.start_column,
+                    location.end_line,
+                    location.end_column
                 );
             }
         }

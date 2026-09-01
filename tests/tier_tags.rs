@@ -117,7 +117,11 @@ fn status_json_advertises_only_implemented_tiers() {
     let v: serde_json::Value = serde_json::from_slice(&out).expect("stdout is JSON");
     let tiers = v["tiers"].as_array().expect("tiers is an array").clone();
     assert!(tiers.contains(&serde_json::json!("treesitter")));
-    assert!(!tiers.contains(&serde_json::json!("lsp")));
+    assert_eq!(
+        tiers.contains(&serde_json::json!("lsp")),
+        cfg!(feature = "lsp"),
+        "lsp must be advertised exactly when its engine is compiled"
+    );
     assert!(!tiers.contains(&serde_json::json!("cpg")));
     assert_eq!(
         tiers.contains(&serde_json::json!("engine-state")),
