@@ -256,6 +256,7 @@ async fn every_fact_serving_response_carries_a_tier() {
                     path: None,
                     at_file: None,
                     at_line: None,
+                    at_col: None,
                 }))
                 .await,
             ),
@@ -345,7 +346,11 @@ async fn status_advertises_only_implemented_tiers() {
     let payload = served(server(&dir).yupana_status().await);
     let tiers = payload["tiers"].as_array().unwrap().clone();
     assert!(tiers.contains(&serde_json::json!("treesitter")));
-    assert!(!tiers.contains(&serde_json::json!("lsp")));
+    assert_eq!(
+        tiers.contains(&serde_json::json!("lsp")),
+        cfg!(feature = "lsp"),
+        "lsp must be advertised exactly when its engine is compiled"
+    );
     assert!(!tiers.contains(&serde_json::json!("cpg")));
     assert_eq!(
         tiers.contains(&serde_json::json!("engine-state")),
@@ -400,6 +405,7 @@ async fn references_declares_its_tier_at_the_top_level() {
                 path: None,
                 at_file: None,
                 at_line: None,
+                at_col: None,
             }))
             .await,
     );
@@ -429,6 +435,7 @@ async fn references_resolves_a_non_rust_definition_on_the_transient_path() {
             // Scoped on purpose: pins the TRANSIENT path, not the resident one.
             at_file: None,
             at_line: None,
+            at_col: None,
             path: Some(".".into()),
         }))
         .await,
@@ -464,6 +471,7 @@ async fn references_by_position_answers_with_the_one_symbol_pointed_at() {
             path: Some(".".into()),
             at_file: None,
             at_line: None,
+            at_col: None,
         }))
         .await,
     );
@@ -476,12 +484,39 @@ async fn references_by_position_answers_with_the_one_symbol_pointed_at() {
             path: Some(".".into()),
             at_file: Some("x.rs".into()),
             at_line: Some(7),
+            at_col: None,
         }))
         .await,
     );
     assert_eq!(by_pos["count"], 1, "position must disambiguate: {by_pos}");
     assert_eq!(by_pos["definitions"][0]["start_line"], 7, "{by_pos}");
     assert_top_level_tier(&by_pos, "yupana_references");
+}
+
+#[tokio::test]
+#[cfg(feature = "lsp")]
+async fn references_column_request_falls_back_to_name_class_when_lsp_cannot_resolve() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("x.rs"), "fn build() {}\n\nfn build() {}\n").unwrap();
+    let payload = served(
+        YupanaMcpServer::new(dir.path().to_path_buf(), None, None)
+            .yupana_references(Parameters(ReferencesRequest {
+                symbol: None,
+                path: Some(".".into()),
+                at_file: Some("x.rs".into()),
+                at_line: Some(3),
+                at_col: Some(4),
+            }))
+            .await,
+    );
+    assert_eq!(
+        payload["count"], 2,
+        "fallback preserves ambiguity: {payload}"
+    );
+    assert_eq!(
+        payload["tier"], "treesitter",
+        "fallback provenance: {payload}"
+    );
 }
 
 #[tokio::test]
@@ -496,6 +531,7 @@ async fn references_refuses_half_a_position_rather_than_downgrading_to_a_name() 
             path: Some(".".into()),
             at_file: Some("x.rs".into()),
             at_line: None,
+            at_col: None,
         }))
         .await;
     assert!(err.is_err(), "half a position must be refused, not guessed");

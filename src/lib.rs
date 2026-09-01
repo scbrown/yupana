@@ -8,8 +8,8 @@
 //!
 //! This crate is an early Phase-1 skeleton: tree-sitter structural extraction,
 //! a config model, a typed fact model, and a CLI. The MCP/HTTP serving layer
-//! (`mcp` feature), CPG/dataflow (`cpg`), LSP precision (`lsp`), and Quipu
-//! promotion (`quipu`) land in subsequent phases.
+//! (`mcp` feature), LSP definition/reference precision (`lsp`), and Quipu
+//! promotion (`quipu`) are feature-gated; the CPG/dataflow tier remains planned.
 
 pub mod action;
 pub mod attribution;

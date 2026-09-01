@@ -18,6 +18,10 @@ use std::path::{Path, PathBuf};
 
 use tree_sitter::{Node, Parser};
 
+/// Build-aware, column-precise definition/reference resolution (FR-2/FR-4).
+#[cfg(feature = "lsp")]
+pub mod lsp;
+
 use crate::errors::{Error, Result};
 use crate::types::{Symbol, SymbolKind, Tier};
 

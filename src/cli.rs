@@ -122,13 +122,14 @@ enum Commands {
         /// Directory to search (defaults to the current directory).
         #[arg(default_value = ".")]
         path: PathBuf,
-        /// Resolve the symbol at a POSITION instead of by name: `FILE:LINE`,
+        /// Resolve the symbol at a POSITION instead of by name: `FILE:LINE` or
+        /// `FILE:LINE:COL` when built with the LSP precision tier,
         /// relative to the search path. Disambiguates common names — `build`,
         /// `new` — by pointing at the one you mean. The tree-sitter tier
-        /// resolves to the innermost symbol enclosing that LINE; column
-        /// precision needs the LSP tier (FR-2), so a column is refused rather
-        /// than silently ignored.
-        #[arg(long, value_name = "FILE:LINE")]
+        /// resolves to the innermost symbol enclosing that LINE. A build with
+        /// the LSP tier accepts a column; other builds refuse it rather than
+        /// silently ignoring precision the caller requested.
+        #[arg(long, value_name = "FILE:LINE[:COL]")]
         at: Option<String>,
     },
     /// Direct callers and callees of a symbol.

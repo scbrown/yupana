@@ -46,8 +46,8 @@ See [The Game-State Harness](../concepts/game-state.md).
 
 ## `yupana_references`
 
-Give it `symbol` **or** a position (`at_file` + `at_line`), not both concerns at
-once.
+Give it `symbol` **or** a position (`at_file` + `at_line`, plus optional
+`at_col`), not both concerns at once.
 
 Names over-connect: a real tree has twelve `build`s, and asking by name gets all
 twelve. When you are reading code you know *where* you are, so point at it:
@@ -60,12 +60,12 @@ The position resolves to the innermost symbol enclosing that line, and the reply
 holds **that symbol alone** — it does not re-expand to every symbol sharing its
 name, which would restore the ambiguity the position was given to remove.
 
-`at_line` is a **line, not a (line, column)**. The tree-sitter extractor records
-lines, so a column would be accepted and silently ignored — an approximation
-served as the finer tier, which FR-3 forbids. Column precision arrives with the
-LSP tier (FR-2). Passing only one of `at_file`/`at_line` is an error rather than
-a quiet downgrade to a name lookup, since that would answer "which one is here?"
-with "all of them".
+`at_col` is one-based and requests LSP precision. An LSP result carries complete
+start/end line+column spans and `tier: "lsp"`. With no language server or
+resolvable build, the request degrades to the **name-based** tree-sitter result,
+which may intentionally contain multiple same-named definitions and carries
+`tier: "treesitter"`. It never ignores the column while claiming precision.
+Passing a partial position is an error.
 
 Position requests always take the transient build, never the resident daemon:
 `/references` does not carry the node spans a position needs.

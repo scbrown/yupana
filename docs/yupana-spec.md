@@ -747,14 +747,12 @@ dependency becomes compelling (§16, open question 1).
   Off by default so Yupana compiles and serves without the promotion toolchain, and
   — critically — **CI builds and tests both with and without it**, the single
   most-emphasized convention in Bobbin (the "don't let a feature ship dark" rule).
-- `cpg` / `lsp` — **planned, NOT yet Cargo features** (aegis-qe5z). They will gate
-  the Phase-2 CPG/dataflow extractor and the LSP tier respectively. They were
-  briefly present as `cpg = []` / `lsp = []` — empty features gating no code — and
-  were removed: an empty feature can be enabled without the implementation
-  existing, which made `yupana status` advertise a precision tier the binary did not
-  have. Re-introduce each ONLY alongside the extractor it gates, and add the tier
-  to `Tier::served()` in the same change, so the flag and the capability move
-  together.
+- `lsp` — gates the real language-agnostic JSON-RPC client and column-precise
+  definition/reference resolution for Rust plus TypeScript/JavaScript. It landed
+  atomically with `Tier::served()` and dedicated CI arms; runtime server/build
+  absence degrades to explicitly tagged tree-sitter facts.
+- `cpg` — **planned, not yet a Cargo feature** (aegis-qe5z). Its former empty
+  feature was removed because it advertised a tier without an implementation.
 
 **Lints.** Adopt Quipu's in-manifest `[lints.rust]` / `[lints.clippy]` block
 verbatim (`unsafe_code = "deny"`, `unused_must_use = "deny"`, `missing_docs =
@@ -1160,7 +1158,9 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
 
 - [x] Project scaffold: Cargo (edition 2021), `[lints]` block, `just` + pre-commit + CI (now nine feature arms), mdBook skeleton.
 - [x] Tree-sitter extraction (Bobbin's grammar set): symbol tree + intra-file calls (`src/extract/`).
-- [ ] LSP client (multilspy-style) for ≥ Rust + one more language: defs/refs/types. **The one Phase 1 item still open** (yupana #1); everything Phase 1 promised degrades to the tree-sitter tier per FR-2 until it lands.
+- [ ] LSP client (multilspy-style) for ≥ Rust + one more language: the shared
+      client and definition/reference position slice are implemented; types,
+      hover, and document/workspace symbols remain on yupana #1.
 - [x] Tier tagging (FR-3) on every served response from day one — pinned by `tests/tier_tags.rs`. (Freshness
       tagging was Phase 3; code-fact freshness now serves on the daemon's
       tenant-scoped `/symbols`, see FR-3's status block above.)
@@ -1525,13 +1525,10 @@ previously read "deps are declared but extractors are Rust-only so far" — that
 was true early in Phase 1, went stale, and is the likeliest reason a release was
 hand-built without the flag.
 
-`cpg` and `lsp` are planned but are **NOT features yet** — they were once
-`cpg = []` / `lsp = []`, empty features that gated nothing, so `--features lsp`
-produced a binary whose `yupana status` advertised a precision tier it did not
-have. A feature that can be enabled without the code existing is a way to
-advertise a lie, so each returns only when it gates a real extractor, and
-`Tier::served()` must move in the same change. `game-state` and `golden-path`
-are not that shape: each gates a real engine (`src/state/`, `src/goldenpath/`).
+`cpg` remains planned and is **not a feature yet**. `lsp` returned as a feature
+only with its real JSON-RPC client, `Tier::served()` arm, and CI matrix. This
+preserves the lesson from the former empty `cpg = []` / `lsp = []` flags: a
+feature that can be enabled without an implementation advertises a lie.
 
 **Tests: 788** (`cargo test --all-features -- --list`), of which 2 are
 `#[ignore]`d and both declare why in the attribute: `shape_agreement`'s Layer 2
@@ -1545,9 +1542,9 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 
 **Not yet built:**
 
-- **LSP precision tier** (FR-2/FR-4; planned `lsp` feature) — GH #1. This is
-  the one open Phase 1 item, and it is what `verify`'s `type-violation` and
-  column-granularity position lookup are both waiting on.
+- **Remaining LSP precision surfaces** (FR-2; `lsp` feature) — GH #1. Precise
+  definition/reference positions are implemented; types, hover,
+  document/workspace symbols, and `verify`'s `type-violation` remain.
 - **CPG control-dependence + inter-procedural taint** (FR-7, remainder of
   FR-8; planned `cpg` feature) — GH #6.
 - **FR-32, the optional LSP *server* surface** — exposing Yupana *as* a
@@ -1570,9 +1567,9 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 | §9.4 branch modeling (named-graph vs qualifier) | 🟡 Qualifier implemented; named-graph refuses | `src/promote_branch.rs` attaches `bobbin:onBranch "<branch>"` to every entity a promotion declares (`git::branch_for` resolves it, or ABSTAINS — no qualifier rather than a guess), gated by `shapes/code-edges.ttl::OnBranchShape`. Default `branch_model` moved to `"qualifier"`, the implemented model. `"named_graph"` REFUSES the promotion naming quipu#36, rather than silently writing under the fallback's semantics. The qualifier answers branch MEMBERSHIP, not per-branch structure — promoted IRIs are branch-independent by design, so both branches' edges land on one subject; that gap is what quipu#36 closes. GH #4. |
 
 Pre-existing Phase 1/2 spec-gaps also remain open (out of the graph-export
-scope): FR-2/FR-4 LSP precision (GH #1), §10/FR-4 column-granularity position
-variants (GH #2 — the *line* half shipped, see `graph/lookup.rs::symbol_at`),
-FR-7/FR-8 CPG (GH #6).
+scope): the remaining FR-2 LSP surfaces (GH #1) and FR-7/FR-8 CPG (GH #6).
+FR-4 column-granularity definition/reference positions are implemented behind
+the `lsp` feature, with name-based tree-sitter fallback when no build resolves.
 
 ## Appendix E: Design Decision Log
 

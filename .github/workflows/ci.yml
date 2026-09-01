@@ -32,6 +32,10 @@ jobs:
             flags: "--features mcp"
           - name: langs-extra
             flags: "--features langs-extra"
+          - name: lsp
+            flags: "--features lsp"
+          - name: mcp+lsp
+            flags: "--features mcp,lsp"
           - name: quipu
             flags: "--features quipu"
           - name: mcp+quipu
@@ -73,6 +77,10 @@ jobs:
             flags: "--features mcp"
           - name: langs-extra
             flags: "--features langs-extra"
+          - name: lsp
+            flags: "--features lsp"
+          - name: mcp+lsp
+            flags: "--features mcp,lsp"
           - name: quipu
             flags: "--features quipu"
           - name: mcp+quipu

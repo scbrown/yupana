@@ -7,10 +7,10 @@ mistakes an approximation for ground truth.
 ## Tier — how a fact was derived
 
 - `treesitter` — fast, build-free, approximate. Always-on breadth; works on a
-  syntactically-broken buffer. **This is the only tier served today** — every fact
-  Yupana currently produces is `treesitter`, and `yupana status` advertises only it.
-- `lsp` — precise defs/refs/types where a build resolves. *Planned (FR-2); not yet
-  implemented or served.*
+  syntactically-broken buffer.
+- `lsp` — precise definitions/references where a build resolves. Available with
+  the `lsp` feature for Rust and TypeScript/JavaScript; runtime server absence
+  degrades to explicitly tagged tree-sitter facts (FR-2/FR-4).
 - `cpg` — control/data dependence from the code property graph. *Planned (Phase 2,
   FR-7); not yet implemented or served.*
 
