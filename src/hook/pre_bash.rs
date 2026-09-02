@@ -31,7 +31,6 @@
 use super::pre_bash_grounding::action_fields;
 use crate::action;
 use std::io::Read;
-
 /// Handle a Claude Code `PreToolUse` payload for the Bash tool.
 ///
 /// Reads the payload on stdin, resolves the command to (verb, target,
@@ -42,7 +41,6 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
     // A read failure is not an error worth surfacing: the command the operator
     // asked for must run either way.
     std::io::stdin().lock().read_to_string(&mut buf).ok();
-
     let cmd = command_of(&buf);
     record_invocation(&buf, cmd.is_some());
 
@@ -63,6 +61,10 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
         let resolved = action::resolve(&cmd);
         record(&resolved, grounding);
         #[cfg(feature = "quipu")]
+        let ci = crate::ci_shift::hook_advisory(&buf, &cmd);
+        #[cfg(not(feature = "quipu"))]
+        let ci = super::pre_edit::Outcome::Allow;
+        #[cfg(feature = "quipu")]
         let disk = super::disk_guard::observe_and_check(&buf, &cmd);
         let memory = super::memory_guard::check(&buf, &cmd);
         // The scope check rides AFTER the record, deliberately: the trace is
@@ -70,7 +72,7 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
         if let Some(text) = scope_refusal(&buf, &resolved) {
             println!("{}", super::deny_envelope(&text));
         } else {
-            let outcome = combine_advisories(memory, {
+            let outcome = combine_advisories(combine_advisories(memory, ci), {
                 #[cfg(feature = "quipu")]
                 {
                     disk

@@ -237,6 +237,8 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "src/brief_sources.rs",
         "shapes/fixtures/conforming.ttl",
         "shapes/fixtures/violating.ttl",
+        // CI equivalence is projected from the governed ontology at pre-push.
+        "src/ci_shift.rs",
         "src/export.rs",
         // Disk observations are promoted into the same deployed ontology.
         "src/hook/disk_guard.rs",

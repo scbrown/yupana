@@ -31,6 +31,7 @@ pub mod brief_l0;
 #[cfg(feature = "quipu")]
 pub mod brief_sources;
 pub mod change;
+pub mod ci_shift;
 pub mod cli;
 mod cli_cmds;
 pub mod community;
