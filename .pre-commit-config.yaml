@@ -49,6 +49,13 @@ repos:
         # the whole defect.
         verbose: true
 
+      - id: internal-identifier-ratchet
+        name: internal identifier ratchet
+        entry: cargo test --test no_internal_identifiers
+        language: system
+        types: [rust]
+        pass_filenames: false
+
       - id: replay-converter-tests
         name: replay converter tests (python)
         entry: python3 tests/spool_to_dogwood.py

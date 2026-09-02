@@ -82,7 +82,16 @@ fn is_real_hit(label: &str, caps: &regex::Captures<'_>) -> bool {
 }
 
 fn root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let out = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .expect("git rev-parse --show-toplevel");
+    assert!(out.status.success(), "git root did not resolve");
+    PathBuf::from(
+        String::from_utf8(out.stdout)
+            .expect("git root is UTF-8")
+            .trim(),
+    )
 }
 
 fn tracked_files() -> Vec<PathBuf> {

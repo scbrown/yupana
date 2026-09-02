@@ -304,7 +304,9 @@ mod tests {
         decode_map(
             &serde_json::json!({"results":{"bindings":[
                 {"job":{"value":"ci:file-size"},"label":{"value":"file size check"},
-                 "command":{"value":"scripts/check-file-size.sh"},"scope":{"value":"src/**/*.rs"}},
+                 "command":{"value":"pre-commit run file-size-check --all-files"},"scope":{"value":"src/**/*.rs"}},
+                {"job":{"value":"ci:internal-identifiers"},"label":{"value":"internal identifier ratchet"},
+                 "command":{"value":"cargo test --test no_internal_identifiers"},"scope":{"value":"**"}},
                 {"job":{"value":"ci:wasm"},"label":{"value":"Check wasm32 target"},
                  "command":{"value":"cargo check --target wasm32-unknown-unknown --no-default-features --lib"},
                  "scope":{"value":"src/**/*.rs"}}
@@ -315,20 +317,35 @@ mod tests {
     }
 
     #[test]
-    fn historical_misses_are_selected_and_an_unrelated_doc_is_quiet() {
+    fn historical_misses_select_every_guard_that_can_observe_the_change() {
         let map = historical_map();
-        let Selection::Checks(yupana) = select(&map[..1], &["src/hook/disk_guard.rs".into()])
-        else {
-            panic!("e1b83ba must select the file-size gate");
+        let Selection::Checks(yupana) = select(&map, &["src/hook/config_drift.rs".into()]) else {
+            panic!("a085c8a must select the repository guards");
         };
-        assert_eq!(yupana[0].label, "file size check");
+        assert_eq!(
+            yupana
+                .iter()
+                .map(|check| check.label.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "file size check",
+                "internal identifier ratchet",
+                "Check wasm32 target"
+            ]
+        );
 
-        let Selection::Checks(quipu) = select(&map[1..], &["src/store/snapshot_upload.rs".into()])
-        else {
+        let wasm = map.iter().find(|check| check.id == "ci:wasm").unwrap();
+        let Selection::Checks(quipu) = select(
+            std::slice::from_ref(wasm),
+            &["src/store/snapshot_upload.rs".into()],
+        ) else {
             panic!("e510e47 must select the wasm32 gate");
         };
         assert_eq!(quipu[0].label, "Check wasm32 target");
-        assert_eq!(select(&map, &["docs/readme.md".into()]), Selection::Quiet);
+        let Selection::Checks(docs) = select(&map, &["docs/readme.md".into()]) else {
+            panic!("the tree-wide identifier ratchet must cover documentation");
+        };
+        assert_eq!(docs[0].label, "internal identifier ratchet");
     }
 
     #[test]
