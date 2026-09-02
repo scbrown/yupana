@@ -462,6 +462,7 @@ pub fn gather(config: &YupanaConfig, root: &Path) -> Option<Brief> {
         now,
     ) {
         Ok(crate::project::ProjectionSource::Live) => None,
+        Ok(crate::project::ProjectionSource::FreshCache { age_secs }) => Some(age_secs),
         Ok(crate::project::ProjectionSource::Cache { age_secs, .. }) => Some(age_secs),
         // No projection, no cache: say so in the one honest line, rather than
         // a briefing that silently omits the governed half.

@@ -241,6 +241,7 @@ pub(super) fn governed_check(
     // a second time.
     let cache_age = match &source {
         crate::project::ProjectionSource::Live => None,
+        crate::project::ProjectionSource::FreshCache { age_secs } => Some(*age_secs),
         crate::project::ProjectionSource::Cache { age_secs, error } => {
             // stderr always, on the same reasoning as every other degradation
             // here: the guard did its job, and the operator still needs to know

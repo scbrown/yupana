@@ -666,12 +666,10 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
     );
 }
 
-/// THE FIX. quipu cannot be projected, but the last-known catalogue is on disk
-/// and recent — so the guard ENFORCES rather than failing open, and says the
-/// verdict is stale. Before this, the same conditions produced zero policies and
-/// an allow.
+/// A recent persisted catalogue is served before touching Quipu. This keeps a
+/// short-lived hook from issuing the full projection fan-out on every edit.
 #[test]
-fn a_failed_projection_serves_the_cache_and_declares_it_stale() {
+fn a_fresh_cache_is_served_without_a_live_projection() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
     seed_cache(&cache, UNREACHABLE, 1_000);
@@ -682,14 +680,11 @@ fn a_failed_projection_serves_the_cache_and_declares_it_stale() {
         .expect("a recent cache is servable when quipu is not");
 
     match source {
-        ProjectionSource::Cache { age_secs, error } => {
+        ProjectionSource::FreshCache { age_secs } => {
             assert_eq!(age_secs, 30, "the age is carried, not merely implied");
-            assert!(
-                !error.is_empty(),
-                "the live failure is carried too — the record must name why"
-            );
         }
         ProjectionSource::Live => panic!("nothing was live; 127.0.0.1:1 is refused"),
+        ProjectionSource::Cache { .. } => panic!("a fresh cache is not a degraded fallback"),
     }
     assert_eq!(
         registry.policies().len(),
@@ -699,8 +694,8 @@ fn a_failed_projection_serves_the_cache_and_declares_it_stale() {
     );
     assert_eq!(
         registry.freshness(),
-        Freshness::Stale,
-        "served from cache is STALE, never Fresh"
+        Freshness::Fresh,
+        "a cache within the configured TTL is current"
     );
 }
 
