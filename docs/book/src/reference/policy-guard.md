@@ -394,6 +394,30 @@ the same hook contract before execution (for example from a scheduler wrapper);
 installing the binary alone does not interpose on arbitrary processes. Do not
 claim cron coverage until the cron entry itself is wired through that seam.
 
+### Quipu-backed disk-impact advisory
+
+The pre-Bash hook also learns the disk cost of commands that commonly create
+large artifacts (`cargo`, container builds, package managers, copy/archive
+tools, and explicit allocation tools). It snapshots filesystem free space with
+`df` before a command and closes that sample when the next matching command
+arrives in the same harness session. This is intentionally a filesystem delta,
+not a directory walk: hardlinks, deleted-open files, caches outside the working
+tree, root, and tmpfs must remain visible as different budgets.
+
+History is keyed by a normalized `binary:subcommand:repo-class` signature and
+an opaque filesystem hash. Raw argv, paths, devices, and mount points are never
+written to Quipu. The guard projects the most recent 100 samples and uses their
+nearest-rank p90. If p90 exceeds 80% of current headroom, it emits a
+`governed, not blocking` system message. There is no enforcement branch in this
+first slice.
+
+No history is **UNKNOWN**, never safe: the matching command is allowed with an
+explicit message that no Quipu-recorded basis exists. A failed history write or
+query is likewise loud fail-open. Unrelated commands do not pay for a Quipu
+round trip and remain silent. The graph vocabulary is governed by
+`CommandDiskImpactObservationShape`; deployments must accept that shape before
+expecting samples to accrue.
+
 ## What the guard checks
 
 1. **Path scope** (FR-25) — is the edited file inside this tenant's writable

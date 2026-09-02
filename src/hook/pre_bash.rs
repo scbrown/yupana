@@ -92,13 +92,25 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
             });
         let resolved = action::resolve(&cmd);
         record(&resolved, grounding);
+        #[cfg(feature = "quipu")]
+        let disk = super::disk_guard::observe_and_check(&buf, &cmd);
         let memory = super::memory_guard::check(&buf, &cmd);
         // The scope check rides AFTER the record, deliberately: the trace is
         // the product and must not depend on a policy decision succeeding.
         if let Some(text) = scope_refusal(&buf, &resolved) {
             println!("{}", super::deny_envelope(&text));
         } else {
-            match memory {
+            let outcome = combine_advisories(memory, {
+                #[cfg(feature = "quipu")]
+                {
+                    disk
+                }
+                #[cfg(not(feature = "quipu"))]
+                {
+                    super::pre_edit::Outcome::Allow
+                }
+            });
+            match outcome {
                 super::pre_edit::Outcome::Allow => {}
                 super::pre_edit::Outcome::Deny(reason) => {
                     println!("{}", super::deny_envelope(&reason));
@@ -110,6 +122,20 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+fn combine_advisories(
+    first: super::pre_edit::Outcome,
+    second: super::pre_edit::Outcome,
+) -> super::pre_edit::Outcome {
+    use super::pre_edit::Outcome;
+    match (first, second) {
+        (Outcome::Deny(a), Outcome::Deny(b)) => Outcome::Deny(format!("{a}\n{b}")),
+        (Outcome::Deny(a), _) | (_, Outcome::Deny(a)) => Outcome::Deny(a),
+        (Outcome::Notify(a), Outcome::Notify(b)) => Outcome::Notify(format!("{a}\n{b}")),
+        (Outcome::Notify(a), _) | (_, Outcome::Notify(a)) => Outcome::Notify(a),
+        (Outcome::Allow, Outcome::Allow) => Outcome::Allow,
+    }
 }
 
 /// The action-scope verdict for a resolved command, or `None` for silence.
