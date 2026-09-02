@@ -1,16 +1,4 @@
-//! `pre_bash` — the input path the action resolver never had.
-//!
-//! `crate::action::resolve` was written for gap 2 of the trace phase and shipped
-//! **unreachable**: yupana supported only `PreEdit`/`PostEdit`, the only live
-//! wiring was `post-edit` on `Write|Edit`, and the fleet's Bash guard chain
-//! referenced yupana zero times. So a resolver with tests and documentation sat in
-//! the tree with no caller and no way to acquire a command line — present,
-//! plausible, and structurally incapable of running.
-//!
-//! That is precisely the failure class this epic exists to prevent (a control
-//! that cannot fail, believed to be working), occurring inside the epic's own
-//! first phase. This module is the correction: a hook event that receives the
-//! harness's Bash payload and feeds it to the resolver.
+//! `pre_bash` feeds harness Bash payloads to the action resolver and guard chain.
 //!
 //! TWO-SIDED LIVENESS (aegis-tv9ri). Every invocation emits `pre_bash_invoked`
 //! BEFORE the payload is inspected, so the trace can tell apart the two ways
@@ -21,36 +9,21 @@
 //! {"kind":"pre_bash_invoked","parsed":false,"payload_bytes":123,
 //!  "payload_keys":"session_id,tool_name,…"}      <- ran, shape unrecognised
 //! ```
-//!
 //! No `pre_bash_invoked` at all across known Bash traffic means the hook is not
 //! wired into the settings THAT SESSION loads — which is a settings-scope
 //! question, not a yupana one.
 //!
-//! ACTION SCOPE IS RECORD-ONLY BY DEFAULT. Governed command policies are a
-//! separate arm: they project their selector and operating point from Quipu,
-//! and the deployment's `[yupana.policy] mode` remains their ceiling. Thus a
-//! newly published hard memory policy advises under the fleet's `advise` mode
-//! and cannot deny merely because its graph facts landed.
+//! ACTION SCOPE IS RECORD-ONLY BY DEFAULT. Governed command policies project
+//! from Quipu, while the deployment's `[yupana.policy] mode` remains their ceiling.
 //!
-//! When it IS armed, the source is the DECLARED scope's `allow_targets` /
-//! `deny_targets` and nothing else. There is no observed rung here: nothing in
-//! the graph records which hosts an item's prior work touched, so there is no
-//! record to infer from — and `declared` is the one provenance the trust ladder
-//! permits to hard-deny anyway.
+//! When armed, only the DECLARED scope's `allow_targets` / `deny_targets` apply;
+//! there is no observed rung from which to infer target scope.
 //!
-//! ABSTENTIONS ARE NEVER VIOLATIONS. `crate::action` answers `Unknown` for
-//! every command whose target is not unambiguous from syntax, and those reach
-//! the scope check as "no check performed". A guard that refused what it could
-//! not identify would refuse most of the shell — which is the same reason the
-//! resolver's recognised set is deliberately small.
-//!
-//! It shares the Bash matcher with the deployment's guard chain, so it stays
-//! silent on every allow.
+//! ABSTENTIONS ARE NEVER VIOLATIONS. An `Unknown` target means no check performed.
 //!
 //! ALWAYS EXIT 0. Harness denial is expressed through the hook JSON envelope,
 //! never through process status. Projection and signal failures are loud
 //! fail-open; only a valid governed policy under `enforce` can emit denial.
-//!
 //! `verb` and `target` are OMITTED on abstention; empty values would replay as facts.
 //! But `target_class` is ALWAYS written, including
 //! `"unknown"`, because the replay in the next phase needs to divide resolved
