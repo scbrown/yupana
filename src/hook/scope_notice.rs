@@ -84,6 +84,7 @@ pub(super) fn notice(rel: &str, root: &Path, config: &YupanaConfig) -> Option<St
         crate::projection_cache::now_secs(),
     ) {
         Ok(crate::project::ProjectionSource::Live) => None,
+        Ok(crate::project::ProjectionSource::FreshCache { age_secs }) => Some(age_secs),
         Ok(crate::project::ProjectionSource::Cache { age_secs, .. }) => Some(age_secs),
         // A store we could not read tells us nothing about the scope. Silence,
         // NOT a deviation: the pre-edit path already reports projection failure

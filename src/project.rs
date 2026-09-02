@@ -243,6 +243,12 @@ pub struct ProjectionRegistry {
 pub enum ProjectionSource {
     /// Projected live from quipu on this invocation.
     Live,
+    /// Served from a persisted projection that is still within its configured
+    /// freshness TTL. No network refresh was attempted on this invocation.
+    FreshCache {
+        /// Age of the projection at the time it was loaded.
+        age_secs: u64,
+    },
     /// quipu could not be projected; the persisted last-known policy set was
     /// served instead. The guard ENFORCED — staleness is not absence.
     Cache {
@@ -379,6 +385,20 @@ impl ProjectionRegistry {
         ttl_secs: u64,
         now: u64,
     ) -> std::result::Result<ProjectionSource, String> {
+        // Hooks are short-lived processes and this method runs on every edit.
+        // Serving a still-fresh persisted projection first prevents each edit
+        // from issuing the full catalogue query fan-out. Once the TTL expires,
+        // the live path below refreshes and rewrites the cache.
+        if let Some(path) = cache_path {
+            if let Ok(cached) =
+                crate::projection_cache::load_servable(path, &self.endpoint, ttl_secs, now)
+            {
+                let age_secs = cached.age_secs(now);
+                self.install_cached(cached, Freshness::Fresh);
+                return Ok(ProjectionSource::FreshCache { age_secs });
+            }
+        }
+
         let live_error = match self.refresh() {
             Ok(()) => {
                 if let Some(path) = cache_path {
@@ -413,22 +433,7 @@ impl ProjectionRegistry {
         match crate::projection_cache::load_servable(path, &self.endpoint, ttl_secs, now) {
             Ok(cached) => {
                 let age_secs = cached.age_secs(now);
-                self.policies = cached.policies;
-                self.text_rules = cached.text_rules;
-                self.tripwires = cached.tripwires;
-                self.memory_policies = cached.memory_policies;
-                self.grounded_rules = cached.grounded_rules;
-                // A cache written before grounding existed restores `None`,
-                // which is the honest answer: that cache never held a set, so
-                // grounded rules are unevaluated (loud), not empty-satisfied.
-                self.grounding = cached.grounding;
-                // Pre-scope caches restore `None` — unknown scope, honestly.
-                self.work_item_scopes = cached.work_item_scopes;
-                self.work_item_parents = cached.work_item_parents;
-                // STALE, never Fresh. The policies are real and worth
-                // enforcing; the claim that they are current is not ours to
-                // make, and every verdict computed against them says so.
-                self.freshness = Freshness::Stale;
+                self.install_cached(cached, Freshness::Stale);
                 Ok(ProjectionSource::Cache {
                     age_secs,
                     error: live_error,
@@ -436,6 +441,22 @@ impl ProjectionRegistry {
             }
             Err(miss) => Err(format!("{live_error}; and {miss}")),
         }
+    }
+
+    fn install_cached(
+        &mut self,
+        cached: crate::projection_cache::CachedProjection,
+        freshness: Freshness,
+    ) {
+        self.policies = cached.policies;
+        self.text_rules = cached.text_rules;
+        self.tripwires = cached.tripwires;
+        self.memory_policies = cached.memory_policies;
+        self.grounded_rules = cached.grounded_rules;
+        self.grounding = cached.grounding;
+        self.work_item_scopes = cached.work_item_scopes;
+        self.work_item_parents = cached.work_item_parents;
+        self.freshness = freshness;
     }
 
     /// Install decoded policies directly (test/daemon seam), marking the cache
