@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn filesystem_identity_is_opaque() {
-        let got = filesystem_identity("/dev/mapper/private", "/home/alice");
+        let got = filesystem_identity("/dev/mapper/private", "/home/jsmith");
         assert!(got.starts_with("fs-"));
         assert!(!got.contains("alice"));
         assert!(!got.contains("mapper"));

@@ -1,18 +1,5 @@
-//! The guard's two RULE planes, lifted out of `pre_edit` for size (yupana #83).
-//!
-//! Both answer the same question — "does the text this edit introduces break a
-//! rule?" — and both return a [`Decision`], one verdict per edit:
-//!
-//! - **local** ([`rule_check`]) — the `[[yupana.policy.rules]]` set from
-//!   config, language-gated, evaluated against the added text. Not per-tenant.
-//! - **governed** ([`governed_check`], `quipu` feature) — projected from
-//!   quipu's registry: a text plane (no grammar needed), a language-gated
-//!   structural plane, and the governed TRIPWIRE plane (path boundaries;
-//!   `tripwire_arm::governed_plane`).
-//!
-//! A child module of `pre_edit` rather than a sibling: it reads that module's
-//! private `Decision`, `decide`, `fail_open` and `introduced_text` through
-//! `use super::*`.
+//! Local and Quipu-governed rule planes, lifted from `pre_edit` for size.
+//! Both evaluate introduced text and return one [`Decision`] per edit.
 
 use super::*;
 

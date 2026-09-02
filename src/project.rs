@@ -1,20 +1,4 @@
-//! Phase-4 projection: a hot, one-directional cache of quipu's structural
-//! policies (`quipu` feature).
-//!
-//! **Evidence locality** (`docs/book/src/design/policy-edit-hooks.md`): a
-//! `tree-sitter`-tier policy is *defined* in quipu but *evaluated* in Yupana, where
-//! the code structure is hot. Yupana never originates a policy — it projects
-//! quipu's canonical `boundary:"action"` structural policies into the same
-//! [`Rule`](crate::rules::Rule) shape the local config uses, and evaluates them at
-//! the pre-edit seam. The projection is strictly one-directional (quipu canonical
-//! → yupana cache); if it diverged, Yupana could allow what quipu would deny, so a
-//! projected verdict always declares the cache's [`Freshness`].
-//!
-//! Like promotion (`src/promote.rs`), this talks to quipu over HTTP — quipu's
-//! `POST /query` with the W3C-standard `application/sparql-results+json` shape —
-//! so it needs no `quipu` *crate* dependency, only a blocking client. The decode
-//! ([`decode_policies`]) is pure and testable against a canned result; the fetch
-//! ([`fetch_policies`]) is the thin network wrapper.
+//! Canonical Quipu policies projected into Yupana with explicit [`Freshness`].
 
 use crate::errors::{Error, Result};
 use crate::rules::Rule;
@@ -84,8 +68,7 @@ pub(crate) fn query(endpoint: &str, sparql: &str) -> Result<String> {
         .map_err(|e| Error::Projection(format!("could not read /query response: {e}")))
 }
 
-/// A violation of a projected policy: the model-facing message plus whether the
-/// governed `effect` blocks the edit (as opposed to merely advising).
+/// A projected-policy violation and whether its governed effect blocks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectedViolation {
     /// The rule's model-facing message.
@@ -244,8 +227,7 @@ pub struct ProjectionRegistry {
 pub enum ProjectionSource {
     /// Projected live from quipu on this invocation.
     Live,
-    /// Served from a persisted projection that is still within its configured
-    /// freshness TTL. No network refresh was attempted on this invocation.
+    /// Served from a persisted projection still within its freshness TTL.
     FreshCache {
         /// Age of the projection at the time it was loaded.
         age_secs: u64,

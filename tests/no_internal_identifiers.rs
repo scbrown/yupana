@@ -238,6 +238,9 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "shapes/fixtures/conforming.ttl",
         "shapes/fixtures/violating.ttl",
         "src/export.rs",
+        // Disk observations are promoted into the same deployed ontology.
+        "src/hook/disk_guard.rs",
+        "src/project_disk.rs",
         "src/project_exposure.rs",
         // Project-memory policy asks the governed graph which commands are
         // memory-heavy, so its SPARQL uses the same deployed vocabulary as
