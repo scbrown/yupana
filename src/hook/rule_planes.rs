@@ -233,8 +233,7 @@ pub(super) fn governed_check(
             );
         }
     };
-    // `served_from_cache` is its OWN record kind and must never be folded into
-    // `fail_open`. They are different events: one is the guard enforcing
+    // `served_from_cache` is its OWN record kind, not `fail_open`: one enforces
     // last-known policy, the other is the guard not running. Collapsing them is
     // the ambiguity aegis-tv9ri removed from the sibling hook, and it is what
     // would let the aegis-mqnl advise-soak count unguarded edits as clean ones

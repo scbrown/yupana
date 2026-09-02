@@ -20,6 +20,7 @@ use crate::errors::{Error, Result};
 use crate::rules::Rule;
 use crate::textrules::TextRule;
 use crate::types::Freshness;
+mod cache_install;
 
 pub use crate::project_decode::{decode_policies, decode_text_rules};
 pub use crate::project_exposure::{fetch_repo_exposure, RepoExposure};
@@ -385,10 +386,7 @@ impl ProjectionRegistry {
         ttl_secs: u64,
         now: u64,
     ) -> std::result::Result<ProjectionSource, String> {
-        // Hooks are short-lived processes and this method runs on every edit.
-        // Serving a still-fresh persisted projection first prevents each edit
-        // from issuing the full catalogue query fan-out. Once the TTL expires,
-        // the live path below refreshes and rewrites the cache.
+        // Short-lived hooks serve a fresh cache before refreshing it live.
         if let Some(path) = cache_path {
             if let Ok(cached) =
                 crate::projection_cache::load_servable(path, &self.endpoint, ttl_secs, now)
@@ -441,22 +439,6 @@ impl ProjectionRegistry {
             }
             Err(miss) => Err(format!("{live_error}; and {miss}")),
         }
-    }
-
-    fn install_cached(
-        &mut self,
-        cached: crate::projection_cache::CachedProjection,
-        freshness: Freshness,
-    ) {
-        self.policies = cached.policies;
-        self.text_rules = cached.text_rules;
-        self.tripwires = cached.tripwires;
-        self.memory_policies = cached.memory_policies;
-        self.grounded_rules = cached.grounded_rules;
-        self.grounding = cached.grounding;
-        self.work_item_scopes = cached.work_item_scopes;
-        self.work_item_parents = cached.work_item_parents;
-        self.freshness = freshness;
     }
 
     /// Install decoded policies directly (test/daemon seam), marking the cache
