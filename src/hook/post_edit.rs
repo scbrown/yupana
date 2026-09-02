@@ -70,6 +70,10 @@ pub fn run_post_edit(tenant: Option<&str>) -> anyhow::Result<()> {
         sections.push(text);
     }
 
+    let sections: Vec<String> = sections
+        .into_iter()
+        .filter_map(|section| super::advisory_for_session(&buf, section))
+        .collect();
     if !sections.is_empty() {
         let envelope = serde_json::json!({
             "hookSpecificOutput": {

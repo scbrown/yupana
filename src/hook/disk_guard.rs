@@ -46,7 +46,8 @@ pub(super) fn observe_and_check(payload: &str, command: &str) -> Outcome {
         Ok(config) => config,
         Err(e) => {
             return Outcome::Notify(format!(
-                "yupana: disk impact UNKNOWN: unreadable config ({e})"
+                "{} disk impact UNKNOWN: unreadable config ({e})",
+                super::CONFIG_ERROR_PREFIX
             ))
         }
     };

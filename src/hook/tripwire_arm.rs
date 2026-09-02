@@ -263,10 +263,10 @@ mod tests {
             "src/lib.rs",
         )
         .unwrap();
-        // Fail-open: never a Deny, and the first notice in a session is loud.
+        // Fail-open: never a Deny, and configuration errors stay loud.
         match decision.outcome {
             Outcome::Notify(msg) => assert!(msg.contains("failed open")),
-            Outcome::Allow => {} // a later edit in the same session: already warned
+            Outcome::Allow => panic!("a configuration error must not be deduplicated"),
             Outcome::Deny(msg) => panic!("misconfiguration must not deny: {msg}"),
         }
     }

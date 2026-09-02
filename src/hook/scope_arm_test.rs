@@ -157,7 +157,7 @@ fn ambient_advise_stays_a_ceiling_over_enforce() {
 }
 
 #[test]
-fn unknown_scope_NOTIFIES_an_identified_tenant_once_per_session() {
+fn unknown_scope_PRODUCES_an_advisory_for_the_delivery_gate() {
     let session = format!("scope-arm-test-{}", std::process::id());
     let d = ladder_fallback(
         &config(Mode::Enforce, Mode::Advise),
@@ -174,7 +174,8 @@ fn unknown_scope_NOTIFIES_an_identified_tenant_once_per_session() {
         );
     };
     assert!(message.contains("UNGUARDED"), "says unguarded: {message}");
-    // Second edit in the same session: the notice already fired.
+    // The producer remains deterministic. The shared delivery boundary owns
+    // once-per-session suppression so a changed cause can speak again.
     let d2 = ladder_fallback(
         &config(Mode::Enforce, Mode::Advise),
         &input(&session),
@@ -183,7 +184,7 @@ fn unknown_scope_NOTIFIES_an_identified_tenant_once_per_session() {
         None,
         None,
     );
-    assert_eq!(d2.outcome, Outcome::Allow);
+    assert_eq!(d2.outcome, d.outcome);
 }
 
 #[test]

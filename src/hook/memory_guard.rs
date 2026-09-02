@@ -6,7 +6,7 @@
 //! cannot deny until the measured soak promotes the mode.
 
 #[cfg(feature = "quipu")]
-use super::{first_notice_for_session, HookInput};
+use super::HookInput;
 use crate::hook::pre_edit::Outcome;
 #[cfg(feature = "quipu")]
 use crate::policy::Mode;
@@ -69,11 +69,10 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     let config = match crate::config::YupanaConfig::resolve(None, &root) {
         Ok(config) => config,
         Err(e) => {
-            return notify_once(
-                input.session_id.as_deref(),
-                "memory-config",
-                &format!("memory policy was NOT EVALUATED: unreadable config ({e})"),
-            )
+            return Outcome::Notify(format!(
+                "{} memory policy was NOT EVALUATED: unreadable config ({e})",
+                super::CONFIG_ERROR_PREFIX
+            ))
         }
     };
     if config.policy.mode == Mode::Off || !config.quipu.enabled || config.quipu.endpoint.is_empty()
@@ -89,14 +88,10 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     ) {
         Ok(source) => source,
         Err(e) => {
-            return notify_once(
-                input.session_id.as_deref(),
-                "memory-projection",
-                &format!(
-                    "memory policy was NOT EVALUATED: governed policy projection failed ({e}). \
+            return notify(&format!(
+                "memory policy was NOT EVALUATED: governed policy projection failed ({e}). \
                      The command is allowed, loudly fail-open."
-                ),
-            )
+            ))
         }
     };
     if !registry
@@ -109,14 +104,10 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     let reading = match read_meminfo() {
         Ok(reading) => reading,
         Err(e) => {
-            return notify_once(
-                input.session_id.as_deref(),
-                "memory-signal",
-                &format!(
-                    "memory policy SIGNAL LOST: {e}. The command is allowed UNGOVERNED by \
+            return notify(&format!(
+                "memory policy SIGNAL LOST: {e}. The command is allowed UNGOVERNED by \
                      memory; the guard fails open rather than inventing a host-wide outage."
-                ),
-            )
+            ))
         }
     };
     evaluate(
@@ -211,13 +202,9 @@ fn evaluate(
 }
 
 #[cfg(feature = "quipu")]
-fn notify_once(session: Option<&str>, kind: &str, message: &str) -> Outcome {
+fn notify(message: &str) -> Outcome {
     eprintln!("yupana: {message}");
-    if first_notice_for_session(session, kind) {
-        Outcome::Notify(format!("yupana: {message}"))
-    } else {
-        Outcome::Allow
-    }
+    Outcome::Notify(format!("yupana: {message}"))
 }
 
 #[cfg(test)]

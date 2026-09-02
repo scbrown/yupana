@@ -344,8 +344,12 @@ fn a_malformed_glob_fails_open_loudly() {
     assert!(message.contains("UNGUARDED"));
     assert!(message.contains("malformed path globs"));
 
-    // Second edit in the same session: still allowed, but no longer noisy.
-    assert_eq!(guard(&payload, dir.path(), Some("t"), None), Outcome::Allow);
+    // Configuration errors stay loud on every invocation: unlike an advisory,
+    // this is an actionable broken guard and silence would hide a disarmed gate.
+    let Outcome::Notify(second) = guard(&payload, dir.path(), Some("t"), None) else {
+        panic!("a repeated configuration error must stay loud");
+    };
+    assert!(second.contains("configuration error"));
     let _ =
         std::fs::remove_file(std::env::temp_dir().join(format!("yupana-guard-failopen-{session}")));
 }
@@ -504,7 +508,7 @@ fn a_config_override_scopes_the_guard() {
 /// A `--config` path that does not exist must fail OPEN loudly, never
 /// silently revert to the ambient config — reverting is the disarm this
 /// override exists to prevent. Fail-open (allow) is still correct for a
-/// guard, but it must be the loud, once-per-session kind.
+/// guard, and as a configuration error it must stay loud on every invocation.
 #[test]
 fn a_missing_config_override_fails_open_loudly() {
     let dir = wide_repo();
@@ -523,6 +527,10 @@ fn a_missing_config_override_fails_open_loudly() {
     };
     assert!(message.contains("UNGUARDED"));
     assert!(message.contains("does not exist"));
+    assert!(matches!(
+        guard(&payload, dir.path(), Some("t"), Some(&missing)),
+        Outcome::Notify(message) if message.contains("configuration error")
+    ));
 }
 
 // --- Structural rules (tree-sitter tier) at the guard level -----------------

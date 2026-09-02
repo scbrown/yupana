@@ -89,7 +89,9 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
                     println!("{}", super::deny_envelope(&reason));
                 }
                 super::pre_edit::Outcome::Notify(message) => {
-                    println!("{}", super::system_message(&message));
+                    if let Some(message) = super::advisory_for_session(&buf, message) {
+                        println!("{}", super::system_message(&message));
+                    }
                 }
             }
         }

@@ -24,7 +24,7 @@ mod verdicts;
 use decision::Decision;
 
 use super::measure::{measure_within, relative};
-use super::{deny_envelope, first_notice_for_session, system_message, HookInput};
+use super::{deny_envelope, system_message, HookInput};
 use crate::config::YupanaConfig;
 use crate::extract::language_for_extension;
 use crate::policy::{BlastRadius, Mode};
@@ -52,7 +52,11 @@ pub fn run_pre_edit(tenant: Option<&str>, config_override: Option<&Path>) -> any
     match guard(&buf, &root, tenant, config_override) {
         Outcome::Allow => {}
         Outcome::Deny(reason) => println!("{}", deny_envelope(&reason)),
-        Outcome::Notify(message) => println!("{}", system_message(&message)),
+        Outcome::Notify(message) => {
+            if let Some(message) = super::advisory_for_session(&buf, message) {
+                println!("{}", system_message(&message));
+            }
+        }
     }
     Ok(())
 }
@@ -222,19 +226,15 @@ fn guard_inner(
             .clone()
             .unwrap_or_else(|| "unmeasured".to_string());
         eprintln!("yupana: blast radius UNMEASURED for `{rel}`: {reason}");
-        let kind = format!("unmeasured-{}-{rel}", reply.kind);
-        if first_notice_for_session(input.session_id.as_deref(), &kind) {
-            return Decision::ruled(
-                Outcome::Notify(format!(
-                    "yupana: blast-radius rules were NOT EVALUATED for `{rel}` — \
-                     {reason}. The edit is allowed (the guard fails open), but \
-                     tenant `{tenant}`'s ceilings did not apply to it. Treat this \
-                     file as UNGUARDED by blast radius, not as within limits."
-                )),
-                "unmeasured",
-            );
-        }
-        return Outcome::Allow.into();
+        return Decision::ruled(
+            Outcome::Notify(format!(
+                "yupana: blast-radius rules were NOT EVALUATED for `{rel}` — \
+                 {reason}. The edit is allowed (the guard fails open), but \
+                 tenant `{tenant}`'s ceilings did not apply to it. Treat this \
+                 file as UNGUARDED by blast radius, not as within limits."
+            )),
+            "unmeasured",
+        );
     };
 
     let verdict = match scope.check_blast(radius, &rel, tenant) {
@@ -254,9 +254,7 @@ fn guard_inner(
     // still guarded, by the transient rebuild.
     if let Some(reason) = daemon_absent {
         eprintln!("yupana: resident guard daemon EXPECTED but unusable: {reason}");
-        if matches!(verdict.outcome, Outcome::Allow)
-            && first_notice_for_session(input.session_id.as_deref(), "daemon-absent")
-        {
+        if matches!(verdict.outcome, Outcome::Allow) {
             return Outcome::Notify(format!(
                 "yupana: the resident guard daemon is DOWN ({reason}). This edit was guarded by a \
                  transient rebuild and ALLOWED — but the daemon a caller could kill to bypass \

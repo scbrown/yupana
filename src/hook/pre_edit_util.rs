@@ -42,17 +42,20 @@ pub(super) fn decide(mode: Mode, message: String) -> Outcome {
 /// Degrade to "allow", loudly. Writes the stderr line the contract requires and,
 /// once per session, a user-visible notice — because a hook's stderr is
 /// surfaced only on exit `2`, so stderr alone would be silent in practice.
-pub(super) fn fail_open(input: &HookInput, kind: &str, reason: &str) -> Outcome {
+pub(super) fn fail_open(_input: &HookInput, kind: &str, reason: &str) -> Outcome {
     eprintln!("yupana: policy guard failed open: {reason}");
     // The metric that separates "allowed clean" from "allowed because the
     // check could not run" — the two must never share a label (aegis-0nng).
     crate::metrics::emit("fail_open", &[("fail_kind", kind.into())]);
-    if first_notice_for_session(input.session_id.as_deref(), kind) {
+    if matches!(kind, "config" | "globs" | "tripwires") {
         return Outcome::Notify(format!(
-            "yupana: policy guard failed open ({reason}) — edits are UNGUARDED this session."
+            "{} policy guard failed open ({reason}) — edits are UNGUARDED this session.",
+            crate::hook::CONFIG_ERROR_PREFIX
         ));
     }
-    Outcome::Allow
+    Outcome::Notify(format!(
+        "yupana: policy guard failed open ({reason}) — edits are UNGUARDED this session."
+    ))
 }
 
 /// Apply the stage-1 denied-edit recurrence advisory (bobbin-fjh) to an

@@ -49,6 +49,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use serde::Deserialize;
+use sha2::Digest;
 
 /// The subset of a harness hook payload Yupana needs.
 ///
@@ -164,6 +165,23 @@ pub fn deny_envelope(reason: &str) -> String {
 #[must_use]
 pub fn system_message(message: &str) -> String {
     serde_json::json!({ "systemMessage": message }).to_string()
+}
+
+/// A configuration error is actionable on every invocation and must never be
+/// hidden by advisory rate limiting.
+pub(super) const CONFIG_ERROR_PREFIX: &str = "yupana: configuration error:";
+
+/// Return an advisory only when this stable cause has not yet spoken in the
+/// harness session. Configuration errors deliberately bypass the gate.
+#[must_use]
+pub(super) fn advisory_for_session(input_json: &str, message: String) -> Option<String> {
+    if message.starts_with(CONFIG_ERROR_PREFIX) {
+        return Some(message);
+    }
+    let session = HookInput::parse(input_json).and_then(|input| input.session_id);
+    let digest = sha2::Sha256::digest(message.as_bytes());
+    let cause = format!("advisory-{}", hex::encode(&digest[..12]));
+    first_notice_for_session(session.as_deref(), &cause).then_some(message)
 }
 
 /// Whether this process has already emitted a fail-open notice for `session`.
@@ -324,6 +342,36 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&system_message("heads up")).unwrap();
         assert_eq!(value["systemMessage"], "heads up");
         assert!(value.get("hookSpecificOutput").is_none());
+    }
+
+    #[test]
+    fn advisory_delivery_dedupes_stable_causes_but_not_config_errors() {
+        let session = format!(
+            "advisory-delivery-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let payload = serde_json::json!({"session_id": session}).to_string();
+
+        assert_eq!(
+            advisory_for_session(&payload, "same advisory".into()).as_deref(),
+            Some("same advisory")
+        );
+        assert_eq!(advisory_for_session(&payload, "same advisory".into()), None);
+        assert_eq!(
+            advisory_for_session(&payload, "changed cause".into()).as_deref(),
+            Some("changed cause")
+        );
+
+        let config = format!("{CONFIG_ERROR_PREFIX} missing binary");
+        assert_eq!(
+            advisory_for_session(&payload, config.clone()),
+            Some(config.clone())
+        );
+        assert_eq!(advisory_for_session(&payload, config.clone()), Some(config));
     }
 
     #[test]

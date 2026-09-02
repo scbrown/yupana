@@ -43,7 +43,7 @@ pub(super) struct ScopePlane {
 /// scope table has no entry for this tenant (or there is no tenant).
 pub(super) fn ladder_fallback(
     config: &YupanaConfig,
-    input: &HookInput,
+    _input: &HookInput,
     tenant: Option<&str>,
     rel: &str,
     item: Option<&str>,
@@ -151,7 +151,8 @@ pub(super) fn ladder_fallback(
 
     // UNKNOWN scope. An unidentified caller (no tenant) is the ordinary
     // single-operator case and stays silent; an identified tenant with no
-    // scope on any rung is told so once per session.
+    // scope on any rung produces an advisory; the delivery boundary suppresses
+    // repeats while its stable cause is unchanged.
     let Some(tenant) = tenant else {
         return Outcome::Allow.into();
     };
@@ -165,36 +166,33 @@ pub(super) fn ladder_fallback(
             format!("work item `{item}` has no observed paths in the graph yet")
         }
     };
-    if first_notice_for_session(input.session_id.as_deref(), "unknown-scope") {
-        crate::metrics::emit(
-            "scope",
-            &[
-                ("provenance", "unknown".into()),
-                ("result", "notify".into()),
-            ],
-        );
-        let outcome = Outcome::Notify(format!(
-            "yupana: no capability scope applies to tenant `{tenant}` — {why}. \
-             The edit is allowed (unknown scope advises, never blocks), but \
-             treat it as UNGUARDED by scope, not as within scope."
-        ));
-        let response = crate::trace::Response::of(&outcome);
-        // Outcome::Unknown, NOT Unsatisfied: no scope was evaluated, so there
-        // is nothing a signed verdict could honestly claim — and an
-        // Unsatisfied here lands in the spool as a "denied edit", which the
-        // recurrence advisory then mines and re-surfaces against unrelated
-        // edits (caught by e2e s12b). The spool skips Unknown by design.
-        return Decision::evaluated(
-            outcome,
-            vec![crate::trace::ConstraintEvaluation::new(
-                "unknown-scope",
-                crate::trace::Outcome::Unknown,
-                response,
-            )],
-            Freshness::Fresh,
-        );
-    }
-    Outcome::Allow.into()
+    crate::metrics::emit(
+        "scope",
+        &[
+            ("provenance", "unknown".into()),
+            ("result", "notify".into()),
+        ],
+    );
+    let outcome = Outcome::Notify(format!(
+        "yupana: no capability scope applies to tenant `{tenant}` — {why}. \
+         The edit is allowed (unknown scope advises, never blocks), but \
+         treat it as UNGUARDED by scope, not as within scope."
+    ));
+    let response = crate::trace::Response::of(&outcome);
+    // Outcome::Unknown, NOT Unsatisfied: no scope was evaluated, so there
+    // is nothing a signed verdict could honestly claim — and an
+    // Unsatisfied here lands in the spool as a "denied edit", which the
+    // recurrence advisory then mines and re-surfaces against unrelated
+    // edits (caught by e2e s12b). The spool skips Unknown by design.
+    Decision::evaluated(
+        outcome,
+        vec![crate::trace::ConstraintEvaluation::new(
+            "unknown-scope",
+            crate::trace::Outcome::Unknown,
+            response,
+        )],
+        Freshness::Fresh,
+    )
 }
 
 #[cfg(test)]
