@@ -12,13 +12,10 @@
 //! No `pre_bash_invoked` at all across known Bash traffic means the hook is not
 //! wired into the settings THAT SESSION loads — which is a settings-scope
 //! question, not a yupana one.
-//!
 //! ACTION SCOPE IS RECORD-ONLY BY DEFAULT. Governed command policies project
 //! from Quipu, while the deployment's `[yupana.policy] mode` remains their ceiling.
-//!
 //! When armed, only the DECLARED scope's `allow_targets` / `deny_targets` apply;
 //! there is no observed rung from which to infer target scope.
-//!
 //! ABSTENTIONS ARE NEVER VIOLATIONS. An `Unknown` target means no check performed.
 //!
 //! ALWAYS EXIT 0. Harness denial is expressed through the hook JSON envelope,

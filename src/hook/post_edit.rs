@@ -1,11 +1,9 @@
 //! The `PostToolUse` advisory — Yupana's answer to "what did that edit reach?".
-//!
 //! `yupana hook post-edit` reads the harness's `PostToolUse` JSON on stdin and
 //! returns an advisory: which symbols in the edited file have callers elsewhere,
 //! so the agent learns the blast radius of its own change synchronously, without
 //! calling a tool. **Advisory only** — the blocking companion is
 //! [`super::pre_edit`].
-//!
 //! With `[yupana.serve] use_daemon = true` this is a thin client of the resident
 //! daemon (FR-31, yupana #1 stage 5): the edited file's symbols are still
 //! extracted fresh HERE (their content is what just changed), but their callers
@@ -15,23 +13,20 @@
 //! model — this is an advisory, not an enforcement surface, and a transient
 //! answer is equally correct.
 
-use std::collections::BTreeSet;
-use std::ffi::OsStr;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-
 use super::{HookInput, ToolInput};
 use crate::config::YupanaConfig;
 use crate::daemon::client::{expected_same_root_daemon, fetch_edit};
 use crate::extract::extract_symbols;
 use crate::graph::{CodeGraph, Dir};
-
+use std::collections::BTreeSet;
+use std::ffi::OsStr;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 /// Budget per localhost round-trip, same rationale as the MCP thin client:
 /// generous against a resident graph, small enough that a wedged daemon costs
 /// one slow query before the transient fallback answers.
 const DAEMON_TIMEOUT: Duration = Duration::from_millis(500);
-
 /// How many impacted symbols to list before summarizing the rest.
 const MAX_LISTED: usize = 8;
 
