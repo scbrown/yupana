@@ -515,10 +515,12 @@ tools, and explicit allocation tools). It snapshots filesystem free space with
 arrives in the same harness session. This is intentionally a filesystem delta,
 not a directory walk: hardlinks, deleted-open files, caches outside the working
 tree, root, and tmpfs must remain visible as different budgets.</p>
-<p>History is keyed by a normalized <code>binary:subcommand:repo-class</code> signature and
-an opaque filesystem hash. Raw argv, paths, devices, and mount points are never
-written to Quipu. The guard projects the most recent 100 samples and uses their
-nearest-rank p90. If p90 exceeds 80% of current headroom, it emits a
+<p>History is keyed by the governed
+<code>binary:subcommand|repo:&lt;class&gt;|cwd:&lt;class&gt;</code> signature and an opaque
+<code>root|tmpfs|mount:&lt;hash&gt;</code> filesystem identity. Raw argv, paths, devices, and
+mount points are never written to Quipu. Deltas are signed: positive values
+consume space and negative values free it. The guard projects the most recent
+100 samples and uses their nearest-rank p90. If p90 exceeds 80% of current headroom, it emits a
 <code>governed, not blocking</code> system message. There is no enforcement branch in this
 first slice.</p>
 <p>No history is <strong>UNKNOWN</strong>, never safe: the matching command is allowed with an
