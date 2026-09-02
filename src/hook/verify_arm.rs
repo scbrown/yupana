@@ -97,7 +97,7 @@ pub(super) fn verify_check(
 /// `None` when the buffer cannot be reconstructed — an anchor that does not
 /// match the file means the harness will reject the tool call itself, so there
 /// is nothing real to verify.
-fn proposed_buffer(input: &HookInput, baseline: Option<&str>) -> Option<String> {
+pub(crate) fn proposed_buffer(input: &HookInput, baseline: Option<&str>) -> Option<String> {
     if let Some(content) = &input.tool_input.content {
         return Some(content.clone());
     }

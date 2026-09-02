@@ -125,6 +125,9 @@ pub struct PolicyConfig {
     /// once the spool says what it would have refused. The ambient `mode` is a
     /// ceiling on top, as everywhere else.
     pub action_scope: Mode,
+    /// Representation guard for st crew, hook, and deployment configuration.
+    /// Advises by default; promote to enforce only after an adjudicated soak.
+    pub config_drift: Mode,
 }
 
 impl Default for PolicyConfig {
@@ -140,6 +143,7 @@ impl Default for PolicyConfig {
             verify: false,
             work_item_scope: Mode::Off,
             action_scope: Mode::Off,
+            config_drift: Mode::Advise,
         }
     }
 }

@@ -110,6 +110,13 @@ fn guard_inner(
     let file = PathBuf::from(&file_path);
     let rel = relative(&file, &root);
 
+    #[cfg(feature = "quipu")]
+    if let Some(outcome) = super::config_drift::check(&config, &input, &file, &rel) {
+        if outcome != Outcome::Allow {
+            return outcome.into();
+        }
+    }
+
     // Tripwires — local Binding/Gate declarations — run FIRST: a wire is the
     // more specific binding (this boundary, this effect), and its declared
     // effect must not be preempted by the ambient-mode outcome the plain rule
@@ -380,6 +387,8 @@ mod verify_arm;
 #[cfg(feature = "quipu")]
 use rule_planes::governed_check;
 use rule_planes::rule_check;
+#[cfg(feature = "quipu")]
+pub(super) use verify_arm::proposed_buffer;
 // The text plane's pure core is exercised directly by `pre_edit_test`, which
 // sits beside this module rather than beside the plane it tests.
 #[cfg(all(test, feature = "quipu"))]
