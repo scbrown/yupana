@@ -404,10 +404,12 @@ arrives in the same harness session. This is intentionally a filesystem delta,
 not a directory walk: hardlinks, deleted-open files, caches outside the working
 tree, root, and tmpfs must remain visible as different budgets.
 
-History is keyed by a normalized `binary:subcommand:repo-class` signature and
-an opaque filesystem hash. Raw argv, paths, devices, and mount points are never
-written to Quipu. The guard projects the most recent 100 samples and uses their
-nearest-rank p90. If p90 exceeds 80% of current headroom, it emits a
+History is keyed by the governed
+`binary:subcommand|repo:<class>|cwd:<class>` signature and an opaque
+`root|tmpfs|mount:<hash>` filesystem identity. Raw argv, paths, devices, and
+mount points are never written to Quipu. Deltas are signed: positive values
+consume space and negative values free it. The guard projects the most recent
+100 samples and uses their nearest-rank p90. If p90 exceeds 80% of current headroom, it emits a
 `governed, not blocking` system message. There is no enforcement branch in this
 first slice.
 

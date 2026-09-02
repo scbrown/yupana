@@ -92,10 +92,10 @@ pub(super) fn observe_and_check(payload: &str, command: &str) -> Outcome {
             ("available_bytes", available.into()),
         ],
     );
-    if predicted > limit {
+    if u64::try_from(predicted).is_ok_and(|predicted| predicted > limit) {
         Outcome::Notify(format!(
             "yupana (governed, not blocking): disk history predicts p90 {} across {} sample(s) for `{signature}` on {}; current headroom is {} and the 80% advisory budget is {}. Free space or choose another filesystem before running.",
-            bytes(predicted), samples.len(), reading.filesystem, bytes(available), bytes(limit)
+            signed_bytes(predicted), samples.len(), reading.filesystem, bytes(available), bytes(limit)
         ))
     } else {
         Outcome::Allow
@@ -156,11 +156,12 @@ fn finish_previous(session: &str, now: &DiskReading, endpoint: &str) -> Option<S
     if pending.filesystem != now.filesystem {
         return Some("previous command crossed filesystems; no delta recorded".into());
     }
-    let consumed = pending.available_bytes.saturating_sub(now.available_bytes);
-    match post_sample(endpoint, &pending, consumed) {
+    let delta = (i128::from(pending.available_bytes) - i128::from(now.available_bytes))
+        .clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+    match post_sample(endpoint, &pending, delta) {
         Ok(()) => Some(format!(
             "recorded previous-command delta {}",
-            bytes(consumed)
+            signed_bytes(delta)
         )),
         Err(e) => Some(format!("previous-command delta NOT RECORDED ({e})")),
     }
@@ -197,7 +198,7 @@ fn state_path(session: &str) -> Option<PathBuf> {
     )
 }
 
-fn post_sample(endpoint: &str, pending: &Pending, consumed: u64) -> Result<(), String> {
+fn post_sample(endpoint: &str, pending: &Pending, delta: i64) -> Result<(), String> {
     let id = hex::encode(Sha256::digest(
         format!(
             "{}\0{}\0{}",
@@ -206,12 +207,15 @@ fn post_sample(endpoint: &str, pending: &Pending, consumed: u64) -> Result<(), S
         .as_bytes(),
     ));
     let turtle = format!(
-        "@prefix aegis: <http://aegis.gastown.local/ontology/> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\
+        "@prefix aegis: <http://aegis.gastown.local/ontology/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\
          aegis:disk-impact-{id} a aegis:CommandDiskImpactObservation ; aegis:commandSignature {} ; \
-         aegis:filesystemIdentity {} ; aegis:diskDeltaBytes \"{consumed}\"^^xsd:integer ; aegis:observedAt {}^^xsd:dateTime .",
+         aegis:filesystemIdentity {} ; aegis:diskDeltaBytes \"{delta}\"^^xsd:integer ; aegis:observedAt {}^^xsd:dateTime ; \
+         rdfs:label {} .",
         serde_json::to_string(&pending.signature).map_err(|e| e.to_string())?,
         serde_json::to_string(&pending.filesystem).map_err(|e| e.to_string())?,
-        serde_json::to_string(&pending.observed_at).map_err(|e| e.to_string())?
+        serde_json::to_string(&pending.observed_at).map_err(|e| e.to_string())?,
+        serde_json::to_string(&format!("disk impact {}", pending.signature))
+            .map_err(|e| e.to_string())?
     );
     let url = format!("{}/knot", endpoint.trim_end_matches('/'));
     let mut request = ureq::post(&url)
@@ -223,10 +227,26 @@ fn post_sample(endpoint: &str, pending: &Pending, consumed: u64) -> Result<(), S
     let body =
         serde_json::json!({"turtle": turtle, "actor": "yupana", "source": "command-disk-impact"})
             .to_string();
-    request
+    let response = request
         .timeout(std::time::Duration::from_secs(3))
         .send_string(&body)
         .map_err(|e| e.to_string())?;
+    let response_body = response
+        .into_string()
+        .map_err(|e| format!("cannot read Quipu knot response: {e}"))?;
+    let result: serde_json::Value = serde_json::from_str(&response_body)
+        .map_err(|e| format!("invalid Quipu knot response: {e}"))?;
+    if result.get("conforms").and_then(serde_json::Value::as_bool) == Some(false) {
+        return Err(format!("Quipu rejected observation: {result}"));
+    }
+    let count = result
+        .get("count")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0);
+    let tx_id = result.get("tx_id").and_then(serde_json::Value::as_u64);
+    if count == 0 && tx_id != Some(0) {
+        return Err(format!("Quipu wrote zero observation triples: {result}"));
+    }
     Ok(())
 }
 
@@ -253,6 +273,11 @@ fn headroom_override() -> Option<u64> {
 fn bytes(value: u64) -> String {
     const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
     format!("{:.2} GiB", value as f64 / GIB)
+}
+
+fn signed_bytes(value: i64) -> String {
+    let sign = if value < 0 { "-" } else { "" };
+    format!("{sign}{}", bytes(value.unsigned_abs()))
 }
 
 #[cfg(test)]
