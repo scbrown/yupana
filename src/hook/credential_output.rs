@@ -23,7 +23,10 @@ pub(super) fn advisory(input_json: &str) -> Option<String> {
     let patterns = [
         ("bearer", r"(?i)bearer[[:space:]]+[A-Za-z0-9._~+/=-]{16,}"),
         ("github", r"(?:gh[op]_[A-Za-z0-9]{20,})"),
-        ("openai", r"(?:sk-[A-Za-z0-9_-]{20,})"),
+        // Require a token boundary. Without it, the `sk-` spanning the end of
+        // an ordinary word such as `disk-impact-<digest>` is misclassified as
+        // an OpenAI key and every reader of governed disk observations warns.
+        ("openai", r"(?:^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}"),
         ("aws-access-key", r"(?:AKIA[0-9A-Z]{16})"),
     ];
     let mut classes = Vec::new();
@@ -90,5 +93,26 @@ mod tests {
     fn ordinary_output_and_malformed_payload_stay_silent() {
         assert_eq!(advisory("not json"), None);
         assert_eq!(advisory(&payload("credential-output-clean", "done")), None);
+    }
+
+    #[test]
+    fn governed_disk_identifiers_are_not_openai_keys() {
+        let digest = "a23ca75c58a36372b73bbbd15937be7c77c814fc61d2e274339f8ed7ac0c4506";
+        let output = format!(
+            "http://example.invalid/ontology/disk-impact-{digest} filesystemIdentity root:20cdc54d46e1706afbe62f91"
+        );
+        assert_eq!(
+            advisory(&payload("credential-output-disk-identifiers", &output)),
+            None
+        );
+    }
+
+    #[test]
+    fn openai_key_shape_at_a_boundary_still_advises() {
+        let session = format!("credential-output-openai-boundary-{}", std::process::id());
+        let input = payload(&session, "value=sk-synthetic0123456789abcdef");
+        let warning = advisory(&input).expect("boundary-delimited key shape must advise");
+        assert!(warning.contains("openai"));
+        assert!(!warning.contains("sk-synthetic"), "must never echo match");
     }
 }
