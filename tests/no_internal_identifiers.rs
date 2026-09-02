@@ -240,6 +240,8 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         // CI equivalence is projected from the governed ontology at pre-push.
         "src/ci_shift.rs",
         "src/export.rs",
+        // Config drift reads and emits ConfigFile facts in the promoted ontology.
+        "src/hook/config_drift.rs",
         // Disk observations are promoted into the same deployed ontology.
         "src/hook/disk_guard.rs",
         "src/project_disk.rs",
