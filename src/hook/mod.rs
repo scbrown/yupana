@@ -67,6 +67,11 @@ pub struct HookInput {
     /// The tool's arguments.
     #[serde(default)]
     pub tool_input: ToolInput,
+    /// The completed tool's result (`PostToolUse` only). Kept as JSON so the
+    /// advisory can inspect strings without depending on each tool's response
+    /// schema; it must never echo this value.
+    #[serde(default)]
+    pub tool_response: serde_json::Value,
     /// Turn-boundary grounding reference injected by the harness for a
     /// NeuralAmplifier-scoped action.
     #[serde(default)]
