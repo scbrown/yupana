@@ -66,7 +66,8 @@ pub(super) fn rule_verdict_message_from(
     let note = match source {
         crate::project::ProjectionSource::FreshCache { age_secs } => format!(
             "verdict freshness: fresh (governed policy served from a valid cache, \
-             {age_secs}s old, within the {cache_ttl_secs}s TTL — quipu was not contacted)"
+             {age_secs}s old, within the {cache_ttl_secs}s TTL — no live policy \
+             projection was attempted)"
         ),
         crate::project::ProjectionSource::Cache { age_secs, .. } => format!(
             "verdict freshness: STALE — quipu could not be projected, so this \
@@ -106,7 +107,10 @@ mod tests {
         assert!(message.contains("verdict freshness: fresh"), "{message}");
         assert!(message.contains("588s old"), "{message}");
         assert!(message.contains("within the 3600s TTL"), "{message}");
-        assert!(message.contains("quipu was not contacted"), "{message}");
+        assert!(
+            message.contains("no live policy projection was attempted"),
+            "{message}"
+        );
         assert!(!message.contains("could not be projected"), "{message}");
     }
 
