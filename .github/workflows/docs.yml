@@ -39,20 +39,23 @@ jobs:
             .github/actions/path-gate/**
 
   build-deploy:
+    name: Build relevant docs
     needs: relevant-changes
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && needs.relevant-changes.outputs.changed == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Install mdbook
+        if: needs.relevant-changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: cargo install mdbook --version "^0.4" --locked
       - name: Build book
+        if: needs.relevant-changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: mdbook build docs/book
       - name: Deploy to gh-pages
+        if: >-
+          (github.event_name == 'push' && needs.relevant-changes.outputs.changed == 'true') ||
+          github.event_name == 'workflow_dispatch'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
