@@ -1,13 +1,10 @@
 //! The `yupana` command-line interface.
-//!
 //! `analyze`, `refs`, `status`, `serve` (MCP), the Phase-2 call-graph commands
 //! `callers`/`impact` and `dataflow`, `export` (referential structure as Turtle,
 //! §5.10/FR-34), the `watch` file-watcher (debounced, tiered re-extraction,
 //! §5.5/FR-17), and the `hook` adapter (edit-reactive harness integration,
 //! §5.9/FR-30) and `verify` (the FR-23/FR-24 edit-buffer verdict) are live.
-//! `promote` (Phase-4 Quipu promotion, FR-19/20/21) is live behind the `quipu`
-//! feature and prints a phase notice in a build without it (`docs/yupana-spec.md`).
-
+//! `promote` is live behind the `quipu` feature (`docs/yupana-spec.md`).
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -282,6 +279,9 @@ enum Commands {
     },
     /// Show base commit, tiers, and configuration.
     Status,
+    /// Refresh the governed-policy cache from Quipu for edit hooks.
+    #[cfg(feature = "quipu")]
+    RefreshProjection,
     /// Agent-harness hook adapter (reads the hook payload on stdin).
     Hook {
         /// Which hook event to handle.
@@ -359,6 +359,8 @@ impl Cli {
             }
             Commands::Watch { path } => self.watch(path).await,
             Commands::Status => self.status(),
+            #[cfg(feature = "quipu")]
+            Commands::RefreshProjection => self.refresh_projection(),
             Commands::Hook { event } => {
                 cli_hook::run(*event, self.tenant.as_deref(), self.config.as_deref())
             }

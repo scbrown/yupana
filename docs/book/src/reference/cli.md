@@ -188,6 +188,22 @@ reason it exists. A status surface that went red once in ten runs from a
 transient blip would be routed around, and then the real red would be invisible
 too.
 
+## `yupana refresh-projection`
+
+Fetch the complete governed-policy catalogue from the configured Quipu endpoint
+and atomically refresh the durable `projection.json` used by short-lived hooks:
+
+```sh
+yupana refresh-projection
+```
+
+This command always contacts Quipu, even when the existing cache is fresh. Run
+it from a timer outside the edit path, with a cache TTL comfortably longer than
+the timer interval. It works while `[yupana.quipu] enabled = false`, allowing an
+operator to bootstrap and verify the cache before enabling the guard. A failed
+projection leaves the prior cache unchanged and exits non-zero; success is not
+reported unless the new timestamp can be read back.
+
 ## `yupana refs`
 
 Definition sites of a symbol, by name, from the same graph `callers`, `impact`
