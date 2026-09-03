@@ -17,6 +17,32 @@ use crate::errors::{Error, Result};
 pub const SCHEMA_VERSION: &str = "aegis-action-certification/v1";
 pub const CANONICALIZATION: &str = "serde-json-struct-order/v1";
 
+#[derive(Debug, clap::Args)]
+pub struct CertifyArgs {
+    /// Path to the existing PKCS#8 verifier key.
+    #[arg(long, default_value = "yupana-signing.pk8")]
+    key_path: std::path::PathBuf,
+    /// Action certification JSONL spool.
+    #[arg(long, default_value = "action-certifications.jsonl")]
+    spool: std::path::PathBuf,
+}
+
+impl CertifyArgs {
+    pub fn run(&self) -> anyhow::Result<()> {
+        let key = crate::verdict_spool::existing_key(&self.key_path).ok_or_else(|| {
+            anyhow::anyhow!(
+                "verifier key absent; run `yupana verifier --key-path {}` first",
+                self.key_path.display()
+            )
+        })?;
+        let input: ActionInput = serde_json::from_reader(std::io::stdin())?;
+        let record = sign(input, &key)?;
+        append(&self.spool, &record)?;
+        println!("{}", serde_json::to_string(&record)?);
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CheckInput {
     pub id: String,

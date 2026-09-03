@@ -302,11 +302,8 @@ enum Commands {
     },
     /// Promote spooled verdicts into quipu (quipu feature).
     ///
-    /// The pre-edit guard SIGNS a verdict the moment a constraint fires and
-    /// appends it locally; it never promotes on the edit path, because a
-    /// `/knot` round-trip does not fit inside the guard's deadline and would
-    /// make every agent's edit latency a function of quipu's availability. This
-    /// is the other half.
+    /// The guard signs and spools locally; this command promotes later so
+    /// Quipu latency never enters the edit path.
     #[cfg(feature = "quipu")]
     Verdicts {
         /// Quipu base URL. Defaults to `[yupana.quipu] endpoint`.
@@ -316,25 +313,15 @@ enum Commands {
         #[arg(long)]
         spool: Option<PathBuf>,
     },
-    /// Sign an agent-action certification from a JSON record on stdin.
     #[cfg(feature = "quipu")]
-    Certify {
-        /// Path to the existing PKCS#8 verifier key.
-        #[arg(long, default_value = "yupana-signing.pk8")]
-        key_path: PathBuf,
-        /// Action certification JSONL spool.
-        #[arg(long, default_value = "action-certifications.jsonl")]
-        spool: PathBuf,
-    },
+    Certify(crate::action_certification::CertifyArgs),
 }
-
 /// Output formats for `yupana export`.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ExportFormat {
     /// RDF Turtle in the `bobbin:` code ontology.
     Turtle,
 }
-
 impl Cli {
     /// Whether `--verbose` was passed. Consulted by `main` to raise the default
     /// tracing verbosity (see [`init_tracing`]).
@@ -389,20 +376,7 @@ impl Cli {
                 self.drain_verdicts(to.as_deref(), spool.as_deref())
             }
             #[cfg(feature = "quipu")]
-            Commands::Certify { key_path, spool } => {
-                let key = crate::verdict_spool::existing_key(key_path).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "verifier key absent; run `yupana verifier --key-path {}` first",
-                        key_path.display()
-                    )
-                })?;
-                let input: crate::action_certification::ActionInput =
-                    serde_json::from_reader(io::stdin())?;
-                let record = crate::action_certification::sign(input, &key)?;
-                crate::action_certification::append(spool, &record)?;
-                println!("{}", serde_json::to_string(&record)?);
-                Ok(())
-            }
+            Commands::Certify(args) => args.run(),
             Commands::Serve { http } => self.serve(*http).await,
             Commands::Daemon { port } => self.daemon(*port).await,
             Commands::Callers { symbol, path } => {
