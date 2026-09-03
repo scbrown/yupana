@@ -1,0 +1,26 @@
+name: Always-reporting path gate
+description: Detect relevant changes inside an unfiltered workflow so required checks always report.
+inputs:
+  base:
+    description: Base commit to compare.
+    required: true
+  head:
+    description: Head commit to compare.
+    required: true
+  paths:
+    description: Newline-delimited git pathspecs.
+    required: true
+outputs:
+  changed:
+    description: Whether the comparison contains a matching path.
+    value: ${{ steps.gate.outputs.changed }}
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      env:
+        PATH_GATE_BASE: ${{ inputs.base }}
+        PATH_GATE_HEAD: ${{ inputs.head }}
+        PATH_GATE_PATHS: ${{ inputs.paths }}
+      run: "$GITHUB_ACTION_PATH/path-gate.sh"

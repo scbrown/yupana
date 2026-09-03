@@ -3,9 +3,8 @@ name: Docs
 on:
   push:
     branches: [main]
-    paths:
-      - "docs/book/**"
-      - ".github/workflows/docs.yml"
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 # Publishes the mdBook to the `gh-pages` branch (contents:write), which GitHub
@@ -13,15 +12,40 @@ on:
 # `pages: write` token this repo's integration doesn't grant. One-time setup:
 # Settings → Pages → "Deploy from a branch" → gh-pages / (root).
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: docs-pages
   cancel-in-progress: false
 
 jobs:
-  build-deploy:
+  relevant-changes:
+    name: Relevant changes
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.paths.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        uses: ./.github/actions/path-gate
+        with:
+          base: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          head: ${{ github.event.pull_request.head.sha || github.sha }}
+          paths: |
+            docs/book/**
+            .github/workflows/docs.yml
+            .github/actions/path-gate/**
+
+  build-deploy:
+    needs: relevant-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && needs.relevant-changes.outputs.changed == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Install mdbook
