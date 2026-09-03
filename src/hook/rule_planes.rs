@@ -435,7 +435,8 @@ pub(super) fn governed_check(
     let message = super::grounded_plane::rule_verdict_message_from(
         &messages.join("\n"),
         registry.freshness(),
-        cache_age,
+        &source,
+        config.quipu.projection_cache_ttl_secs,
     );
     // The same rule names the `governed` line already reports, carried onto the
     // `guard` line too (yupana #77). Without this a governed deny is the one deny
