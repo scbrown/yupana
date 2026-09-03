@@ -53,6 +53,7 @@ use crate::textrules::TextRule;
 /// written by another version is REFUSED rather than parsed leniently, because
 /// a half-understood policy set is the one thing this cache must never serve.
 pub const CACHE_VERSION: u32 = 2;
+const MIN_READABLE_CACHE_VERSION: u32 = 1;
 
 /// A persisted projection: both catalogues, the endpoint they came from, and
 /// when they were last CONFIRMED against quipu.
@@ -81,8 +82,10 @@ pub struct CachedProjection {
     #[serde(default)]
     pub tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
     /// Last-known command-memory policies. Version 2 made this a complete
-    /// catalogue member; version 1 caches are refused rather than served as if
-    /// they had checked this plane.
+    /// catalogue member. A version 1 cache restores an empty set honestly: it
+    /// predates this plane, while retaining the older policy planes is safer
+    /// than making the whole guard fail open during a live projection failure.
+    #[serde(default)]
     pub memory_policies: Vec<crate::project_memory::MemoryPolicy>,
     /// Last-known entity-grounded rules (bobbin-tvn). Defaulted so a cache
     /// written before grounding existed still loads.
@@ -282,7 +285,7 @@ pub fn load_servable(
     let body = std::fs::read(path).map_err(|e| CacheMiss::Unreadable(e.to_string()))?;
     let cached: CachedProjection =
         serde_json::from_slice(&body).map_err(|e| CacheMiss::Unreadable(e.to_string()))?;
-    if cached.version != CACHE_VERSION {
+    if !(MIN_READABLE_CACHE_VERSION..=CACHE_VERSION).contains(&cached.version) {
         return Err(CacheMiss::Version(cached.version));
     }
     // Endpoint equality is exact apart from a trailing slash, which `project`

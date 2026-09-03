@@ -185,6 +185,25 @@ fn a_cache_from_another_format_version_is_refused_not_parsed_leniently() {
     );
 }
 
+/// A cache written before the memory-policy plane existed must keep the older
+/// policy planes alive when the network projection fails. This is the exact
+/// field-upgrade path used by version 1 caches deployed before version 2.
+#[test]
+fn a_version_one_cache_without_memory_policies_is_still_servable() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("projection.json");
+    let mut value = serde_json::to_value(a_projection("http://quipu.test", 1_000)).unwrap();
+    value["version"] = serde_json::json!(1);
+    value.as_object_mut().unwrap().remove("memory_policies");
+    std::fs::write(&p, serde_json::to_vec(&value).unwrap()).unwrap();
+
+    let loaded = load_servable(&p, "http://quipu.test", 3600, 1_001).unwrap();
+    assert_eq!(loaded.version, 1);
+    assert_eq!(loaded.policies.len(), 1);
+    assert_eq!(loaded.text_rules.len(), 1);
+    assert!(loaded.memory_policies.is_empty());
+}
+
 #[test]
 fn a_corrupt_cache_is_a_named_miss_and_never_a_panic() {
     let dir = tempfile::tempdir().unwrap();

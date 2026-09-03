@@ -36,7 +36,7 @@ pub fn fetch_repo_exposure(endpoint: &str, repo: &str) -> RepoExposure {
     let target = format!("http://aegis.gastown.local/ontology/repo_{repo}");
     let body = serde_json::json!({ "policy": EXPOSURE_POLICY_IRI, "target": target }).to_string();
     let resp = match ureq::post(&url)
-        .timeout(crate::project::HTTP_TIMEOUT)
+        .timeout(crate::project::http_timeout())
         .set("Content-Type", "application/json")
         .send_string(&body)
     {

@@ -38,7 +38,7 @@ fn values(sparql_json: &str, var: &str) -> Vec<String> {
 /// source failing must never fail the briefing.
 fn post(endpoint: &str, route: &str, body: &serde_json::Value) -> Option<serde_json::Value> {
     let text = ureq::post(&format!("{}{route}", endpoint.trim_end_matches('/')))
-        .timeout(crate::project::HTTP_TIMEOUT)
+        .timeout(crate::project::http_timeout())
         .set("Content-Type", "application/json")
         .send_string(&body.to_string())
         .ok()?

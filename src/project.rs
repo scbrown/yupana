@@ -48,18 +48,28 @@ pub fn fetch_text_rules(endpoint: &str) -> Result<Vec<TextRule>> {
 /// PRE-EDIT hook, so an unbounded call does not fail — it HANGS EVERY EDIT
 /// (measured: a transiently wedged quipu held the guard for the full two
 /// minutes a caller was willing to wait; only the harness's own hook timeout
-/// stood between that and a frozen fleet). Two seconds is generous for a LAN
-/// round-trip and keeps the worst case (two queries + one exposure check)
-/// inside the harness's kill window — past it, the projection fails OPEN,
-/// loudly, like every other gap on this path.
-pub(crate) const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+/// stood between that and a frozen fleet). The live policy projection has been
+/// measured above four seconds, so the former two-second ceiling made failure
+/// deterministic. Ten seconds leaves room for that measured query while still
+/// bounding a wedged service. Operators can tune the ceiling without rebuilding
+/// via `YUPANA_PROJECTION_HTTP_TIMEOUT_SECS`.
+pub(crate) fn http_timeout() -> std::time::Duration {
+    const DEFAULT_SECS: u64 = 10;
+    let configured = std::env::var("YUPANA_PROJECTION_HTTP_TIMEOUT_SECS").ok();
+    let secs = configured
+        .as_deref()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_SECS);
+    std::time::Duration::from_secs(secs)
+}
 
 /// POST a SPARQL query to quipu's `/query`, returning the raw body.
 pub(crate) fn query(endpoint: &str, sparql: &str) -> Result<String> {
     let url = format!("{}/query", endpoint.trim_end_matches('/'));
     let body = serde_json::json!({ "query": sparql }).to_string();
     let resp = ureq::post(&url)
-        .timeout(HTTP_TIMEOUT)
+        .timeout(http_timeout())
         .set("Content-Type", "application/json")
         .set("Accept", "application/sparql-results+json")
         .send_string(&body)
