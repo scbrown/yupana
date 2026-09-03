@@ -189,6 +189,22 @@ pub fn sign(input: ActionInput, key: &Ed25519KeyPair) -> Result<SignedActionReco
 }
 
 pub fn append(path: &Path, record: &SignedActionRecord) -> Result<()> {
+    if let Ok(existing) = std::fs::read_to_string(path) {
+        for line in existing.lines() {
+            let Ok(prior) = serde_json::from_str::<SignedActionRecord>(line) else {
+                continue;
+            };
+            if prior.record_id == record.record_id {
+                if prior.signed_payload_hash == record.signed_payload_hash {
+                    return Ok(());
+                }
+                return Err(Error::Promote(format!(
+                    "record_id {} already exists with a different signed payload",
+                    record.record_id
+                )));
+            }
+        }
+    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -263,5 +279,21 @@ mod tests {
         let record = sign(i, &kp).unwrap();
         assert_eq!(record.certification_status, "uncertified");
         assert!(serde_json::to_value(record).unwrap().get("item").is_none());
+    }
+
+    #[test]
+    fn record_id_is_idempotent_only_for_the_same_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("actions.jsonl");
+        let kp = key();
+        let first = sign(input(true), &kp).unwrap();
+        append(&path, &first).unwrap();
+        append(&path, &first).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap().lines().count(), 1);
+
+        let changed = sign(input(false), &kp).unwrap();
+        let error = append(&path, &changed).unwrap_err().to_string();
+        assert!(error.contains("different signed payload"));
+        assert_eq!(std::fs::read_to_string(path).unwrap().lines().count(), 1);
     }
 }
