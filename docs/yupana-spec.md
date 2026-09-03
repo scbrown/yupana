@@ -1431,7 +1431,7 @@ than degrading to the qualifier.)
 ## Appendix D: Implementation Status
 
 A snapshot of what is actually built, reconciled against the source tree
-2026-08-25. The body of this spec (§§1–11) is the *design*; this appendix is
+2026-09-03. The body of this spec (§§1–11) is the *design*; this appendix is
 the *state* — so its numbers are **recomputed** from `find`/`wc` and
 `cargo test -- --list`, never carried forward from the previous revision.
 
@@ -1458,7 +1458,7 @@ drops landed outside the phase numbering entirely — the game-state harness
 (FR-35..FR-39) and the golden-path guard (FR-40..FR-42) — each behind its own
 Cargo feature and its own addendum.
 
-**Source layout (`src/`, 162 `.rs` files, ~42,950 lines):** the 400-line soft
+**Source layout (`src/`, 181 `.rs` files, ~47,259 lines):** the 400-line soft
 cap is a warn-not-fail target and 24 non-test files currently exceed it, led by
 `promote.rs` (625), `export.rs` (605) and `hook/rule_planes.rs` (567). Those
 three are the only entries in `scripts/file-size-baseline.txt`: the ratchet
@@ -1482,6 +1482,7 @@ exempt from the check (`*_test.rs`, `*tests.rs`, `tests/`).
 | `projection_cache.rs` | durable projection cache with a TTL past which the guard fails open loudly | done |
 | `trace.rs` / `attribution.rs` / `constraint.rs` / `action.rs` / `plate.rs` | the Σ-derived trace record: `ConstraintEvaluation`, the SARC §9.6 attribution tuple, action resolution | done |
 | `verdict.rs` / `verdict_spool.rs` / `audit.rs` | signed verdicts, local spool, deferred promotion (`yupana verdicts`) | done (`quipu` feature) |
+| `action_certification.rs` | signed, replay-compatible agent push/land certification records | done (`quipu` feature) |
 | `brief*.rs` / `grounding*.rs` / `turn_grounding.rs` / `recurrence.rs` / `exemplar.rs` | the work-item briefing (CONTEXT consumer) and turn-grounding evidence | done (`quipu` feature) |
 | `tripwire.rs` / `project_tripwire.rs` | governed path-boundary tripwires projected from quipu | done (`quipu` feature) |
 | `state/` | game-state ingestion, `graph-pattern` policy plane, order guard, what-if, per-(game, faction) tenancy (FR-35..FR-39) | done (`game-state` feature) |
@@ -1496,7 +1497,7 @@ exempt from the check (`*_test.rs`, `*tests.rs`, `tests/`).
 (`--cochange`), `communities`, `census`, `changed`, `dataflow`, `export`,
 `verify`, `exemplar`, `status`, `watch`, `completions`, `hook <post-edit |
 pre-edit | pre-bash | session-start>`, `serve` (`mcp` feature), `daemon`
-(`mcp` feature), `promote` / `verifier` / `verdicts` (`quipu` feature).
+(`mcp` feature), `promote` / `verifier` / `verdicts` / `certify` (`quipu` feature).
 
 **MCP tools (15, `mcp` feature):** `yupana_status`, `yupana_symbols`,
 `yupana_references`, `yupana_analyze`, `yupana_callers`, `yupana_callees`,
