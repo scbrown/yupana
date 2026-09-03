@@ -262,6 +262,10 @@ shapes_path = "shapes/"
 # serving the cache.
 projection_cache_ttl_secs = 3600
 
+# The per-request projection timeout defaults to 10 seconds. Operators can
+# override it without rebuilding Yupana:
+# YUPANA_PROJECTION_HTTP_TIMEOUT_SECS=15
+
 [yupana.policy]
 # "off" (inert) | "advise" (report only) | "enforce" (deny).
 mode = "off"
