@@ -783,6 +783,26 @@ fn a_successful_refresh_persists_the_projection_for_the_next_process() {
     assert_eq!(served.policies[0].rule.name, "todo-needs-ticket");
 }
 
+/// A scheduled refresher must bypass a still-fresh cache and advance its
+/// confirmation timestamp; otherwise it cannot keep the edit path off-network.
+#[test]
+fn an_out_of_band_refresh_always_contacts_quipu_and_advances_the_cache() {
+    let dir = tempfile::tempdir().unwrap();
+    let cache = dir.path().join("projection.json");
+    seed_cache(&cache, "http://old-endpoint.invalid", 1_000);
+    let endpoint = stub_quipu(5);
+
+    let mut registry = ProjectionRegistry::new(&endpoint);
+    registry
+        .refresh_and_persist(&cache, 2_000)
+        .expect("the scheduled refresh succeeds");
+
+    let served = crate::projection_cache::load_servable(&cache, &endpoint, 3600, 2_001).unwrap();
+    assert_eq!(served.written_at, 2_000);
+    assert_eq!(served.endpoint, endpoint);
+    assert_eq!(served.policies.len(), 2);
+}
+
 /// The cache is bound to the quipu it came from. Serving another deployment's
 /// catalogue would enforce policy this endpoint never declared, while the
 /// verdict claimed to be enforcing this one's.
