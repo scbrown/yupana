@@ -1101,6 +1101,17 @@ retry: it runs on every edit across the fleet and its latency ceiling is the
 reason it exists. A status surface that went red once in ten runs from a
 transient blip would be routed around, and then the real red would be invisible
 too.</p>
+<h2 id="yupana-refresh-projection"><a class="header" href="#yupana-refresh-projection"><code>yupana refresh-projection</code></a></h2>
+<p>Fetch the complete governed-policy catalogue from the configured Quipu endpoint
+and atomically refresh the durable <code>projection.json</code> used by short-lived hooks:</p>
+<pre><code class="language-sh">yupana refresh-projection
+</code></pre>
+<p>This command always contacts Quipu, even when the existing cache is fresh. Run
+it from a timer outside the edit path, with a cache TTL comfortably longer than
+the timer interval. It works while <code>[yupana.quipu] enabled = false</code>, allowing an
+operator to bootstrap and verify the cache before enabling the guard. A failed
+projection leaves the prior cache unchanged and exits non-zero; success is not
+reported unless the new timestamp can be read back.</p>
 <h2 id="yupana-refs"><a class="header" href="#yupana-refs"><code>yupana refs</code></a></h2>
 <p>Definition sites of a symbol, by name, from the same graph <code>callers</code>, <code>impact</code>
 and <code>communities</code> read — so every language this build has a grammar for is
