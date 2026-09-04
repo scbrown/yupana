@@ -12,6 +12,8 @@
 //! promotion (`quipu`) are feature-gated; the CPG/dataflow tier remains planned.
 
 pub mod action;
+#[cfg(feature = "quipu")]
+pub mod action_certification;
 pub mod attribution;
 pub mod audit;
 /// The work-item briefing — the CONTEXT consumer of the scope ladder. Gated

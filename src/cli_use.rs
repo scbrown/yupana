@@ -33,5 +33,7 @@ pub(super) fn deliberate_use_name(cmd: &Commands) -> Option<&'static str> {
         Commands::Verifier { .. } => "verifier",
         #[cfg(feature = "quipu")]
         Commands::Verdicts { .. } => "verdicts",
+        #[cfg(feature = "quipu")]
+        Commands::Certify(_) => "certify",
     })
 }

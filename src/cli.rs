@@ -302,11 +302,8 @@ enum Commands {
     },
     /// Promote spooled verdicts into quipu (quipu feature).
     ///
-    /// The pre-edit guard SIGNS a verdict the moment a constraint fires and
-    /// appends it locally; it never promotes on the edit path, because a
-    /// `/knot` round-trip does not fit inside the guard's deadline and would
-    /// make every agent's edit latency a function of quipu's availability. This
-    /// is the other half.
+    /// The guard signs and spools locally; this command promotes later so
+    /// Quipu latency never enters the edit path.
     #[cfg(feature = "quipu")]
     Verdicts {
         /// Quipu base URL. Defaults to `[yupana.quipu] endpoint`.
@@ -316,15 +313,15 @@ enum Commands {
         #[arg(long)]
         spool: Option<PathBuf>,
     },
+    #[cfg(feature = "quipu")]
+    Certify(crate::action_certification::CertifyArgs),
 }
-
 /// Output formats for `yupana export`.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ExportFormat {
     /// RDF Turtle in the `bobbin:` code ontology.
     Turtle,
 }
-
 impl Cli {
     /// Whether `--verbose` was passed. Consulted by `main` to raise the default
     /// tracing verbosity (see [`init_tracing`]).
@@ -380,6 +377,8 @@ impl Cli {
             Commands::Verdicts { to, spool } => {
                 self.drain_verdicts(to.as_deref(), spool.as_deref())
             }
+            #[cfg(feature = "quipu")]
+            Commands::Certify(args) => args.run(),
             Commands::Serve { http } => self.serve(*http).await,
             Commands::Daemon { port } => self.daemon(*port).await,
             Commands::Callers { symbol, path } => {
