@@ -187,4 +187,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npx markdownlint-cli2
+      - run: npx markdownlint-cli2@0.23.2
