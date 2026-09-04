@@ -7,6 +7,44 @@ use crate::types::Tier;
 use super::cli_status_rules::{measure_rule_set, RuleSetState, RuleSetStatus};
 
 impl Cli {
+    /// Perform the slow network projection outside the latency-sensitive edit
+    /// path and atomically replace the durable hook cache on success.
+    #[cfg(feature = "quipu")]
+    pub(super) fn refresh_projection(&self) -> anyhow::Result<()> {
+        let root = std::env::current_dir()?;
+        let config = self.load_config(&root)?;
+        anyhow::ensure!(
+            !config.quipu.endpoint.is_empty(),
+            "[yupana.quipu] endpoint is empty; no projection source is configured"
+        );
+        let cache = crate::projection_cache::cache_path()
+            .ok_or_else(|| anyhow::anyhow!("no projection cache path could be resolved"))?;
+        let now = crate::projection_cache::now_secs();
+        let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
+        registry.refresh_and_persist(&cache, now)?;
+
+        let projected = registry.policies().len() + registry.text_rules().len();
+        if self.json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "outcome": "refreshed",
+                    "cache": cache,
+                    "written_at": now,
+                    "projected": projected,
+                    "structural": registry.policies().len(),
+                    "text": registry.text_rules().len(),
+                })
+            );
+        } else if !self.quiet {
+            println!(
+                "projection cache refreshed: {projected} rule(s) -> {}",
+                cache.display()
+            );
+        }
+        Ok(())
+    }
+
     /// Print base ref, tier availability, and config.
     pub(super) fn status(&self) -> anyhow::Result<()> {
         let root = std::env::current_dir()?;

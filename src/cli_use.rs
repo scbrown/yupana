@@ -17,6 +17,8 @@ pub(super) fn deliberate_use_name(cmd: &Commands) -> Option<&'static str> {
         Commands::Refs { .. } => "refs",
         Commands::Watch { .. } => "watch",
         Commands::Status => "status",
+        #[cfg(feature = "quipu")]
+        Commands::RefreshProjection => "refresh-projection",
         Commands::Callers { .. } => "callers",
         Commands::Communities { .. } => "communities",
         Commands::Impact { .. } => "impact",

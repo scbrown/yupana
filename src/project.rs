@@ -392,22 +392,7 @@ impl ProjectionRegistry {
         let live_error = match self.refresh() {
             Ok(()) => {
                 if let Some(path) = cache_path {
-                    crate::projection_cache::save(
-                        path,
-                        &crate::projection_cache::CachedProjection {
-                            version: crate::projection_cache::CACHE_VERSION,
-                            written_at: now,
-                            endpoint: self.endpoint.clone(),
-                            policies: self.policies.clone(),
-                            text_rules: self.text_rules.clone(),
-                            tripwires: self.tripwires.clone(),
-                            memory_policies: self.memory_policies.clone(),
-                            grounded_rules: self.grounded_rules.clone(),
-                            grounding: self.grounding.clone(),
-                            work_item_scopes: self.work_item_scopes.clone(),
-                            work_item_parents: self.work_item_parents.clone(),
-                        },
-                    );
+                    crate::projection_cache::save(path, &self.cached_projection(now));
                 }
                 return Ok(ProjectionSource::Live);
             }
