@@ -122,24 +122,27 @@ SELECT ?pred ?name ?label ?matchType ?tier ?rationale WHERE {
   OPTIONAL { ?pred rdfs:comment ?rationale }
 }";
 
-/// The OBSERVED work-item scope map (work-scoped-governance ladder, bottom
-/// rung): which paths prior work on each item actually touched, via the
+/// One tenant's OBSERVED work-item scope (work-scoped-governance ladder,
+/// bottom rung): which paths prior work on that item actually touched, via the
 /// deterministic provenance chain quipu already aggregates
 /// (`Bead <-aegis:implements- Commit -aegis:modifies-> entity`, quipu
-/// shapes/provenance.ttl). Zero rows on a store with no promoted provenance —
-/// an empty map, not an error, like every other catalogue here.
+/// shapes/provenance.ttl). `$ITEM` is replaced with an escaped exact identifier
+/// before dispatch; leaving it unbound turns this into a whole-store three-way
+/// join that exceeds quipu's own query deadline. Zero rows means this item has
+/// no promoted provenance — an empty map, not an error.
 pub const WORK_ITEM_SCOPE_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
-SELECT ?id ?path WHERE {
+SELECT ?path WHERE {
+  ?w aegis:identifier \"$ITEM\" .
   ?c aegis:implements ?w ;
      aegis:modifies ?e .
-  ?w aegis:identifier ?id .
   ?e aegis:filePath ?path .
 }";
 
-/// The DERIVED rung's source: which work item each item hangs under.
+/// The DERIVED rung's source: which work item the current item hangs under.
 ///
-/// `aegis:contains` is quipu's existing epic/bead hierarchy (an epic is just a
+/// `$ITEM` is replaced with the same escaped exact identifier as the scope
+/// query. `aegis:contains` is quipu's existing epic/bead hierarchy (an epic is just a
 /// Bead with children — `shapes/provenance.ttl`), so this rung, like the
 /// observed one below it, needs no new graph vocabulary.
 ///
@@ -151,9 +154,9 @@ SELECT ?id ?path WHERE {
 /// hard-denies (see `scope_arm`).
 pub const WORK_ITEM_PARENT_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
-SELECT ?id ?parent WHERE {
+SELECT ?parent WHERE {
+  ?w aegis:identifier \"$ITEM\" .
   ?p aegis:contains ?w .
-  ?w aegis:identifier ?id .
   ?p aegis:identifier ?parent .
 }";
 
