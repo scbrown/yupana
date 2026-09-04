@@ -329,10 +329,8 @@ impl ProjectionRegistry {
                 );
                 // Same contract as the grounding set: its failure disables
                 // only its own rung (unknown scope advises), never the guard.
-                self.work_item_scopes =
-                    crate::project_scope::fetch_work_item_scopes(&self.endpoint);
-                self.work_item_parents =
-                    crate::project_scope::fetch_work_item_parents(&self.endpoint);
+                (self.work_item_scopes, self.work_item_parents) =
+                    crate::project_scope::fetch_work_item_context(&self.endpoint);
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
