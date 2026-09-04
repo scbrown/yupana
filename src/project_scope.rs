@@ -88,7 +88,7 @@ fn fetch_work_item_context_for(
 
     let mut rows = Vec::new();
     for id in ids {
-        let projected = crate::project::query(endpoint, &scope_query(&id))
+        let projected = crate::project::query(endpoint, &scope_query(id))
             .and_then(|body| binding_values(&body, "path"));
         match projected {
             Ok(found) => rows.extend(found.into_iter().map(|path| (id.to_string(), path))),
