@@ -116,7 +116,8 @@ def cedar_string(value: object) -> str:
 
 def input_fields(rec: dict) -> dict[str, str]:
     """Policy-visible fields, absent when the spool did not resolve them."""
-    keys = ("session", "item", "tenant", "result", "target_class", "rule", "tool", "mode")
+    keys = ("session", "item", "tenant", "result", "target_class", "rule", "tool", "mode",
+            "exposure", "repo")
     return {key: str(rec[key]) for key in keys if rec.get(key) is not None}
 
 
