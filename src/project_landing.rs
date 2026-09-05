@@ -315,6 +315,21 @@ pub fn resolve(catalogue: &[RepoLanding], name: &str) -> LandingAuthority {
     }
 }
 
+impl crate::project::ProjectionRegistry {
+    /// The governed landing catalogue, or `None` when this registry cannot
+    /// speak about landings at all.
+    ///
+    /// The `Option` carries the distinction the guard turns on: `None` is
+    /// "never asked, or restored from a cache predating this plane" and
+    /// resolves as [`LandingAuthority::Unknown`]; `Some(&[])` is "asked, and no
+    /// repository declares a rule", which resolves as
+    /// [`LandingAuthority::Ungoverned`] and allows.
+    #[must_use]
+    pub fn landing_policies(&self) -> Option<&[RepoLanding]> {
+        self.landing_policies.as_deref()
+    }
+}
+
 #[cfg(test)]
 #[allow(non_snake_case)]
 mod tests {
@@ -476,20 +491,5 @@ mod tests {
         assert!(repos[0].owner.is_none());
         assert!(!repos[0].is_owner("anyone"));
         assert!(!repos[0].is_owner(""));
-    }
-}
-
-impl crate::project::ProjectionRegistry {
-    /// The governed landing catalogue, or `None` when this registry cannot
-    /// speak about landings at all.
-    ///
-    /// The `Option` carries the distinction the guard turns on: `None` is
-    /// "never asked, or restored from a cache predating this plane" and
-    /// resolves as [`LandingAuthority::Unknown`]; `Some(&[])` is "asked, and no
-    /// repository declares a rule", which resolves as
-    /// [`LandingAuthority::Ungoverned`] and allows.
-    #[must_use]
-    pub fn landing_policies(&self) -> Option<&[RepoLanding]> {
-        self.landing_policies.as_deref()
     }
 }

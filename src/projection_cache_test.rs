@@ -55,7 +55,7 @@ fn a_text_rule(name: &str) -> TextRule {
 /// guard reported ALLOW on a non-owner merge onto a governed repository, with no
 /// error anywhere: exactly the shape of a guard that looks armed and is not.
 #[test]
-fn a_cache_predating_the_landing_plane_is_UNKNOWN_not_an_empty_catalogue() {
+fn a_cache_predating_the_landing_plane_is_unknown_not_an_empty_catalogue() {
     let mut value = serde_json::to_value(a_projection("http://q", 10)).unwrap();
     // Drop the field, reproducing a cache written by the previous version.
     value.as_object_mut().unwrap().remove("landing_policies");
