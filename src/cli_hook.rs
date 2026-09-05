@@ -12,6 +12,11 @@ pub(crate) enum HookEvent {
     /// Claude Code `PreToolUse` on Edit/Write: deny an edit that exceeds the
     /// tenant's capability scope. Opt-in, and always fails open.
     PreEdit,
+    /// Claude Code `PostToolUse` / `PostToolUseFailure` on Bash: record the
+    /// action's OUTCOME, joined to its `pre-bash` record by the harness's
+    /// `tool_use_id`. Wire it on BOTH events — the event name IS the outcome.
+    /// Never denies, never prints (aegis-368cu.10).
+    PostBash,
     /// Claude Code `PreToolUse` on Bash: record the action and evaluate governed
     /// command policies. Advises first; denial requires enforce mode.
     PreBash,
@@ -30,6 +35,7 @@ pub(crate) fn run(
 ) -> anyhow::Result<()> {
     match event {
         HookEvent::PostEdit => crate::hook::run_post_edit(tenant),
+        HookEvent::PostBash => crate::hook::run_post_bash(),
         HookEvent::PreBash => crate::hook::run_pre_bash(),
         HookEvent::PreEdit => crate::hook::run_pre_edit(tenant, config),
         #[cfg(feature = "quipu")]

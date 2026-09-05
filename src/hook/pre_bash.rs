@@ -63,7 +63,11 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
                 (reference, state)
             });
         let resolved = action::resolve(&cmd);
-        record(&resolved, grounding);
+        record(
+            &resolved,
+            grounding,
+            input.as_ref().and_then(|i| i.tool_use_id.clone()),
+        );
         #[cfg(feature = "quipu")]
         let ci = crate::ci_shift::hook_advisory(&buf, &cmd);
         #[cfg(not(feature = "quipu"))]
@@ -239,8 +243,18 @@ fn record(
         &crate::turn_grounding::GroundingRef,
         crate::turn_grounding::GroundingState,
     )>,
+    action_id: Option<String>,
 ) {
-    crate::metrics::emit("action", &action_fields(a, grounding));
+    let mut fields = action_fields(a, grounding);
+    // The harness's id for this tool call, carried so the OUTCOME record can be
+    // joined to the action (aegis-368cu.10). OMITTED when the harness did not
+    // supply one, never blanked: a reader must be able to tell "this payload
+    // carried no id" from "the id was empty", because the first means the join
+    // is impossible for that row and the second would be a bug.
+    if let Some(id) = action_id {
+        fields.push(("action_id", id.into()));
+    }
+    crate::metrics::emit("action", &fields);
 }
 
 #[cfg(test)]

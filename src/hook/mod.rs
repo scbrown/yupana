@@ -42,6 +42,7 @@ mod landing_guard;
 mod measure;
 mod memory_guard;
 pub mod paa;
+mod post_bash;
 mod post_edit;
 mod pre_bash;
 mod pre_bash_grounding;
@@ -51,6 +52,7 @@ mod scope_notice;
 #[cfg(feature = "quipu")]
 mod session_start;
 
+pub use post_bash::run_post_bash;
 pub use post_edit::{advisory_for, run_post_edit};
 pub use pre_bash::run_pre_bash;
 pub use pre_edit::{run_pre_edit, Outcome};
@@ -90,6 +92,30 @@ pub struct HookInput {
     /// schema; it must never echo this value.
     #[serde(default)]
     pub tool_response: serde_json::Value,
+    /// The harness's id for THIS tool call, present on both `PreToolUse` and
+    /// `PostToolUse` and identical across the pair (aegis-368cu.10).
+    ///
+    /// This is the correlation id that makes an action's OUTCOME joinable to the
+    /// action itself. It is supplied by the harness, so the two short-lived hook
+    /// processes need no shared state and no minted id — and critically not a
+    /// timestamp-plus-agent correlation, which is what failed in aegis-0jv06
+    /// with ~20 agents running concurrently.
+    ///
+    /// Measured on this harness: a matched pre/post pair shares one value
+    /// (e.g. `toolu_01P22bAxbYw46r3SRRpjY8DE`).
+    #[serde(default)]
+    pub tool_use_id: Option<String>,
+    /// Which hook event this payload is for — `PostToolUse` vs
+    /// `PostToolUseFailure` is how the harness REPORTS an action's outcome, so
+    /// reading it is observation. Inferring success by parsing `stderr` would be
+    /// the fiction this bead exists to avoid.
+    #[serde(default)]
+    pub hook_event_name: Option<String>,
+    /// Wall time the HARNESS measured for the tool call (`PostToolUse` only).
+    /// Authoritative in a way a hook's own timing cannot be: the hook runs after
+    /// the call it would be timing.
+    #[serde(default)]
+    pub duration_ms: Option<u64>,
     /// Turn-boundary grounding reference injected by the harness for a
     /// NeuralAmplifier-scoped action.
     #[serde(default)]
