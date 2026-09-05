@@ -61,6 +61,14 @@ pub fn run_post_edit(tenant: Option<&str>) -> anyhow::Result<()> {
     if let Some(text) = super::scope_notice::for_payload(&buf, &root) {
         sections.push(text);
     }
+    // The DELEGATE line (aegis-2o9eo). Placed HERE rather than inside
+    // `advisory_for` deliberately: that function returns early for anything
+    // that is not a Rust file with symbols, and this boundary is
+    // language-independent — the specimen case in the bead was edits across
+    // several repos and file types, none of which advisory_for would have seen.
+    if let Some(text) = super::delegate_line::advisory(&buf) {
+        sections.push(text);
+    }
     if let Some(text) = advisory_for(&buf, &root, tenant) {
         sections.push(text);
     }

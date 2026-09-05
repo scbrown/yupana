@@ -46,6 +46,14 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
 
     if let Some(cmd) = cmd {
         let input = crate::hook::HookInput::parse(&buf);
+        // Record that this session produced a delegable artifact, so the
+        // post-edit DELEGATE advisory can tell "still investigating" from
+        // "already had something to hand off" (aegis-2o9eo). Record-only: this
+        // hook never refuses a command on that basis.
+        super::delegate_line::note_command(
+            input.as_ref().and_then(|i| i.session_id.as_deref()),
+            &cmd,
+        );
         let grounding = input
             .as_ref()
             .and_then(|i| i.grounding.as_ref())

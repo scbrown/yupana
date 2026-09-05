@@ -24,6 +24,7 @@
 #[cfg(feature = "quipu")]
 mod config_drift;
 mod credential_output;
+mod delegate_line;
 #[cfg(feature = "quipu")]
 mod disk_guard;
 /// The governed landing policy's decision procedure — pure, every arm testable
@@ -233,7 +234,7 @@ pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
         return true;
     }
     prune_fail_open_markers(&marker_dir, SystemTime::now());
-    let marker = marker_dir.join(format!("{MARKER_PREFIX}{safe}-{kind_safe}"));
+    let marker = marker_dir.join(marker_name(&safe, &kind_safe));
     match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -243,6 +244,60 @@ pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
         // Already exists => already warned. Any other error => warn anyway.
         Err(e) => e.kind() != std::io::ErrorKind::AlreadyExists,
     }
+}
+
+/// The marker file name for one (session, kind) pair.
+///
+/// ONE definition, because [`first_notice_for_session`] writes it and
+/// [`session_event_recorded`] reads it. Two spellings of this name would make
+/// the reader silently answer "no" forever while the writer kept recording —
+/// a guard that is never wrong out loud.
+fn marker_name(safe_session: &str, safe_kind: &str) -> String {
+    format!("{MARKER_PREFIX}{safe_session}-{safe_kind}")
+}
+
+/// Sanitise a session id and a kind the same way [`first_notice_for_session`]
+/// does, or `None` when the session cannot be keyed on.
+fn safe_marker_parts(session: Option<&str>, kind: &str) -> Option<(String, String)> {
+    let session = session?;
+    let safe: String = session
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(64)
+        .collect();
+    if safe.is_empty() {
+        return None;
+    }
+    let kind_safe: String = kind
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(80)
+        .collect();
+    Some((safe, kind_safe))
+}
+
+/// Whether this session has already recorded `kind`, WITHOUT recording it.
+///
+/// [`first_notice_for_session`] is a test-and-set: asking it whether something
+/// happened makes it have happened. This is the read-only half, for a guard
+/// that needs to consult an event it did not cause.
+///
+/// Absence answers `false`. That is deliberate and it is the safe direction
+/// here: the caller advises when the event IS present, so an unreadable or
+/// pruned marker degrades to silence rather than to a spurious advisory.
+#[must_use]
+pub fn session_event_recorded(session: Option<&str>, kind: &str) -> bool {
+    let Some((safe, kind_safe)) = safe_marker_parts(session, kind) else {
+        return false;
+    };
+    fail_open_marker_dir()
+        .join(marker_name(&safe, &kind_safe))
+        .exists()
+}
+
+/// Record `kind` for this session, ignoring whether it was already there.
+pub fn record_session_event(session: Option<&str>, kind: &str) {
+    let _ = first_notice_for_session(session, kind);
 }
 
 /// Marker file-name prefix. `HANK_MARKER_PREFIX` is the pre-rename spelling: markers
