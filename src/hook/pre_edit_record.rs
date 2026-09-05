@@ -134,10 +134,14 @@ pub(super) fn guard_recorded(
     // an action to a dead session's work item is the confidently-wrong case the
     // plate docs call out. A dispatcher-written plate carries no session and is
     // still read — see `plate::parse`.
-    if let Some(item) = crate::plate::current(input.as_ref().and_then(|i| i.session_id.as_deref()))
-    {
-        fields.push(("item", item.into()));
-    }
+    // ALWAYS push the field, so the UNSCOPED fallback in `metrics::emit` cannot
+    // reinstate an item this session-scoped read deliberately abstained on.
+    // Null claims the field and is dropped rather than written.
+    fields.push((
+        "item",
+        crate::plate::current(input.as_ref().and_then(|i| i.session_id.as_deref()))
+            .map_or(serde_json::Value::Null, Into::into),
+    ));
 
     // The SUBJECT of the decision (yupana #77). Recorded for allow as well as
     // deny, deliberately and under the same knob: scope that can only be

@@ -113,10 +113,27 @@ pub fn emit_to(path: &std::path::Path, kind: &str, fields: &[(&str, serde_json::
         // UNKNOWN rather than recorded as null or a guess: a record that omits
         // the field is honestly silent, whereas one asserting the wrong item
         // would be replayed later as justification for a rule.
-        if let Some(item) = crate::plate::current(None) {
-            obj.insert("item".into(), item.into());
+        // THIS IS A FALLBACK AND MUST NOT OVERRIDE A CALLER'S DECISION. A
+        // caller that resolved the plate ITSELF — `pre_edit_record` does, scoped
+        // to the hook payload's session — may have deliberately ABSTAINED, and
+        // this read is UNSCOPED. Filling the field here reinstates exactly the
+        // attribution the caller just refused to make: measured on
+        // aegis-368cu.7, a mismatched session abstained and the record still
+        // carried the item, so the session guard was inert for the one field it
+        // exists to protect. A caller claims the field by passing `item`,
+        // including as Null for "I looked and abstained"; Null is dropped below.
+        if !fields.iter().any(|(k, _)| *k == "item") {
+            if let Some(item) = crate::plate::current(None) {
+                obj.insert("item".into(), item.into());
+            }
         }
         for (k, v) in fields {
+            // OMITTED, NEVER BLANKED: a caller passes Null to claim a field and
+            // declare it unknown. Writing null would make "I abstained"
+            // indistinguishable from "the value is null" to every reader.
+            if v.is_null() {
+                continue;
+            }
             obj.insert((*k).into(), v.clone());
         }
         let Ok(line) = serde_json::to_string(&serde_json::Value::Object(obj)) else {
@@ -183,6 +200,46 @@ mod tests {
         assert_eq!(v["result"], "deny");
         assert_eq!(v["duration_ms"], 12);
         assert!(v["ts"].as_u64().unwrap() > 0);
+    }
+
+    /// A caller's ABSTENTION must survive the unscoped fallback.
+    ///
+    /// `pre_edit_record` resolves the plate scoped to the hook payload's
+    /// session; `emit` resolves it UNSCOPED as a fallback for callers that do
+    /// not. Measured on aegis-368cu.7: when the scoped read abstained on a
+    /// session mismatch it pushed nothing, the fallback filled the field
+    /// anyway, and the record asserted an item the guard had just refused to
+    /// attribute — the session guard inert for the one field it protects.
+    #[test]
+    fn a_null_item_claims_the_field_and_is_omitted_not_blanked() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("m.jsonl");
+        emit_to(
+            &p,
+            "guard",
+            &[
+                ("result", "allow".into()),
+                ("item", serde_json::Value::Null),
+            ],
+        );
+        let line = std::fs::read_to_string(&p).unwrap();
+        let v: serde_json::Value = serde_json::from_str(line.lines().next().unwrap()).unwrap();
+        assert!(
+            v.get("item").is_none(),
+            "an abstained item must be OMITTED, never written as null and never \
+             refilled by the unscoped fallback: {v}"
+        );
+        assert_eq!(v.get("result").and_then(|x| x.as_str()), Some("allow"));
+    }
+
+    #[test]
+    fn a_supplied_item_is_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("m.jsonl");
+        emit_to(&p, "guard", &[("item", "aegis-1".into())]);
+        let line = std::fs::read_to_string(&p).unwrap();
+        let v: serde_json::Value = serde_json::from_str(line.lines().next().unwrap()).unwrap();
+        assert_eq!(v.get("item").and_then(|x| x.as_str()), Some("aegis-1"));
     }
 
     #[test]
