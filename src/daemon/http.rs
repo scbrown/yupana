@@ -56,6 +56,10 @@ pub fn router(engine: ResidentEngine) -> Router {
     {
         router = router.merge(super::path_http::routes());
     }
+    #[cfg(feature = "quipu")]
+    {
+        router = router.route("/projection", get(projection));
+    }
     router.with_state(engine)
 }
 
@@ -63,6 +67,30 @@ pub fn router(engine: ResidentEngine) -> Router {
 /// this and nothing else, so it stays a bare, dependency-free 200.
 async fn health() -> &'static str {
     "ok"
+}
+
+/// The resident projected policy (aegis-x894x2) — the endpoint that makes a
+/// hook's projection cost a localhost read of resident memory instead of a
+/// contended quipu `/query`.
+///
+/// Answers from memory: no network call happens on this path, which is the
+/// whole point. The reply carries the catalogue's AGE and never a servability
+/// verdict — the caller applies its own `projection_cache_ttl_secs`, so the
+/// deliberate past-TTL refusal (`a_cache_past_the_ttl_fails_open_and_the_reason
+/// _names_both_halves`) keeps being made in exactly one place.
+///
+/// **503, never an empty catalogue**, when this daemon has no projection at all:
+/// a `200` with zero rules is indistinguishable from "no rules apply", and those
+/// need opposite responses. The client turns this into a fall-back-to-live, not
+/// into a clean allow.
+#[cfg(feature = "quipu")]
+async fn projection(
+    State(engine): State<ResidentEngine>,
+) -> Result<Json<super::projection::ProjectionReply>, StatusCode> {
+    match engine.projection() {
+        Some(resident) => Ok(Json(resident.snapshot(crate::projection_cache::now_secs()))),
+        None => Err(StatusCode::SERVICE_UNAVAILABLE),
+    }
 }
 
 /// The resident graph's real facts — what an operator (or `yupana daemon status`,
