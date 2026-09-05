@@ -42,6 +42,7 @@ test *args="":
     # that runs every test.
     python3 tests/spool_to_dogwood.py
     just session-guard --selftest
+    python3 tests/session_depth.py
 
 # Run the linter (matches CI: deny warnings, allow missing-docs)
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every

@@ -17,6 +17,8 @@ Usage: just session-guard <transcript.jsonl>
 import json
 import sys
 
+from session_trajectory import is_compaction, records
+
 WHOLE_FILE = (0, float("inf"))
 
 
@@ -33,78 +35,60 @@ def overlaps(a, b):
     return a[0] < b[1] and b[0] < a[1]
 
 
-def is_compaction(rec):
-    """A boundary after which prior content may no longer be in context.
-
-    Several markers are accepted because the field has moved between Claude Code
-    versions; treating an unknown-but-compaction-shaped record as a boundary is
-    the SAFE direction — it suppresses a warning rather than inventing one.
-    """
-    if rec.get("isCompactSummary") or rec.get("compact"):
-        return True
-    if rec.get("subtype") in ("compact_boundary", "compaction", "compact"):
-        return True
-    msg = rec.get("message") or {}
-    return bool(msg.get("isCompactSummary"))
-
-
 def events(path):
     """Pair successful text results with requests; a request alone proves no read."""
     import hashlib
 
     out, pending = [], {}
-    with open(path, errors="replace") as fh:
-        for line in fh:
-            try:
-                rec = json.loads(line)
-            except (ValueError, TypeError):
+    for rec in records(path):
+        if rec is None:
+            out.append({"kind": "compact"})
+            pending.clear()
+            continue
+        if is_compaction(rec):
+            out.append({"kind": "compact"})
+            pending.clear()
+            continue
+        content = (rec.get("message") or {}).get("content") or []
+        if not isinstance(content, list):
+            continue
+        for c in content:
+            if not isinstance(c, dict):
                 continue
-            if not isinstance(rec, dict):
-                continue
-            if is_compaction(rec):
-                out.append({"kind": "compact"})
-                pending.clear()
-                continue
-            content = (rec.get("message") or {}).get("content") or []
-            if not isinstance(content, list):
-                continue
-            for c in content:
-                if not isinstance(c, dict):
+            if c.get("type") == "tool_use":
+                inp = c.get("input") or {}
+                name, fp = c.get("name"), inp.get("file_path")
+                if name == "Bash":
+                    out.append({"kind": "bash", "cmd": str(inp.get("command", ""))})
+                elif name in ("Edit", "Write", "NotebookEdit") and fp:
+                    out.append({"kind": "edit", "path": fp})
+                elif name == "Read" and fp and c.get("id"):
+                    # Known background-task outputs are polled for changes,
+                    # not reread because their earlier content was forgotten.
+                    parts = str(fp).replace("\\", "/").split("/")
+                    if "tasks" in parts and str(fp).endswith(".output"):
+                        continue
+                    begin = len(out)
+                    out.append({"kind": "read_begin"})
+                    pending[c["id"]] = (fp, region(inp), begin)
+            elif c.get("type") == "tool_result":
+                request = pending.pop(c.get("tool_use_id"), None)
+                if request is None:
                     continue
-                if c.get("type") == "tool_use":
-                    inp = c.get("input") or {}
-                    name, fp = c.get("name"), inp.get("file_path")
-                    if name == "Bash":
-                        out.append({"kind": "bash", "cmd": str(inp.get("command", ""))})
-                    elif name in ("Edit", "Write", "NotebookEdit") and fp:
-                        out.append({"kind": "edit", "path": fp})
-                    elif name == "Read" and fp and c.get("id"):
-                        # Known background-task outputs are polled for changes,
-                        # not reread because their earlier content was forgotten.
-                        parts = str(fp).replace("\\", "/").split("/")
-                        if "tasks" in parts and str(fp).endswith(".output"):
-                            continue
-                        begin = len(out)
-                        out.append({"kind": "read_begin"})
-                        pending[c["id"]] = (fp, region(inp), begin)
-                elif c.get("type") == "tool_result":
-                    request = pending.pop(c.get("tool_use_id"), None)
-                    if request is None:
-                        continue
-                    fp, span, begin = request
-                    body = c.get("content")
-                    if isinstance(body, list):
-                        if not body or any(not isinstance(v, dict) or v.get("type") != "text"
-                                           or not isinstance(v.get("text"), str) for v in body):
-                            body = None
-                        else:
-                            body = "\n".join(v["text"] for v in body)
-                    if c.get("is_error") or not isinstance(body, str) or not body.strip():
-                        out.append({"kind": "edit", "path": fp})  # evidence unavailable
-                        continue
-                    digest = hashlib.sha256(body.encode()).hexdigest()
-                    out.append({"kind": "read", "path": fp, "region": span,
-                                "digest": digest, "begin": begin})
+                fp, span, begin = request
+                body = c.get("content")
+                if isinstance(body, list):
+                    if not body or any(not isinstance(v, dict) or v.get("type") != "text"
+                                       or not isinstance(v.get("text"), str) for v in body):
+                        body = None
+                    else:
+                        body = "\n".join(v["text"] for v in body)
+                if c.get("is_error") or not isinstance(body, str) or not body.strip():
+                    out.append({"kind": "edit", "path": fp})  # evidence unavailable
+                    continue
+                digest = hashlib.sha256(body.encode()).hexdigest()
+                out.append({"kind": "read", "path": fp, "region": span,
+                            "digest": digest, "begin": begin})
     return out
 
 
@@ -238,7 +222,10 @@ def selftest():
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "--selftest"
-    if arg == "--selftest":
+    if arg == "depth":
+        from session_depth import main
+        sys.exit(main(sys.argv[2:]))
+    elif arg == "--selftest":
         sys.exit(selftest())
     else:
         report(arg)
