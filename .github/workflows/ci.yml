@@ -5,6 +5,17 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Re-run the suite on demand, without inventing a commit to trigger it.
+  #
+  # Added while soaking the aegis-beavto flake fix (aegis-x2zuxg): proving a
+  # flake is gone needs REPEATED runs of the SAME commit, and with only push and
+  # pull_request the only ways to get one were an empty commit or a throwaway
+  # PR. Both put noise in the history to answer a question about the history.
+  #
+  # It matters beyond that soak: an intermittent failure is exactly the case
+  # where you need to run the same tree again, and it was the one thing this
+  # workflow could not do.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
