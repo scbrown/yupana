@@ -248,3 +248,31 @@ fn large_transcripts_use_recent_connected_evidence_without_needing_the_root() {
         .join("\n");
     assert_eq!(evaluate(&p, &compacted), Verdict::NoMatch);
 }
+
+#[test]
+fn unknown_diagnostics_distinguish_hook_time_evidence_gaps() {
+    let p = payload();
+    assert_eq!(unknown_evidence(&p, None), "transcript_unavailable");
+    assert_eq!(unknown_evidence(&p, Some("{")), "malformed_snapshot");
+    assert_eq!(
+        unknown_evidence(&p, Some(&request("first").to_string())),
+        "current_request_absent"
+    );
+    let unlinked = request("second").to_string();
+    assert_eq!(
+        unknown_evidence(&p, Some(&unlinked)),
+        "ancestry_unavailable"
+    );
+    let mut r = request("second");
+    r["message"]["content"][0]["input"]["limit"] = 10.into();
+    assert_eq!(
+        unknown_evidence(&p, Some(&r.to_string())),
+        "request_arguments_differ"
+    );
+    let mut missing = p.clone();
+    missing["tool_response"] = Value::Null;
+    assert_eq!(
+        unknown_evidence(&missing, Some("{}")),
+        "structured_response_unavailable"
+    );
+}

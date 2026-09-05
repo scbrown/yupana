@@ -279,8 +279,15 @@ pub(super) fn advisory(input_json: &str) -> Option<String> {
     if payload.get("tool_name").and_then(Value::as_str) != Some("Read") {
         return None;
     }
-    let outcome =
-        read_transcript(&payload).map_or(Verdict::Unknown, |text| evaluate(&payload, &text));
+    let transcript = read_transcript(&payload);
+    let outcome = transcript
+        .as_deref()
+        .map_or(Verdict::Unknown, |text| evaluate(&payload, text));
+    let evidence = if outcome == Verdict::Unknown {
+        unknown_evidence(&payload, transcript.as_deref())
+    } else {
+        "evaluated"
+    };
     let label = match outcome {
         Verdict::Candidate => "candidate",
         Verdict::NoMatch => "no_match",
@@ -292,12 +299,60 @@ pub(super) fn advisory(input_json: &str) -> Option<String> {
         "reread_evaluated",
         &[
             ("result", label.into()),
+            ("evidence", evidence.into()),
             ("observation", observation.into()),
         ],
     );
     (outcome == Verdict::Candidate).then(|| String::from(
         "Yupana reread candidate: this Read returned the same text and region as a completed read before this request, with no recorded edit or compaction between them. Reuse the earlier result if it is still in context. Unreported eviction cannot be ruled out; a necessary context refresh is legitimate. Advisory only.",
     ))
+}
+
+/// Classify missing evidence from the SAME bounded snapshot used to evaluate.
+/// This emits no transcript text, paths, identifiers or persistent text copy.
+fn unknown_evidence(payload: &Value, transcript: Option<&str>) -> &'static str {
+    let Some(text) = transcript else {
+        return "transcript_unavailable";
+    };
+    let Some(path) = payload
+        .pointer("/tool_input/file_path")
+        .and_then(Value::as_str)
+    else {
+        return "file_path_unavailable";
+    };
+    if text_read(&payload["tool_response"], path).is_none() {
+        return "structured_response_unavailable";
+    }
+    let Some(id) = payload.get("tool_use_id").and_then(Value::as_str) else {
+        return "request_id_unavailable";
+    };
+    let mut requests = 0;
+    let mut same_arguments = false;
+    for line in text.lines() {
+        let Ok(record) = serde_json::from_str::<Value>(line) else {
+            return "malformed_snapshot";
+        };
+        if let Some(content) = record.pointer("/message/content").and_then(Value::as_array) {
+            for block in content {
+                if block.get("type").and_then(Value::as_str) == Some("tool_use")
+                    && block.get("id").and_then(Value::as_str) == Some(id)
+                {
+                    requests += 1;
+                    same_arguments = block["input"] == payload["tool_input"];
+                }
+            }
+        }
+    }
+    match requests {
+        0 => "current_request_absent",
+        1 if !same_arguments => "request_arguments_differ",
+        1 => match active_records(text, id) {
+            None => "ancestry_unavailable",
+            Some((_, false)) => "ancestry_incomplete",
+            Some((_, true)) => "connected_evidence_unavailable",
+        },
+        _ => "current_request_ambiguous",
+    }
 }
 
 fn read_transcript(payload: &Value) -> Option<String> {

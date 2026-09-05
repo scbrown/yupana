@@ -129,7 +129,11 @@ the window cannot manufacture a clean pass when no pair is found. Missing,
 unreadable or unrecognized evidence produces `unknown`. Each Read hook
 evaluation emits `reread_evaluated` metrics with `candidate`, `no_match`, or
 `unknown` and a hash of the session/request identity. Metrics contain no paths
-or returned text. A candidate metric records evaluation, not delivery after
+or returned text. The `evidence` field classifies UNKNOWN from the same snapshot:
+missing current request, malformed snapshot, unavailable structured response,
+argument mismatch, or incomplete/unavailable ancestry. This distinguishes a
+hook-time evidence gap from later successful replay; it does not relax the guard.
+A candidate metric records evaluation, not delivery after
 suppression, and zero candidates cannot establish a residual false-positive rate.
 
 ## Handoff advice from measured depth
