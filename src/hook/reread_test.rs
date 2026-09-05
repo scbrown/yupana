@@ -276,3 +276,72 @@ fn unknown_diagnostics_distinguish_hook_time_evidence_gaps() {
         "structured_response_unavailable"
     );
 }
+
+#[test]
+fn bounded_resnapshot_waits_for_request_flush_without_inventing_evidence() {
+    let text = linked(&baseline())
+        .iter()
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let before = linked(&baseline()[..2])
+        .iter()
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut reads = 0;
+    let mut waits = 0;
+    let result = observe_with(
+        &payload(),
+        || {
+            reads += 1;
+            Some(if reads == 1 {
+                before.clone()
+            } else {
+                text.clone()
+            })
+        },
+        || waits += 1,
+    );
+    assert_eq!(result, (Verdict::Candidate, "evaluated", 2));
+    assert_eq!(waits, 1);
+    waits = 0;
+    let result = observe_with(&payload(), || Some(before.clone()), || waits += 1);
+    assert_eq!(result, (Verdict::Unknown, "current_request_absent", 5));
+    assert_eq!(waits, 4);
+    // Do not retry unsupported responses: waiting cannot repair their schema.
+    let mut unsupported = payload();
+    unsupported["tool_response"] = Value::Null;
+    assert_eq!(
+        observe_with(
+            &unsupported,
+            || Some(text.clone()),
+            || panic!("unexpected wait")
+        ),
+        (Verdict::Unknown, "structured_response_unavailable", 1)
+    );
+    // A compaction becoming visible during the wait still invalidates the pair.
+    let mut records = baseline();
+    records[1]["isCompactSummary"] = true.into();
+    let compacted = linked(&records)
+        .iter()
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    reads = 0;
+    assert_eq!(
+        observe_with(
+            &payload(),
+            || {
+                reads += 1;
+                Some(if reads == 1 {
+                    "{".into()
+                } else {
+                    compacted.clone()
+                })
+            },
+            || {}
+        ),
+        (Verdict::NoMatch, "evaluated", 2)
+    );
+}
