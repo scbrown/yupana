@@ -298,6 +298,24 @@ pub(crate) fn align(endpoint: &str, graph_a: &str, graph_b: &str) -> Result<serd
     )
 }
 
+/// Publish a graph back out as a share bundle, written to `out`.
+///
+/// The parent is settled by the CALLER, not here, so the decision is visible at
+/// the CLI surface where an operator can see it — see [`crate::share_reshare`].
+pub(crate) fn reshare(
+    endpoint: &str,
+    graph: &str,
+    parent: Option<&str>,
+    shapes: &[String],
+    no_shapes: bool,
+    out: &std::path::Path,
+) -> Result<(serde_json::Value, Vec<String>)> {
+    let body = crate::share_reshare::request(graph, parent, shapes, no_shapes);
+    let payload = post(endpoint, "/share", &body, "author a share")?;
+    let files = crate::share_reshare::write_bundle(&payload, out)?;
+    Ok((payload, files))
+}
+
 fn post(
     base: &str,
     route: &str,

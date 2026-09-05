@@ -135,6 +135,9 @@ mod share_client;
 /// `yupana share` — pull a Quipu share, preview its policy, admit it.
 #[cfg(feature = "quipu")]
 pub mod share_pull;
+/// Publishing a graph back out as a share, naming its parent when it has one.
+#[cfg(feature = "quipu")]
+mod share_reshare;
 /// The game-state harness (FR-35..FR-39): a generic in-memory fact graph, a
 /// `graph-pattern` policy plane over it, and `(game, faction)` tenancy. Gated so
 /// a build that cannot ingest a board does not advertise the tier.
