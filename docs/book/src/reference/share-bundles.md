@@ -2,7 +2,9 @@
 
 A Quipu **share bundle** is a git-storable, content-addressed directory holding a canonical RDF
 graph, the shapes that describe it, and a lineage manifest. This page is the measured workflow for
-turning a Yupana code-graph slice into one, and for importing it into somebody else's store.
+turning a Yupana code-graph slice into one, and for importing it into somebody else's store. For
+the consumer side — pulling a bundle somebody hands YOU into the graph Yupana reads — see
+[Pulling a Share](share-pull.md).
 
 Yupana is the **producer of structural code facts and nothing more**. It does not write manifests,
 compute share ids, or canonicalize RDF: Quipu authors the bundle from the graph it holds, so a

@@ -29,6 +29,7 @@
 - [Golden-Path Conformance](reference/golden-path.md)
 - [The Enforcement Trace](reference/enforcement-trace.md)
 - [Code Slices as Share Bundles](reference/share-bundles.md)
+  - [Pulling a Share](reference/share-pull.md)
 - [E2E Grounding Eval](reference/e2e-grounding-eval.md)
 
 # Design

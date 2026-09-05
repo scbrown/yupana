@@ -9,6 +9,14 @@ repos:
         types: [json]
       - id: check-merge-conflict
       - id: check-added-large-files
+      # A private key must never reach this repo, which is public. There was no
+      # secret scanner here at all until 2026-09-05, when a `git add -A` after a
+      # verifier test run put a freshly generated PKCS#8 signing key
+      # (.quipu/verifier.pk8) into a pushed branch with EVERY gate green — the
+      # internal-identifier ratchet checks hostnames, not keys. `.quipu/` is now
+      # gitignored, which handles the known path; this catches the next key that
+      # arrives by a path nobody predicted.
+      - id: detect-private-key
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.17.2
