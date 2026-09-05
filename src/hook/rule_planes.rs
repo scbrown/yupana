@@ -203,11 +203,17 @@ pub(super) fn governed_check(
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
     let cache_path = crate::projection_cache::cache_path();
     let now = crate::projection_cache::now_secs();
-    let source = match registry.refresh_or_cached(
-        cache_path.as_deref(),
-        config.quipu.projection_cache_ttl_secs,
-        now,
-    ) {
+    // aegis-x894x2: the resident daemon first when one is expected. `None` means
+    // no usable daemon answer and the live path below is unchanged.
+    let projected = match crate::hook::daemon_projection::from_daemon(config, &mut registry, now) {
+        Some(result) => result,
+        None => registry.refresh_or_cached(
+            cache_path.as_deref(),
+            config.quipu.projection_cache_ttl_secs,
+            now,
+        ),
+    };
+    let source = match projected {
         Ok(source) => source,
         Err(reason) => {
             return Some(
@@ -425,15 +431,15 @@ pub(super) fn governed_check(
                 if cache_age.is_some() { "cache" } else { "live" }.into(),
             ),
             ("policy_age_secs", cache_age.unwrap_or(0).into()),
-            // WHAT MATCHED, so a block is adjudicable from the record instead of
-            // by re-reading the repos (aegis-mqnl). Safe only because the spool is
-            // internal-only and never pushed. The SUBJECT path stays behind
-            // `metrics.record_paths`: that knob is a deployment's opt-in, and
-            // widening it "only for blocks" still turns it on beneath one.
+            // WHAT MATCHED (aegis-mqnl) and WHICH FILE (aegis-x894x2), so a block is
+            // adjudicable from the record rather than by re-reading the repos. The
+            // plain path stays behind `metrics.record_paths`; the digest keys a file
+            // 1:1 without exporting it. Rationale in `audit::path_digest`.
             (
                 "matched",
                 crate::textrules::distinct_matched(&text_violations).into(),
             ),
+            ("path_digest", crate::audit::path_digest(rel).into()),
         ],
     );
     let blocks = config.policy.mode == Mode::Enforce && any_blocking;

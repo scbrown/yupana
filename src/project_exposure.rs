@@ -38,6 +38,7 @@ pub fn fetch_repo_exposure(endpoint: &str, repo: &str) -> RepoExposure {
     let resp = match ureq::post(&url)
         .timeout(crate::project::http_timeout())
         .set("Content-Type", "application/json")
+        .set("X-Quipu-Client", crate::quipu_label::current())
         .send_string(&body)
     {
         Ok(r) => r,
