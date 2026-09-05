@@ -1,37 +1,18 @@
 #!/usr/bin/env python3
-"""Guard A (aegis-sem1z): flag a RE-READ that was genuinely redundant.
+"""Advisory replay of repeated successful text reads (aegis-sem1z).
 
-Stiwi: "you already read that file, no need to read it again if it wasn't updated."
+Requires identical returned text for the exact same requested region, with the
+prior result delivered before the new request. Requests without successful text
+results do not establish context. Edits, possible shell writes, and recorded
+compaction invalidate prior evidence. Known background-task output polling is
+excluded; polling for new output is not forgetting previously read content.
 
-The whole feature is the DISCRIMINATION, not the detection. Detecting "this path
-was read twice" is trivial and useless — most repeat reads are correct, and a
-guard that fires on them is worse than absent because it gets ignored.
+This does not prove the harness retained content without an eviction marker,
+and it deliberately misses subset reuse instead of accusing reads of new lines.
+The offline advisory is not an automatically installed or blocking hook.
 
-FIRES on:
-  - re-read of an OVERLAPPING REGION of the same file, with no intervening edit
-    and no intervening compaction. The content is still in context; reading it
-    again buys nothing.
-
-STAYS SILENT on:
-  1. re-read after an edit to that file        -> content genuinely changed
-  2. re-read after a COMPACTION boundary       -> the content was dropped from
-                                                  context and the agent cannot
-                                                  know it is repeating itself
-  3. re-read of a DISJOINT REGION              -> a different part of the file
-                                                  was never read at all
-  4. the first read of anything
-
-Case 3 is NOT in the bead. It came out of live transcript data: this session read
-scripts/deploy-cutover.sh twice, at offset=44 limit=60 and offset=30 limit=14 —
-disjoint line ranges, both necessary. A guard keyed on file_path alone reports
-that as waste, i.e. it fires on correct behaviour, which is exactly the failure
-mode the bead warns about. Reading is REGION-scoped, so identity must be too.
-
-Reads the Claude Code session transcript (JSONL). Advisory only: exit 0 always.
-
-Usage:
-  session-reread-guard.py <transcript.jsonl>   # report redundant re-reads
-  session-reread-guard.py --selftest           # the acceptance, as a test
+Usage: just session-guard <transcript.jsonl>
+       just session-guard --selftest  # nonzero on regression
 """
 import json
 import sys
@@ -68,41 +49,62 @@ def is_compaction(rec):
 
 
 def events(path):
-    """Flatten the transcript into an ordered event stream."""
-    out = []
-    with open(path, errors="ignore") as fh:
+    """Pair successful text results with requests; a request alone proves no read."""
+    import hashlib
+
+    out, pending = [], {}
+    with open(path, errors="replace") as fh:
         for line in fh:
             try:
                 rec = json.loads(line)
-            except Exception:
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(rec, dict):
                 continue
             if is_compaction(rec):
                 out.append({"kind": "compact"})
+                pending.clear()
                 continue
-            if rec.get("type") != "assistant":
+            content = (rec.get("message") or {}).get("content") or []
+            if not isinstance(content, list):
                 continue
-            for c in (rec.get("message", {}) or {}).get("content") or []:
-                if not isinstance(c, dict) or c.get("type") != "tool_use":
+            for c in content:
+                if not isinstance(c, dict):
                     continue
-                inp = c.get("input") or {}
-                # A Bash command that so much as NAMES a file is treated as a
-                # possible edit to it. Coarse on purpose — measured on 433 real
-                # transcripts, Bash-mediated edits (sed -i, a python patch, a
-                # heredoc redirect) accounted for an upper bound of 89% of
-                # findings, because the guard could not see them and called the
-                # honest re-read that followed "waste". Erring toward SILENCE is
-                # the only safe direction: a missed redundant read costs tokens,
-                # a false accusation costs the guard its credibility.
-                if c.get("name") == "Bash":
-                    out.append({"kind": "bash", "cmd": str(inp.get("command", ""))})
-                    continue
-                fp = inp.get("file_path")
-                if not fp:
-                    continue
-                if c.get("name") == "Read":
-                    out.append({"kind": "read", "path": fp, "region": region(inp)})
-                elif c.get("name") in ("Edit", "Write", "NotebookEdit"):
-                    out.append({"kind": "edit", "path": fp})
+                if c.get("type") == "tool_use":
+                    inp = c.get("input") or {}
+                    name, fp = c.get("name"), inp.get("file_path")
+                    if name == "Bash":
+                        out.append({"kind": "bash", "cmd": str(inp.get("command", ""))})
+                    elif name in ("Edit", "Write", "NotebookEdit") and fp:
+                        out.append({"kind": "edit", "path": fp})
+                    elif name == "Read" and fp and c.get("id"):
+                        # Known background-task outputs are polled for changes,
+                        # not reread because their earlier content was forgotten.
+                        parts = str(fp).replace("\\", "/").split("/")
+                        if "tasks" in parts and str(fp).endswith(".output"):
+                            continue
+                        begin = len(out)
+                        out.append({"kind": "read_begin"})
+                        pending[c["id"]] = (fp, region(inp), begin)
+                elif c.get("type") == "tool_result":
+                    request = pending.pop(c.get("tool_use_id"), None)
+                    if request is None:
+                        continue
+                    fp, span, begin = request
+                    body = c.get("content")
+                    if isinstance(body, list):
+                        if not body or any(not isinstance(v, dict) or v.get("type") != "text"
+                                           or not isinstance(v.get("text"), str) for v in body):
+                            body = None
+                        else:
+                            body = "\n".join(v["text"] for v in body)
+                    if c.get("is_error") or not isinstance(body, str) or not body.strip():
+                        out.append({"kind": "edit", "path": fp})  # evidence unavailable
+                        continue
+                    digest = hashlib.sha256(body.encode()).hexdigest()
+                    out.append({"kind": "read", "path": fp, "region": span,
+                                "digest": digest, "begin": begin})
     return out
 
 
@@ -122,9 +124,14 @@ def analyse(evs):
                     seen.pop(path, None)    # may have been written outside the Edit tool
         elif e["kind"] == "read":
             prior = seen.get(e["path"], [])
-            if any(overlaps(e["region"], p) for p in prior):
+            # Exact regions deliberately miss some subset reuse. Overlap alone
+            # cannot establish that the newly requested lines were already read.
+            if any(e["region"] == p["region"] and e["digest"] == p["digest"]
+                   and p["completed"] < e["begin"] for p in prior):
                 findings.append({"index": i, "path": e["path"], "region": e["region"]})
-            seen.setdefault(e["path"], []).append(e["region"])
+            # A changed result can reflect another writer invisible to this
+            # transcript. Never keep the older content as the current baseline.
+            seen[e["path"]] = [{**e, "completed": i}]
     return findings
 
 
@@ -132,25 +139,32 @@ def report(path):
     f = analyse(events(path))
     if not f:
         return
-    print("⚠ REDUNDANT RE-READ — this content should still be in your context")
+    print("⚠ RE-READ CANDIDATE — identical successful text, same region")
     for x in f:
         lo, hi = x["region"]
         span = "whole file" if (lo, hi) == WHOLE_FILE else f"lines {lo}-{hi}"
         print(f"    {x['path']} ({span})")
-    print("  Advisory. Silent on re-reads after an edit, after a compaction, and")
+    print("  Advisory: no intervening edit or compaction was recorded.")
+    print("  Unreported context eviction cannot be ruled out. Silent after edits, compaction, and")
     print("  on a different region of the same file — those are all legitimate.")
 
 
 # ── acceptance: the bead's discrimination test, executable ──────────────────
 def selftest():
-    def R(p, off=None, lim=None):
+    next_id = iter(range(1000))
+
+    def R(p, off=None, lim=None, body="same text", error=False):
         i = {"file_path": p}
         if off is not None:
             i["offset"] = off
         if lim is not None:
             i["limit"] = lim
-        return {"type": "assistant",
-                "message": {"content": [{"type": "tool_use", "name": "Read", "input": i}]}}
+        rid = str(next(next_id))
+        return [{"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": rid, "name": "Read", "input": i}]}},
+                {"type": "user", "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": rid,
+                     "content": body, "is_error": error}]}}]
 
     def E(p):
         return {"type": "assistant",
@@ -168,8 +182,8 @@ def selftest():
     cases = [
         ("MUST FIRE   wasteful re-read, same whole file, nothing between",
          [R("/x.rs"), R("/x.rs")], 1),
-        ("MUST FIRE   wasteful re-read, OVERLAPPING regions",
-         [R("/x.rs", 10, 50), R("/x.rs", 30, 50)], 1),
+        ("must stay SILENT  overlapping regions include new lines",
+         [R("/x.rs", 10, 50), R("/x.rs", 30, 50)], 0),
         ("must stay SILENT  re-read after an EDIT",
          [R("/x.rs"), E("/x.rs"), R("/x.rs")], 0),
         ("must stay SILENT  re-read after COMPACTION",
@@ -180,7 +194,7 @@ def selftest():
          [R("/x.rs")], 0),
         ("must stay SILENT  different files",
          [R("/x.rs"), R("/y.rs")], 0),
-        ("must stay SILENT  edit to ANOTHER file does not license a re-read",
+        ("MUST FIRE   edit to ANOTHER file does not license a re-read",
          [R("/x.rs"), E("/y.rs"), R("/x.rs")], 1),
         ("must stay SILENT  file written via BASH between the reads (89% of real findings)",
          [R("/x.rs"), B("sed -i s/a/b/ /x.rs"), R("/x.rs")], 0),
@@ -188,13 +202,31 @@ def selftest():
          [R("/x.rs"), B("ls -la /tmp"), R("/x.rs")], 1),
     ]
 
+    first, second = R("/x.rs"), R("/x.rs")
+    cases.extend([
+        ("must stay SILENT  failed prior read", [R("/x.rs", error=True), R("/x.rs")], 0),
+        ("must stay SILENT  failed new read", [R("/x.rs"), R("/x.rs", error=True)], 0),
+        ("must stay SILENT  externally changed content", [R("/x.rs"), R("/x.rs", body="new")], 0),
+        ("must stay SILENT  parallel reads requested before either result",
+         [first[0], second[0], first[1], second[1]], 0),
+        ("must stay SILENT  image results",
+         [R("/x.png", body=[{"type": "image"}]), R("/x.png", body=[{"type": "image"}])], 0),
+        ("must stay SILENT  background task output polling",
+         [R("/tmp/tasks/job.output"), R("/tmp/tasks/job.output")], 0),
+        ("must stay SILENT  missing prior result", [first[0], R("/x.rs")], 0),
+        ("MUST FIRE   successful matching text blocks",
+         [R("/x.rs", body=[{"type": "text", "text": "x"}]),
+          R("/x.rs", body=[{"type": "text", "text": "x"}])], 1),
+    ])
+
     import tempfile, os
     npass = nfail = 0
     for name, recs, expect in cases:
         fd, tmp = tempfile.mkstemp(suffix=".jsonl")
         with os.fdopen(fd, "w") as fh:
-            for r in recs:
-                fh.write(json.dumps(r) + "\n")
+            for group in recs:
+                for r in group if isinstance(group, list) else [group]:
+                    fh.write(json.dumps(r) + "\n")
         got = len(analyse(events(tmp)))
         os.unlink(tmp)
         ok = got == expect
@@ -207,7 +239,7 @@ def selftest():
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "--selftest"
     if arg == "--selftest":
-        selftest()
+        sys.exit(selftest())
     else:
         report(arg)
     sys.exit(0)

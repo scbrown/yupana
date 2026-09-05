@@ -82,3 +82,20 @@ Also test a custom program/verb pair using only changed graph data, and confirm
 that a `block` policy refuses projection. The `trajectory_advised` metrics record
 names the rule, tier, frequency and attempted-command evidence; it never records
 an inferred successful work-item creation.
+
+## Read replay evidence
+
+`just session-guard session.jsonl` runs a separate, offline Claude transcript
+replay. It reports identical successful text returned for the same requested
+region, only when the earlier result preceded the later request. Failed reads,
+missing results, images, concurrent requests, changed output, recorded edits,
+compaction, and known background-task output polling do not produce candidates.
+Overlapping but different ranges remain silent because they may contain new lines.
+
+The output is a candidate for review, not proof of wasted work or that the
+harness still retains the content: eviction without a transcript marker remains
+unobservable. This replay is not automatically installed as a hook. It does not
+supply a context-depth measurement or handoff trigger.
+
+`just session-guard --selftest` exercises the discriminators and exits nonzero on
+failure. Both `just test` and the pre-commit/CI quality gate run this suite.
