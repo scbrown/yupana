@@ -1286,3 +1286,58 @@ fn a_payload_with_no_session_omits_the_field_rather_than_blanking_it() {
         "an absent session must be absent, never an empty string"
     );
 }
+
+/// The guard record carries the harness's tool-call id, so an edit DECISION can
+/// be joined to what actually happened (aegis-368cu.10).
+///
+/// There is no post-edit outcome record yet — `hook post-bash` covers the
+/// command path only. This pins the id being RECORDED, because it is knowable
+/// only while the harness holds the call open and cannot be backfilled later.
+#[test]
+fn the_record_carries_the_harness_tool_call_id_for_joining() {
+    let dir = wide_repo();
+    let payload = serde_json::json!({
+        "session_id": "sess-abc",
+        "tool_use_id": "toolu_01JOINEDIT",
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Write",
+        "tool_input": {
+            "file_path": dir.path().join("leaf.rs").to_str().unwrap(),
+            "content": "fn leaf() {}\n",
+        },
+    })
+    .to_string();
+    let (_, fields) = guard_recorded(&payload, dir.path(), Some("t"), None);
+    let id = fields
+        .iter()
+        .find(|(k, _)| *k == "action_id")
+        .map(|(_, v)| v.clone());
+    assert_eq!(
+        id,
+        Some(serde_json::Value::from("toolu_01JOINEDIT")),
+        "the guard record must carry the id the outcome record will join on"
+    );
+}
+
+/// A payload with no id OMITS the field. Absent means "this harness sent no id,
+/// so this row is unjoinable" — a fact a reader needs, and one that a blank
+/// string would hide.
+#[test]
+fn a_payload_without_a_tool_call_id_omits_the_field() {
+    let dir = wide_repo();
+    let payload = serde_json::json!({
+        "session_id": "sess-abc",
+        "cwd": dir.path().to_str().unwrap(),
+        "tool_name": "Write",
+        "tool_input": {
+            "file_path": dir.path().join("leaf.rs").to_str().unwrap(),
+            "content": "fn leaf() {}\n",
+        },
+    })
+    .to_string();
+    let (_, fields) = guard_recorded(&payload, dir.path(), Some("t"), None);
+    assert!(
+        !fields.iter().any(|(k, _)| *k == "action_id"),
+        "omitted, never blanked"
+    );
+}

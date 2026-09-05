@@ -129,6 +129,19 @@ pub(super) fn guard_recorded(
     if let Some(session) = input.as_ref().and_then(|i| i.session_id.as_deref()) {
         fields.push(("session", session.into()));
     }
+    // The harness's id for THIS tool call (aegis-368cu.10). Carried on the guard
+    // record for the same reason it rides the `action` record: it is the only
+    // correlation that joins a decision to what actually happened, and it is the
+    // one field a later outcome record cannot reconstruct for itself.
+    //
+    // NOTE what this does and does NOT claim. There is no post-EDIT outcome
+    // record today — `hook post-bash` covers the command path only. This makes
+    // the edit path JOINABLE when one is added; it does not assert one exists.
+    // Recording it now costs one field and cannot be backfilled later, because
+    // the id is knowable only while the harness is holding the call open.
+    if let Some(id) = input.as_ref().and_then(|i| i.tool_use_id.as_deref()) {
+        fields.push(("action_id", id.into()));
+    }
     // Scope the plate read to THIS session. A plate stamped by a session that has
     // since died no longer answers for the one making this edit, and attributing
     // an action to a dead session's work item is the confidently-wrong case the
