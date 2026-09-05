@@ -151,15 +151,31 @@ pub fn emit_to(path: &std::path::Path, kind: &str, fields: &[(&str, serde_json::
             }
         }
         use std::io::Write;
-        // O_APPEND: one small write per line — atomic enough for a line-oriented
-        // reader on the same host; a torn tail line is skipped by the converter
-        // (the same one-corrupt-record-must-not-dam rule as ev-172).
+        // O_APPEND makes ONE `write` atomic against concurrent appenders — so the
+        // record and its newline must leave in ONE call. `writeln!` does not do
+        // that: `write_fmt` issues the payload and the `\n` as SEPARATE writes,
+        // and another agent's record can land between them. That is not
+        // theoretical and the comment here used to claim it was "atomic enough":
+        // measured 2026-09-05 over 243,374 spool lines written by ~10 concurrent
+        // agents, 88 were malformed — 87 pairs concatenated by a swallowed
+        // newline, and 1 genuinely torn with bytes lost (aegis-x894x2).
+        //
+        // A corrupt line is not a cosmetic problem here: `jq` ABORTS at the first
+        // one, so a reader measuring this spool silently sees only the records
+        // BEFORE it — 265 guard rows out of 771 in the case that found this. The
+        // spool is the evidence base for the enforcement soak, so a lossy writer
+        // makes the soak unadjudicable rather than merely untidy.
+        let mut bytes = line.into_bytes();
+        bytes.push(b'\n');
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path)
         {
-            let _ = writeln!(f, "{line}");
+            // `write_all` may still split a short write in principle; for a
+            // regular file under O_APPEND the kernel does not, and a partial
+            // write here would be a torn line either way. One call is the fix.
+            let _ = f.write_all(&bytes);
         }
     }));
 }
@@ -183,6 +199,68 @@ mod tests {
             PathBuf::from("/h/.local/state/yupana/metrics.jsonl")
         );
         assert!(resolve_path(None, None, None).is_none());
+    }
+
+    /// CONCURRENT APPENDERS MUST NOT TEAR EACH OTHER'S LINES.
+    ///
+    /// The spool is written by ~10 agents at once and is the evidence base for
+    /// the enforcement soak. Before this test `emit_to` used `writeln!`, whose
+    /// `write_fmt` emits the payload and the newline as two separate `write`
+    /// calls; `O_APPEND` makes each atomic individually, so a second writer's
+    /// record could land between them. Measured on the live spool: 88 malformed
+    /// lines in 243,374 (aegis-x894x2).
+    ///
+    /// The assertion is on EVERY line parsing, not on a line count alone: the
+    /// dominant corruption shape was two intact records sharing one line, which
+    /// keeps the byte count right while making the file unreadable to `jq` —
+    /// and `jq` ABORTS at the first bad line rather than skipping it, so one
+    /// tear silently truncates every measurement taken over this file.
+    #[test]
+    fn concurrent_writers_do_not_tear_each_others_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("metrics.jsonl");
+
+        const THREADS: usize = 8;
+        const PER_THREAD: usize = 250;
+
+        std::thread::scope(|s| {
+            for t in 0..THREADS {
+                let path = path.clone();
+                s.spawn(move || {
+                    for i in 0..PER_THREAD {
+                        // A payload long enough that a split write leaves an
+                        // obvious seam, and unique so a duplicate is visible.
+                        emit_to(
+                            &path,
+                            "guard",
+                            &[
+                                ("writer", t.into()),
+                                ("seq", i.into()),
+                                ("filler", "x".repeat(200).into()),
+                            ],
+                        );
+                    }
+                });
+            }
+        });
+
+        let body = std::fs::read_to_string(&path).unwrap();
+        let mut seen = 0;
+        for (n, line) in body.lines().enumerate() {
+            if line.is_empty() {
+                continue;
+            }
+            assert!(
+                serde_json::from_str::<serde_json::Value>(line).is_ok(),
+                "line {n} is not one whole record — a concurrent write tore it: {line:.120}"
+            );
+            seen += 1;
+        }
+        assert_eq!(
+            seen,
+            THREADS * PER_THREAD,
+            "every record must appear exactly once, on its own line"
+        );
     }
 
     #[test]

@@ -296,7 +296,7 @@ fn write_knot_request(
     let mut resp = None;
     let mut last_err = String::new();
     for attempt in 1..=ATTEMPTS {
-        let mut req = ureq::post(&url).set("Content-Type", "application/json");
+        let mut req = crate::quipu_label::json_post(&url, crate::quipu_label::PROMOTE);
         if let Some(token) = &auth {
             req = req.set("Authorization", &format!("Bearer {token}"));
         }

@@ -122,6 +122,9 @@ pub mod promote_provenance;
 /// without `quipu`, where it decides whether the feature-off refusal is even
 /// reached.
 pub mod promote_trigger;
+/// Which yupana caller a quipu request came from (`X-Quipu-Client`).
+#[cfg(feature = "quipu")]
+pub mod quipu_label;
 pub mod reconcile;
 pub mod recurrence;
 mod render;

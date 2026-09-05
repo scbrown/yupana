@@ -38,6 +38,8 @@ pub mod client;
 pub(crate) mod http;
 #[cfg(all(feature = "mcp", feature = "golden-path"))]
 pub(crate) mod path_http;
+#[cfg(feature = "quipu")]
+pub mod projection;
 #[cfg(all(feature = "mcp", feature = "game-state"))]
 pub(crate) mod state_http;
 mod tenanted;
@@ -90,6 +92,11 @@ struct Engine {
     /// serve half is Phase 3 (FR-3).
     freshness:
         std::sync::Mutex<std::collections::HashMap<(String, String), crate::types::Freshness>>,
+    /// The RESIDENT PROJECTED POLICY (aegis-x894x2). `None` when quipu is not
+    /// configured, so `/projection` 503s rather than serving an empty catalogue
+    /// that would read as "no rules apply". Details in [`projection`].
+    #[cfg(feature = "quipu")]
+    projection: Option<Arc<projection::ResidentProjection>>,
 }
 
 impl ResidentEngine {
@@ -109,6 +116,8 @@ impl ResidentEngine {
         let registry = Base::build_at(root, "HEAD")
             .ok()
             .map(|base| RwLock::new(TenantRegistry::with_tenancy(base, config.tenancy.clone())));
+        #[cfg(feature = "quipu")]
+        let projection = projection::for_config(&config);
         Ok(Self {
             inner: Arc::new(Engine {
                 root: root.to_path_buf(),
@@ -121,8 +130,22 @@ impl ResidentEngine {
                 #[cfg(feature = "game-state")]
                 board: RwLock::new(crate::state::StateRegistry::new()),
                 freshness: std::sync::Mutex::new(std::collections::HashMap::new()),
+                #[cfg(feature = "quipu")]
+                projection,
             }),
         })
+    }
+
+    /// The resident projection, if this daemon has one.
+    #[cfg(feature = "quipu")]
+    #[must_use]
+    pub fn projection(&self) -> Option<&Arc<projection::ResidentProjection>> {
+        self.inner.projection.as_ref()
+    }
+    /// The build-time config snapshot — the single trust point, never re-read.
+    #[must_use]
+    pub fn config(&self) -> &YupanaConfig {
+        &self.inner.config
     }
 
     /// The code-fact freshness of `rel` for `tenant`, or `None` if this engine
@@ -348,6 +371,8 @@ pub async fn serve(
         "yupana daemon: resident graph built — {} nodes, {} edges from {}",
         status.nodes, status.edges, status.root
     );
+    #[cfg(feature = "quipu")]
+    let _refresher = projection::spawn_for(&engine);
     http::serve(engine, bind, port).await
 }
 
