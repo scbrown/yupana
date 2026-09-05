@@ -431,15 +431,15 @@ pub(super) fn governed_check(
                 if cache_age.is_some() { "cache" } else { "live" }.into(),
             ),
             ("policy_age_secs", cache_age.unwrap_or(0).into()),
-            // WHAT MATCHED, so a block is adjudicable from the record instead of
-            // by re-reading the repos (aegis-mqnl). Safe only because the spool is
-            // internal-only and never pushed. The SUBJECT path stays behind
-            // `metrics.record_paths`: that knob is a deployment's opt-in, and
-            // widening it "only for blocks" still turns it on beneath one.
+            // WHAT MATCHED (aegis-mqnl) and WHICH FILE (aegis-x894x2), so a block is
+            // adjudicable from the record rather than by re-reading the repos. The
+            // plain path stays behind `metrics.record_paths`; the digest keys a file
+            // 1:1 without exporting it. Rationale in `audit::path_digest`.
             (
                 "matched",
                 crate::textrules::distinct_matched(&text_violations).into(),
             ),
+            ("path_digest", crate::audit::path_digest(rel).into()),
         ],
     );
     let blocks = config.policy.mode == Mode::Enforce && any_blocking;
