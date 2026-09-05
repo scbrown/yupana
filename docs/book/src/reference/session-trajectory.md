@@ -82,3 +82,71 @@ Also test a custom program/verb pair using only changed graph data, and confirm
 that a `block` policy refuses projection. The `trajectory_advised` metrics record
 names the rule, tier, frequency and attempted-command evidence; it never records
 an inferred successful work-item creation.
+
+## Read replay evidence
+
+`just session-guard session.jsonl` runs a separate, offline Claude transcript
+replay. It reports identical successful text returned for the same requested
+region, only when the earlier result preceded the later request. Failed reads,
+missing results, images, concurrent requests, changed output, recorded edits,
+compaction, and known background-task output polling do not produce candidates.
+Overlapping but different ranges remain silent because they may contain new lines.
+
+The output is a candidate for review, not proof of wasted work or that the
+harness still retains the content: eviction without a transcript marker remains
+unobservable. This replay is not automatically installed as a hook.
+
+`just session-guard --selftest` exercises the discriminators and exits nonzero on
+failure. Both `just test` and the pre-commit/CI quality gate run this suite.
+
+## Handoff advice from measured depth
+
+The same command exposes a read-only depth evaluator:
+
+```sh
+just session-guard depth session.jsonl --harness claude \
+  --session-id current-session-id --config context-policy.json
+```
+
+Use `--harness codex` for a Codex rollout. Supply the current session identity
+explicitly; the evaluator does not search for a likely transcript. Both guards
+share transcript parsing and recorded compaction boundaries.
+
+Claude depth is the latest assistant request's `input_tokens` plus
+`cache_read_input_tokens` and `cache_creation_input_tokens`. Codex depth is the
+latest `token_count.info.last_token_usage.input_tokens`; cached input is already
+included, and cumulative session usage is never substituted. These are measured
+request depths, not a promise about growth after the measurement. A missing,
+invalid or unreadable latest measurement invalidates the earlier sample. A
+recorded compaction requires a new measurement.
+
+The JSON config selects policy per harness under `harnesses.claude` or
+`harnesses.codex`. Each policy requires:
+
+| Field | Contract |
+| --- | --- |
+| `handoff_tokens` | Positive integer threshold, chosen from observed depth/compaction evidence |
+| `threshold_evidence` | Nonempty reference to the observations supporting that threshold |
+| `max_age_seconds` | Positive freshness window for accepting the measurement |
+
+There is **no built-in threshold or freshness default**. An observed distribution
+that supports a default has not yet been established; the empty config
+`{"harnesses": {}}` deliberately leaves advice unevaluated. A reference string
+records operator provenance; it does not validate the quality of those observations.
+Do not substitute transcript bytes, elapsed time, or lifetime token totals.
+
+The evaluator always prints a JSON verdict:
+
+| Status | Action | Exit |
+| --- | --- | --- |
+| `UNKNOWN` | `DO_NOT_ACT` | 2 |
+| `BELOW_THRESHOLD` | `DO_NOT_ACT` | 0 |
+| `HANDOFF_ADVISED` | `CHECKPOINT_AND_HANDOFF` | 0 |
+
+Missing config, missing depth, wrong session identity, stale/future timestamps,
+and malformed evidence all return `UNKNOWN`. This is an explicit signal-loss
+verdict, never an instruction to cycle and never a claim that context is healthy.
+At or above a configured threshold, checkpoint and use your orchestrator's safe
+handoff procedure. The evaluator itself never clears context, stops a session,
+or installs a hook. A deployment must deliberately supply its signal and config;
+no production handoff is activated by installing this repository.

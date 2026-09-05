@@ -41,6 +41,8 @@ test *args="":
     # CI's pre-commit job. Kept here too so `just test` stays the one command
     # that runs every test.
     python3 tests/spool_to_dogwood.py
+    just session-guard --selftest
+    python3 tests/session_depth.py
 
 # Run the linter (matches CI: deny warnings, allow missing-docs)
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every
@@ -117,3 +119,7 @@ docs cmd="build":
         check)    just docs lint && just docs build ;;
         *)        echo "Unknown: {{cmd}}. Try: build serve lint fix fmt vale check" ;;
     esac
+
+# Replay context-aware text rereads, or run its discrimination tests.
+session-guard *args="--selftest":
+    python3 scripts/session-reread-guard.py {{args}}

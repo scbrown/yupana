@@ -100,3 +100,19 @@ repos:
         files: ^(scripts/(install-local|selftest-install-local)\.sh|scripts/install-artifacts\.py|tests/install_local\.py|examples/install-contract\.rs|tests/install_contract\.rs|justfile|Cargo\.(toml|lock)|\.github/workflows/release\.yml)$
         pass_filenames: false
         verbose: true
+
+      - id: session-reread-tests
+        name: session reread discrimination (python)
+        entry: python3 scripts/session-reread-guard.py --selftest
+        language: system
+        files: ^(scripts/(session-reread-guard|session_trajectory)\.py|justfile)$
+        pass_filenames: false
+        verbose: true
+
+      - id: session-depth-tests
+        name: session depth and signal loss discrimination (python)
+        entry: python3 tests/session_depth.py
+        language: system
+        files: ^((scripts|tests)/session_depth\.py|scripts/session_trajectory\.py|justfile)$
+        pass_filenames: false
+        verbose: true
