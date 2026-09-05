@@ -24,6 +24,10 @@
 #[cfg(feature = "quipu")]
 mod config_drift;
 mod credential_output;
+/// Asking the resident daemon for the projected policy before going live
+/// (aegis-x894x2). Gated with the projection it serves.
+#[cfg(feature = "quipu")]
+mod daemon_projection;
 mod delegate_line;
 #[cfg(feature = "quipu")]
 mod disk_guard;

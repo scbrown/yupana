@@ -203,11 +203,17 @@ pub(super) fn governed_check(
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
     let cache_path = crate::projection_cache::cache_path();
     let now = crate::projection_cache::now_secs();
-    let source = match registry.refresh_or_cached(
-        cache_path.as_deref(),
-        config.quipu.projection_cache_ttl_secs,
-        now,
-    ) {
+    // aegis-x894x2: the resident daemon first when one is expected. `None` means
+    // no usable daemon answer and the live path below is unchanged.
+    let projected = match crate::hook::daemon_projection::from_daemon(config, &mut registry, now) {
+        Some(result) => result,
+        None => registry.refresh_or_cached(
+            cache_path.as_deref(),
+            config.quipu.projection_cache_ttl_secs,
+            now,
+        ),
+    };
+    let source = match projected {
         Ok(source) => source,
         Err(reason) => {
             return Some(

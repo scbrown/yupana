@@ -23,7 +23,7 @@ impl ProjectionRegistry {
         Ok(())
     }
 
-    pub(super) fn cached_projection(
+    pub(crate) fn cached_projection(
         &self,
         written_at: u64,
     ) -> crate::projection_cache::CachedProjection {
@@ -44,7 +44,7 @@ impl ProjectionRegistry {
         }
     }
 
-    pub(super) fn install_cached(
+    pub(crate) fn install_cached(
         &mut self,
         cached: crate::projection_cache::CachedProjection,
         freshness: Freshness,
