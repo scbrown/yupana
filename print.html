@@ -2202,6 +2202,60 @@ A changed trigger cannot inherit evidence recorded under its old definition.</p>
 that a <code>block</code> policy refuses projection. The <code>trajectory_advised</code> metrics record
 names the rule, tier, frequency and attempted-command evidence; it never records
 an inferred successful work-item creation.</p>
+<h2 id="read-replay-evidence"><a class="header" href="#read-replay-evidence">Read replay evidence</a></h2>
+<p><code>just session-guard session.jsonl</code> runs a separate, offline Claude transcript
+replay. It reports identical successful text returned for the same requested
+region, only when the earlier result preceded the later request. Failed reads,
+missing results, images, concurrent requests, changed output, recorded edits,
+compaction, and known background-task output polling do not produce candidates.
+Overlapping but different ranges remain silent because they may contain new lines.</p>
+<p>The output is a candidate for review, not proof of wasted work or that the
+harness still retains the content: eviction without a transcript marker remains
+unobservable. This replay is not automatically installed as a hook.</p>
+<p><code>just session-guard --selftest</code> exercises the discriminators and exits nonzero on
+failure. Both <code>just test</code> and the pre-commit/CI quality gate run this suite.</p>
+<h2 id="handoff-advice-from-measured-depth"><a class="header" href="#handoff-advice-from-measured-depth">Handoff advice from measured depth</a></h2>
+<p>The same command exposes a read-only depth evaluator:</p>
+<pre><code class="language-sh">just session-guard depth session.jsonl --harness claude \
+  --session-id current-session-id --config context-policy.json
+</code></pre>
+<p>Use <code>--harness codex</code> for a Codex rollout. Supply the current session identity
+explicitly; the evaluator does not search for a likely transcript. Both guards
+share transcript parsing and recorded compaction boundaries.</p>
+<p>Claude depth is the latest assistant request's <code>input_tokens</code> plus
+<code>cache_read_input_tokens</code> and <code>cache_creation_input_tokens</code>. Codex depth is the
+latest <code>token_count.info.last_token_usage.input_tokens</code>; cached input is already
+included, and cumulative session usage is never substituted. These are measured
+request depths, not a promise about growth after the measurement. A missing,
+invalid or unreadable latest measurement invalidates the earlier sample. A
+recorded compaction requires a new measurement.</p>
+<p>The JSON config selects policy per harness under <code>harnesses.claude</code> or
+<code>harnesses.codex</code>. Each policy requires:</p>
+<div class="table-wrapper"><table><thead><tr><th>Field</th><th>Contract</th></tr></thead><tbody>
+<tr><td><code>handoff_tokens</code></td><td>Positive integer threshold, chosen from observed depth/compaction evidence</td></tr>
+<tr><td><code>threshold_evidence</code></td><td>Nonempty reference to the observations supporting that threshold</td></tr>
+<tr><td><code>max_age_seconds</code></td><td>Positive freshness window for accepting the measurement</td></tr>
+</tbody></table>
+</div>
+<p>There is <strong>no built-in threshold or freshness default</strong>. An observed distribution
+that supports a default has not yet been established; the empty config
+<code>{"harnesses": {}}</code> deliberately leaves advice unevaluated. A reference string
+records operator provenance; it does not validate the quality of those observations.
+Do not substitute transcript bytes, elapsed time, or lifetime token totals.</p>
+<p>The evaluator always prints a JSON verdict:</p>
+<div class="table-wrapper"><table><thead><tr><th>Status</th><th>Action</th><th>Exit</th></tr></thead><tbody>
+<tr><td><code>UNKNOWN</code></td><td><code>DO_NOT_ACT</code></td><td>2</td></tr>
+<tr><td><code>BELOW_THRESHOLD</code></td><td><code>DO_NOT_ACT</code></td><td>0</td></tr>
+<tr><td><code>HANDOFF_ADVISED</code></td><td><code>CHECKPOINT_AND_HANDOFF</code></td><td>0</td></tr>
+</tbody></table>
+</div>
+<p>Missing config, missing depth, wrong session identity, stale/future timestamps,
+and malformed evidence all return <code>UNKNOWN</code>. This is an explicit signal-loss
+verdict, never an instruction to cycle and never a claim that context is healthy.
+At or above a configured threshold, checkpoint and use your orchestrator's safe
+handoff procedure. The evaluator itself never clears context, stops a session,
+or installs a hook. A deployment must deliberately supply its signal and config;
+no production handoff is activated by installing this repository.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="golden-path-conformance"><a class="header" href="#golden-path-conformance">Golden-Path Conformance</a></h1>
 <p>FR-40..FR-42, behind the <code>golden-path</code> Cargo feature (in the CI matrix). A
 <strong>golden path</strong> is a blessed trajectory — a pruned, human-promoted record of
