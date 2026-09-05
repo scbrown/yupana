@@ -1,0 +1,257 @@
+{
+  "head": {
+    "vars": [
+      "repo",
+      "label",
+      "alt",
+      "owner",
+      "rule",
+      "protectedRef",
+      "state"
+    ]
+  },
+  "results": {
+    "bindings": [
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "Quipu"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "quipu"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "quipu-repo-github"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "repo_quipu"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "repo_quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "Quipu"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "repo_quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "quipu"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "repo_quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "quipu-repo-github"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      },
+      {
+        "repo": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/repo_quipu"
+        },
+        "label": {
+          "type": "literal",
+          "value": "repo_quipu"
+        },
+        "alt": {
+          "type": "literal",
+          "value": "repo_quipu"
+        },
+        "owner": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/malcolm"
+        },
+        "rule": {
+          "type": "literal",
+          "value": "single-writer"
+        },
+        "protectedRef": {
+          "type": "literal",
+          "value": "main"
+        },
+        "state": {
+          "type": "literal",
+          "value": "RULED"
+        }
+      }
+    ]
+  }
+}

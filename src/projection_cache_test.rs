@@ -44,6 +44,44 @@ fn a_text_rule(name: &str) -> TextRule {
     }
 }
 
+/// A cache written BEFORE the landing plane existed must not read as "no
+/// repository is governed".
+///
+/// MEASURED 2026-09-05, and it is the reason the field is an `Option`. The
+/// landing plane first shipped as a plain `Vec` with `#[serde(default)]`, so a
+/// pre-upgrade cache deserialised to an empty catalogue — and because
+/// `refresh_or_cached` serves a FRESH cache without contacting quipu at all, the
+/// governed landing rule was silently inert on every host with a warm cache. The
+/// guard reported ALLOW on a non-owner merge onto a governed repository, with no
+/// error anywhere: exactly the shape of a guard that looks armed and is not.
+#[test]
+fn a_cache_predating_the_landing_plane_is_UNKNOWN_not_an_empty_catalogue() {
+    let mut value = serde_json::to_value(a_projection("http://q", 10)).unwrap();
+    // Drop the field, reproducing a cache written by the previous version.
+    value.as_object_mut().unwrap().remove("landing_policies");
+    let restored: CachedProjection = serde_json::from_value(value).unwrap();
+    assert!(
+        restored.landing_policies.is_none(),
+        "an absent catalogue must stay absent — Some(vec![]) would claim the \
+         cache had ASKED and found nothing governed"
+    );
+    // The other planes still restore, so refusing to speak about landings does
+    // not cost the guard everything else it knows.
+    assert_eq!(restored.policies.len(), 1);
+    assert_eq!(restored.text_rules.len(), 1);
+}
+
+/// …and a cache that DOES carry the plane, holding no governed repository, is a
+/// real answer that must survive the round trip as `Some(empty)`.
+#[test]
+fn a_cache_carrying_an_empty_landing_catalogue_stays_a_real_answer() {
+    let mut projection = a_projection("http://q", 10);
+    projection.landing_policies = Some(Vec::new());
+    let restored: CachedProjection =
+        serde_json::from_str(&serde_json::to_string(&projection).unwrap()).unwrap();
+    assert_eq!(restored.landing_policies, Some(Vec::new()));
+}
+
 fn a_projection(endpoint: &str, written_at: u64) -> CachedProjection {
     CachedProjection {
         version: CACHE_VERSION,
@@ -53,7 +91,7 @@ fn a_projection(endpoint: &str, written_at: u64) -> CachedProjection {
         text_rules: vec![a_text_rule("internal-hostname")],
         tripwires: Vec::new(),
         memory_policies: Vec::new(),
-        landing_policies: Vec::new(),
+        landing_policies: None,
         grounded_rules: Vec::new(),
         grounding: None,
         work_item_scopes: None,

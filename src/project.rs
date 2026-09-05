@@ -209,12 +209,14 @@ pub struct ProjectionRegistry {
     pub(crate) tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
     pub(crate) memory_policies: Vec<crate::project_memory::MemoryPolicy>,
     /// Last-known governed LANDING policies — which repositories declare who
-    /// may put code on their protected refs. An EMPTY catalogue is a real
-    /// answer ("no repository declares a landing rule"), never an absent one:
-    /// the guard reads absence-from-catalogue as UNGOVERNED, and it may only
-    /// do that because a projection failure marks the whole registry stale
-    /// rather than leaving an empty set looking authoritative.
-    pub(crate) landing_policies: Vec<crate::project_landing::RepoLanding>,
+    /// may put code on their protected refs.
+    ///
+    /// `None` means this registry cannot speak about landings (never synced, or
+    /// restored from a cache predating the plane); `Some(vec![])` means it
+    /// asked and no repository declares a rule. The guard refuses on the first
+    /// and allows on the second, so collapsing them silently un-guards every
+    /// repository. See `projection_cache::CachedProjection::landing_policies`.
+    pub(crate) landing_policies: Option<Vec<crate::project_landing::RepoLanding>>,
     pub(crate) grounded_rules: Vec<crate::grounding::GroundedRule>,
     /// `None` when the grounding projection is missing or failed — which
     /// renders every grounded rule UNEVALUATED (loud), never satisfied-by-
@@ -272,7 +274,7 @@ impl ProjectionRegistry {
             text_rules: Vec::new(),
             tripwires: Vec::new(),
             memory_policies: Vec::new(),
-            landing_policies: Vec::new(),
+            landing_policies: None,
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -332,7 +334,7 @@ impl ProjectionRegistry {
                 self.text_rules = text_rules;
                 self.tripwires = tripwires;
                 self.memory_policies = memory_policies;
-                self.landing_policies = landing_policies;
+                self.landing_policies = Some(landing_policies);
                 self.grounded_rules = grounded_rules;
                 self.grounding = crate::project_grounding::fetch_grounding_set(
                     &self.endpoint,

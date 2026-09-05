@@ -663,7 +663,7 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
             text_rules: Vec::new(),
             tripwires: Vec::new(),
             memory_policies: Vec::new(),
-            landing_policies: Vec::new(),
+            landing_policies: None,
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,

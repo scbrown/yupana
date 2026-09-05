@@ -81,11 +81,18 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
         config.quipu.projection_cache_ttl_secs,
         crate::projection_cache::now_secs(),
     ) {
-        // An empty catalogue from a SYNCED registry is a real answer.
-        Ok(_) => crate::project_landing::resolve(registry.landing_policies(), &repo),
-        // …and from an unsynced one it is not. This is the only place the
-        // Unknown arm is produced, and it must stay that way: the emptiness of
-        // the slice can never distinguish these two cases on its own.
+        // A projection succeeded — but "succeeded" includes being served from a
+        // cache written before this plane existed, which carries no catalogue
+        // and must not read as "nothing is governed".
+        Ok(_) => match registry.landing_policies() {
+            Some(catalogue) => crate::project_landing::resolve(catalogue, &repo),
+            None => LandingAuthority::Unknown(
+                "the served projection predates the landing plane and carries no \
+                 landing catalogue; refresh it (`yupana promote`/scheduled refresh) \
+                 so the rule can be read"
+                    .into(),
+            ),
+        },
         Err(e) => LandingAuthority::Unknown(e),
     };
 
@@ -201,20 +208,19 @@ fn record(
     let session = std::env::var("CLAUDE_SESSION_ID")
         .or_else(|_| std::env::var("SHANTY_SESSION"))
         .unwrap_or_else(|_| "unknown".to_string());
-    let checks = vec![
-        crate::action_certification::CheckInput {
-            id: "landing-permitted".into(),
-            expected: true.into(),
-            observed: (!decision.refuses()).into(),
-            evidence_ref: format!("landing:{}:{}", request.repo, request.git_ref),
-        },
-        crate::action_certification::CheckInput {
-            id: "ref-stated-by-command".into(),
-            expected: true.into(),
-            observed: (!request.ref_assumed).into(),
-            evidence_ref: landing.evidence.clone(),
-        },
-    ];
+    // ONE check, deliberately. `certify` derives `certification_status` from
+    // whether every check is satisfied, so anything listed here is a condition
+    // the landing had to MEET. Whether the command stated its ref is not such a
+    // condition — it is how the evidence was obtained — and modelling it as a
+    // check marked a perfectly good owner landing `uncertified`, which is the
+    // record lying about the decision it accompanies. It rides
+    // `scope_provenance` below instead, where derivation facts belong.
+    let checks = vec![crate::action_certification::CheckInput {
+        id: "landing-permitted".into(),
+        expected: true.into(),
+        observed: (!decision.refuses()).into(),
+        evidence_ref: format!("landing:{}:{}", request.repo, request.git_ref),
+    }];
     let input = crate::action_certification::ActionInput {
         record_id: format!(
             "landing-{ts}-{}",
@@ -234,7 +240,15 @@ fn record(
         sha: String::new(),
         git_ref: request.git_ref.clone(),
         remote_authority: String::new(),
-        scope_provenance: serde_json::json!({ "as_of": ts, "query_id": "landing-policy" }),
+        scope_provenance: serde_json::json!({
+            "as_of": ts,
+            "query_id": "landing-policy",
+            // How the ref was obtained. A refusal on a ref the command never
+            // named is the shape a false positive takes here, so the soak has
+            // to be able to count those without re-deriving anything.
+            "ref_stated_by_command": !request.ref_assumed,
+            "command": landing.evidence,
+        }),
         checks,
     };
     if let Ok(record) = crate::action_certification::sign(input, &key) {

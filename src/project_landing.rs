@@ -428,6 +428,39 @@ mod tests {
         assert!(!repos[0].protects("wt/grant"));
     }
 
+    /// The REAL body the live graph returns, captured 2026-09-05 immediately
+    /// after the policy facts were written.
+    ///
+    /// It is a cross-product — 2 `rdfs:label` values x 4 `skos:altLabel` values
+    /// = 8 rows for ONE repository — and that shape is not something the
+    /// hand-built fixtures above exercise. A decoder that treated each row as a
+    /// repository would report eight governed repositories where there is one,
+    /// and every scalar would "conflict" with itself.
+    #[test]
+    fn the_LIVE_cross_product_decodes_to_exactly_one_repo() {
+        let body = include_str!("../tests/fixtures/landing-policy-live.json");
+        let repos = decode_landing_policies(body).expect("the live body decodes");
+        assert_eq!(repos.len(), 1, "8 rows are one repository, not eight");
+        let quipu = &repos[0];
+        assert_eq!(quipu.owner.as_deref(), Some("malcolm"));
+        assert_eq!(quipu.rule, LandingRule::SingleWriter);
+        assert_eq!(quipu.ownership_state.as_deref(), Some("RULED"));
+        // The repeated `protectedRef` across all 8 rows must collapse, not stack.
+        assert_eq!(quipu.protected_refs, ["main"]);
+        assert!(quipu.protected_refs_declared, "the graph DECLARED this ref");
+        // Every alias the graph carries resolves, and so does the bare name.
+        for name in ["quipu", "repo_quipu", "Quipu", "quipu-repo-github"] {
+            assert!(
+                matches!(resolve(&repos, name), LandingAuthority::Governed(_)),
+                "`{name}` must resolve to the governed repository"
+            );
+        }
+        assert!(matches!(
+            resolve(&repos, "yupana"),
+            LandingAuthority::Ungoverned { .. }
+        ));
+    }
+
     #[test]
     fn a_declared_rule_with_NO_owner_cannot_be_satisfied_by_anyone() {
         let rows = body(&format!(
@@ -447,16 +480,16 @@ mod tests {
 }
 
 impl crate::project::ProjectionRegistry {
-    /// The governed landing catalogue and its shared projection freshness.
+    /// The governed landing catalogue, or `None` when this registry cannot
+    /// speak about landings at all.
     ///
-    /// Read it together with [`crate::project::ProjectionRegistry::freshness`]:
-    /// an empty catalogue from a FRESH registry means no repository declares a
-    /// landing rule, while an empty one from a registry that never synced means
-    /// nothing is known. The guard must not treat those alike, which is why the
-    /// caller resolves [`LandingAuthority::Unknown`] from the projection result
-    /// rather than from the emptiness of this slice.
+    /// The `Option` carries the distinction the guard turns on: `None` is
+    /// "never asked, or restored from a cache predating this plane" and
+    /// resolves as [`LandingAuthority::Unknown`]; `Some(&[])` is "asked, and no
+    /// repository declares a rule", which resolves as
+    /// [`LandingAuthority::Ungoverned`] and allows.
     #[must_use]
-    pub fn landing_policies(&self) -> &[RepoLanding] {
-        &self.landing_policies
+    pub fn landing_policies(&self) -> Option<&[RepoLanding]> {
+        self.landing_policies.as_deref()
     }
 }
