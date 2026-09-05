@@ -1,14 +1,38 @@
 name: Publish to crates.io
 
+# THE MANUAL LANE ONLY. The real one lives in release.yml (aegis-pz5crt).
+#
+# `release: [published]` is kept below because it costs nothing and would work
+# for a release a HUMAN publishes — but it must not be mistaken for the lane
+# that ships our releases. release-plz creates the release with GITHUB_TOKEN,
+# and events raised by GITHUB_TOKEN never trigger workflows, so on a real
+# release this file does not run at all — the same reason the `binary` job in
+# release.yml cannot be triggered by its own tag push, which that file already
+# documents.
+#
+# On quipu this exact shape left crates.io six versions behind (aegis-pb4rzi).
+# Here it left the crate UNPUBLISHED: crates.io has no `yupana` at all.
+#
+# The publishing steps live in .github/actions/crates-publish so this file and
+# release.yml cannot drift apart. Change them there, not here.
+
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
+      version:
+        description: >-
+          Version to publish, without a leading v (e.g. 0.6.5). Stated
+          explicitly and on purpose: the action refuses to publish if the crate
+          is not at this version, and a value derived from Cargo.toml would be
+          comparing a number to itself.
+        required: true
+        type: string
       dry_run:
-        description: 'Dry run (do not publish)'
+        description: 'Dry run (publish nothing)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 env:
@@ -17,6 +41,13 @@ env:
 jobs:
   publish:
     name: Publish to crates.io
+    # A PRERELEASE must never reach crates.io, and `release: [published]` fires
+    # for prereleases too. THIS JOB PREVIOUSLY HAD NO `if:` AT ALL — quipu gained
+    # this guard in its #142 and this repo never did, so a prerelease release
+    # event went straight to `cargo publish`. Kept here as the cheap outer gate;
+    # the action refuses a prerelease VERSION as well, so this lane is not the
+    # only thing standing between a rehearsal and the registry.
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,20 +61,34 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
 
-      - name: Verify package
-        run: cargo package --no-verify
-
-      - name: Publish (dry run)
-        if: ${{ inputs.dry_run == true }}
-        run: cargo publish --dry-run
-
-      - name: Authenticate with crates.io
-        if: ${{ inputs.dry_run != true }}
-        id: crates-auth
-        uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1
-
-      - name: Publish to crates.io
-        if: ${{ inputs.dry_run != true }}
-        run: cargo publish
+      # For a release event the tag is the independent statement of intent; for
+      # a dispatch the operator's input is. Neither reads Cargo.toml, which is
+      # the point — the action compares this against the crate and refuses a
+      # mismatch.
+      - name: Resolve the version this run intends to publish
+        id: want
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            WANT="${INPUT_VERSION#v}"
+          else
+            # yupana-v0.3.34 -> 0.3.34
+            WANT="${TAG##*-v}"
+          fi
+          if [ -z "$WANT" ]; then
+            echo "::error::could not resolve a version to publish"
+            exit 1
+          fi
+          echo "want=${WANT}" >> "$GITHUB_OUTPUT"
+          echo "intending to publish: ${WANT}"
+
+      - uses: ./.github/actions/crates-publish
+        with:
+          expected-version: ${{ steps.want.outputs.want }}
+          # A release event is always a real publish. `inputs.dry_run` is null
+          # outside a dispatch, so compare explicitly rather than relying on
+          # falsiness.
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
