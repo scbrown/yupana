@@ -2244,6 +2244,10 @@ or returned text. The <code>evidence</code> field classifies UNKNOWN from the sa
 missing current request, malformed snapshot, unavailable structured response,
 argument mismatch, or incomplete/unavailable ancestry. This distinguishes a
 hook-time evidence gap from later successful replay; it does not relax the guard.
+An absent current request or malformed snapshot triggers up to four 50 ms waits
+and fresh bounded reads. <code>snapshot_attempts</code> records the number of observations.
+Evidence still missing after the bounded retry remains UNKNOWN; the hook never
+synthesizes a request or treats completion order as request order.
 A candidate metric records evaluation, not delivery after
 suppression, and zero candidates cannot establish a residual false-positive rate.</p>
 <h2 id="handoff-advice-from-measured-depth"><a class="header" href="#handoff-advice-from-measured-depth">Handoff advice from measured depth</a></h2>
