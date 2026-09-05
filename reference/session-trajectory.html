@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Golden-Path Conformance - Yupana — Live Code Structure</title>
+        <title>Session trajectory advice - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/golden-path.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/reference/session-trajectory.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,82 +181,84 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="golden-path-conformance"><a class="header" href="#golden-path-conformance">Golden-Path Conformance</a></h1>
-<p>FR-40..FR-42, behind the <code>golden-path</code> Cargo feature (in the CI matrix). A
-<strong>golden path</strong> is a blessed trajectory — a pruned, human-promoted record of
-how verified-successful work actually went, authored and governed in Quipu.
-This plane evaluates work against one: given a declared <code>followsPath</code> and a
-sequence of steps, it answers where the work stands — matched, deviating,
-hazard-adjacent — under the versioned conformance grammar shared with Quipu's
-backtest (<code>gp-grammar/1</code>).</p>
-<p>The full design addendum, including the blessing ladder and the division of
-labor with camayoc and quipu, is
-<a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md"><code>docs/golden-path-guard.md</code></a>.</p>
-<h2 id="surfaces"><a class="header" href="#surfaces">Surfaces</a></h2>
-<ul>
-<li><strong><code>yupana_path_check</code></strong> over MCP (registered on every build; refuses with a
-message naming the feature when <code>golden-path</code> is absent).</li>
-<li><strong><code>POST /path/check</code></strong> on the <a href="daemon.html">resident daemon</a>, mounted only on
-a build that can serve it.</li>
-</ul>
-<p>Both take the same request: the <code>followsPath</code> IRI the work declared, the steps
-as v1 signatures (<code>action_kind</code> + <code>target_class</code>), the <strong>projected paths
-supplied per call</strong>, a <code>mode</code>, and an optional <code>deny</code> opt-in.</p>
-<p>Paths are supplied per call, like the board guard's <code>StatePolicy</code> list,
-because a stale resident copy would enforce yesterday's blessing while looking
-current. "Empty registry" is therefore a per-call property: a request
-declaring a <code>followsPath</code> that is not in the supplied set is <strong>refused</strong>,
-never reported clean — <code>409 Conflict</code> over HTTP, an error result over MCP, so
-a caller gating on status alone cannot mistake "nothing was loaded" for "this
-plan conforms". A grammar version this build does not implement refuses the
-same way.</p>
-<h2 id="the-two-modes"><a class="header" href="#the-two-modes">The two modes</a></h2>
-<p>Under gp-grammar/1 gaps are allowed, so an <strong>open</strong> trajectory never
-hard-deviates — a future step could always match the next pattern element.
-Deviation is decidable only against a complete intent, which is what splits
-the check in two:</p>
-<ul>
-<li><strong><code>mode: "plan"</code></strong> (default, FR-42) — the submitted sequence is the whole
-intent. The report names how much of the pattern matched and the <strong>first
-deviation point</strong> (which pattern step was expected, after which submitted
-step). This is the only mode in which deviation is decidable, and so the
-only mode that can ever deny.</li>
-<li><strong><code>mode: "progress"</code></strong> (FR-41) — the work is in flight. The report says how
-far along the path the work is, which <code>deadEnd</code> hazards it has brushed
-("exemplars tried this; it did not help"), and which steps the grammar could
-not evaluate. It never denies.</li>
-</ul>
-<h2 id="effects-are-capped-by-blessing-level"><a class="header" href="#effects-are-capped-by-blessing-level">Effects are capped by blessing level</a></h2>
-<div class="table-wrapper"><table><thead><tr><th>Path level</th><th>Effect</th></tr></thead><tbody>
-<tr><td><code>advisory</code> (L3)</td><td><code>warn</code> only</td></tr>
-<tr><td><code>blessed</code> (L4)</td><td><code>warn</code> by default; <code>deny</code> only when the caller passed <code>deny: true</code> <strong>and</strong> the mode is <code>plan</code></td></tr>
-<tr><td>constraint-backing (L5)</td><td>does not even parse — an unsigned L5 cannot enforce as if it were signed; gated on verdict signing</td></tr>
+                        <h1 id="governed-session-trajectory-advice"><a class="header" href="#governed-session-trajectory-advice">Governed session trajectory advice</a></h1>
+<p>The post-edit hook can advise when a selected command was attempted earlier in
+the same session. For example, a work-item creation command followed by more
+edits can prompt the agent to check ownership before continuing. The graph owns
+the command vocabulary, event ordering, notification frequency and explanation.
+Yupana owns the observation and evaluation mechanism.</p>
+<p>The command observation runs in <code>pre-bash</code>. It proves an <strong>attempt</strong>, not a
+successful command or a newly created work item. Deep investigation without a
+matching command stays silent. Missing session identity cannot establish an
+ordering and stays silent as well.</p>
+<h2 id="policy-data"><a class="header" href="#policy-data">Policy data</a></h2>
+<p>This is a separate <code>trajectory_policies</code> channel in the existing projection,
+using the existing <code>Policy</code>, <code>Selector</code> and <code>Predicate</code> classes. A Policy with
+<code>targets = "session-trajectory"</code> supplies:</p>
+<div class="table-wrapper"><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>selector / evidenceSource</code></td><td>JSON object with nonempty <code>programs</code> and <code>verbs</code> arrays of bare command tokens</td></tr>
+<tr><td><code>predicate / evidenceSource</code></td><td><code>command-before-edit</code>, the supported ordering</td></tr>
+<tr><td><code>enforcementTier</code></td><td><code>warn</code>, the supported advisory tier</td></tr>
+<tr><td><code>oncePer</code></td><td><code>session</code> for one notice per rule/session, or <code>edit</code> for every subsequent edit</td></tr>
+<tr><td><code>effect</code> / <code>verificationPoint</code></td><td><code>warn</code> at <code>PAA</code>, the supported response and placement</td></tr>
+<tr><td><code>rdfs:comment</code></td><td>The full explanation delivered to the agent</td></tr>
 </tbody></table>
 </div>
-<p>Deviation is not failure: a deviation verdict is input to the record (quipu
-stores it; the promotion gates consume it as traffic), not a judgment that the
-agent is wrong. Paths are demoted when conformers start failing, and that
-evidence only exists if deviation and conformance are both recorded
-faithfully.</p>
-<h2 id="the-report"><a class="header" href="#the-report">The report</a></h2>
-<p>An answerable check returns a <code>PathCheckReport</code>: the grammar version and path
-IRI it evaluated, the path's <code>level</code> and the <code>mode</code>, <code>matched</code> out of
-<code>pattern_len</code>, the <code>first_deviation</code> (plan mode), <code>hazards</code> (which submitted
-step matched which dead end, with its note), <code>unevaluated_steps</code>, the
-resulting <code>effect</code>, the path's <strong>exemplar citations</strong> (a warn must be able to
-say "because this concrete work succeeded this way"), and <code>projected_at</code> —
-echoed from the projection, omitted rather than faked when the projection
-carries none.</p>
+<p>The example declaration is <code>policies/delegate-line.ttl</code> in the repository.
+It is imported deliberately; the binary never seeds a fallback rule.</p>
+<p>The normal Policy and Selector/Predicate shape requirements still apply,
+including <code>claim</code> and atom <code>name</code> fields. The trajectory decoder validates its
+additional fields, rejects unknown keys in the trigger JSON, rejects conflicting
+rows for one identity, and treats a missing required field as an error. Policies
+with incomplete fields remain visible to the query so they cannot disappear
+through a required SPARQL join.</p>
+<p>A work-item selector can use:</p>
+<pre><code class="language-json">{"programs":["br","bd"],"verbs":["create"]}
+</code></pre>
+<p>Its rationale must preserve the discriminator: comments, updates and closes are
+ordinary traffic on an existing item, not artifact creation. The advice should
+ask whether edits belong to the agent's assigned work; it must permit continuing
+that work. The parser retains the previous narrow behavior, including the known
+miss when a value-less long flag precedes the verb (<code>br --json create</code>). That
+produces a missed observation, never a claim of successful creation.</p>
+<h2 id="tier-and-placement"><a class="header" href="#tier-and-placement">Tier and placement</a></h2>
+<p>This slice supports <strong>advice only</strong>. A trajectory policy marked <code>block</code> is
+<strong>refused during projection</strong>, with an error naming the missing pre-edit
+enforcement point. The post-edit hook cannot prevent an edit that already
+happened. A future pre-edit gate is a separate placement change requiring its
+own verification and promotion; accepting a block tier here would falsely
+advertise enforcement.</p>
+<p>The deployment's existing policy mode remains the ceiling. <code>off</code> disables the
+channel. <code>advise</code> and <code>enforce</code> both deliver <code>warn</code> as advice.</p>
+<h2 id="refresh-and-verification"><a class="header" href="#refresh-and-verification">Refresh and verification</a></h2>
+<p>Run <code>yupana refresh-projection</code> after changing graph policy. The JSON result
+includes a <code>trajectory</code> count and the durable cache includes the complete rule.
+Hooks read this local cache without network requests. A missing channel in an
+older cache is <strong>unknown</strong>, distinct from a refreshed empty catalogue; absent,
+expired or invalid cache data reports <code>NOT EVALUATED</code> rather than silently
+claiming no rule applies. Removing a policy and refreshing retires its advice.
+A changed trigger cannot inherit evidence recorded under its old definition.</p>
+<p>Verify with a fresh isolated session:</p>
+<ol>
+<li>Post-edit before any selected command: silent control.</li>
+<li>Pre-bash with a selected invocation: observe the attempt.</li>
+<li>Post-edit: the graph's explanation appears.</li>
+<li>Post-edit again: silent when <code>oncePer</code> is <code>session</code>.</li>
+</ol>
+<p>Also test a custom program/verb pair using only changed graph data, and confirm
+that a <code>block</code> policy refuses projection. The <code>trajectory_advised</code> metrics record
+names the rule, tier, frequency and attempted-command evidence; it never records
+an inferred successful work-item creation.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../reference/session-trajectory.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/replay.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../reference/enforcement-trace.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../reference/golden-path.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -266,11 +268,11 @@ carries none.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../reference/session-trajectory.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/replay.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../reference/enforcement-trace.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../reference/golden-path.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
