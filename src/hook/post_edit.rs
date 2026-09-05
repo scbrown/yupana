@@ -66,17 +66,18 @@ pub fn run_post_edit(tenant: Option<&str>) -> anyhow::Result<()> {
     // that is not a Rust file with symbols, and this boundary is
     // language-independent — the specimen case in the bead was edits across
     // several repos and file types, none of which advisory_for would have seen.
-    if let Some(text) = super::delegate_line::advisory(&buf) {
-        sections.push(text);
-    }
+    let trajectory = super::delegate_line::advisory(&buf);
     if let Some(text) = advisory_for(&buf, &root, tenant) {
         sections.push(text);
     }
 
-    let sections: Vec<String> = sections
+    let mut sections: Vec<String> = sections
         .into_iter()
         .filter_map(|section| super::advisory_for_session(&buf, section))
         .collect();
+    // This channel applies its graph-declared once_per itself. Generic duplicate
+    // advice suppression must not silently override an explicit edit scope.
+    sections.extend(trajectory);
     if !sections.is_empty() {
         let envelope = serde_json::json!({
             "hookSpecificOutput": {

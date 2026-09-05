@@ -34,6 +34,7 @@ impl Cli {
                     "projected": projected,
                     "structural": registry.policies().len(),
                     "text": registry.text_rules().len(),
+                    "trajectory": registry.trajectory_policies().map_or(0, <[_]>::len),
                 })
             );
         } else if !self.quiet {

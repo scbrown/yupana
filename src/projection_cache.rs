@@ -87,6 +87,9 @@ pub struct CachedProjection {
     /// than making the whole guard fail open during a live projection failure.
     #[serde(default)]
     pub memory_policies: Vec<crate::project_memory::MemoryPolicy>,
+    /// None distinguishes pre-channel caches from a queried empty catalogue.
+    #[serde(default)]
+    pub trajectory_policies: Option<Vec<crate::project_trajectory::TrajectoryPolicy>>,
     /// Last-known entity-grounded rules (bobbin-tvn). Defaulted so a cache
     /// written before grounding existed still loads.
     #[serde(default)]
@@ -300,6 +303,13 @@ pub fn load_servable(
     let body = std::fs::read(path).map_err(|e| CacheMiss::Unreadable(e.to_string()))?;
     let cached: CachedProjection =
         serde_json::from_slice(&body).map_err(|e| CacheMiss::Unreadable(e.to_string()))?;
+    if let Some(policies) = &cached.trajectory_policies {
+        for policy in policies {
+            policy
+                .validate()
+                .map_err(|e| CacheMiss::Unreadable(e.to_string()))?;
+        }
+    }
     if !(MIN_READABLE_CACHE_VERSION..=CACHE_VERSION).contains(&cached.version) {
         return Err(CacheMiss::Version(cached.version));
     }

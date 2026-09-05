@@ -24,8 +24,8 @@ check:
 # === Rust ===
 
 # Build the project
-build:
-    cargo build
+build *args="":
+    cargo build {{args}}
 
 # Run tests
 test *args="":
@@ -46,8 +46,8 @@ test *args="":
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every
 # test target, and the lints hiding there were real: a spawned daemon never
 # reaped on the timeout path, and bool `assert_eq!`s (yupana #83).
-lint:
-    cargo clippy --all-targets -- -D warnings -A missing-docs
+lint *args="":
+    cargo clippy --all-targets {{args}} -- -D warnings -A missing-docs
 
 # Format code
 fmt:
