@@ -2469,7 +2469,9 @@ what each one provably cannot decide.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="code-slices-as-quipu-share-bundles"><a class="header" href="#code-slices-as-quipu-share-bundles">Code slices as Quipu share bundles</a></h1>
 <p>A Quipu <strong>share bundle</strong> is a git-storable, content-addressed directory holding a canonical RDF
 graph, the shapes that describe it, and a lineage manifest. This page is the measured workflow for
-turning a Yupana code-graph slice into one, and for importing it into somebody else's store.</p>
+turning a Yupana code-graph slice into one, and for importing it into somebody else's store. For
+the consumer side — pulling a bundle somebody hands YOU into the graph Yupana reads — see
+<a href="reference/share-pull.html">Pulling a Share</a>.</p>
 <p>Yupana is the <strong>producer of structural code facts and nothing more</strong>. It does not write manifests,
 compute share ids, or canonicalize RDF: Quipu authors the bundle from the graph it holds, so a
 bundle built this way carries <code>producer.name = "quipu"</code>. That is by design, not a gap — one
@@ -2553,6 +2555,133 @@ idempotence — is pinned by an end-to-end regression that stands up two indepen
 round-trips a real slice between them. Reproduce it with the commands on this page; the arms that
 matter are the cross-condition hash and the bare-consumer quarantine, because each fails in the
 reassuring direction if you only run the easy version.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="pulling-a-share-yupana-share"><a class="header" href="#pulling-a-share-yupana-share">Pulling a share: <code>yupana share</code></a></h1>
+<p><a href="reference/share-bundles.html">Code Slices as Share Bundles</a> is the PRODUCER half — how a Yupana code slice
+becomes a Quipu share bundle somebody else can hold. This page is the CONSUMER half: how a bundle
+somebody hands you gets into the graph Yupana reads, and what it can and cannot do once it is there.</p>
+<pre><code class="language-bash">yupana share pull    &lt;bundle-dir|url&gt; --to &lt;quipu-url&gt;   # stage it, and say where you stand
+yupana share policy  &lt;staging-graph&gt;  [--to &lt;quipu-url&gt;] # what policy would this contribute?
+yupana share promote &lt;share-id&gt;       --to &lt;quipu-url&gt;   # admit it (the governance decision)
+</code></pre>
+<h2 id="the-one-property-to-understand-first"><a class="header" href="#the-one-property-to-understand-first">The one property to understand first</a></h2>
+<p><strong>A pulled share is inert until you promote it.</strong></p>
+<p>Quipu stages an import into a named graph — <code>urn:quipu:import:staging:&lt;hash&gt;</code>, or
+<code>…:quarantine:&lt;hash&gt;</code> when the receiving store does not govern the vocabulary. Yupana's policy
+projection — the queries the pre-edit guard sends to build its rule catalogue — carry <strong>no <code>GRAPH</code>
+clause</strong>, so they cannot see a named graph at all.</p>
+<p>That is what makes <code>pull</code> safe to run on a bundle from someone you have not audited. It is also
+exactly the kind of claim that deserves a measurement rather than a reassurance, so here is the
+measurement, taken against a real Quipu 0.3.36 with the guard's own query constant (not a
+paraphrase of it), before and after promoting the same share:</p>
+<div class="table-wrapper"><table><thead><tr><th>the guard's own unscoped text-rule query</th><th>rows</th></tr></thead><tbody>
+<tr><td>after <code>share pull</code> — staged, not promoted</td><td><strong>0</strong></td></tr>
+<tr><td>the identical query scoped <code>GRAPH &lt;staging&gt;</code></td><td><strong>1</strong></td></tr>
+<tr><td>after <code>share promote</code></td><td><strong>1</strong></td></tr>
+</tbody></table>
+</div>
+<p>The middle row is the control. Two zeroes would prove nothing on their own — an endpoint that
+answered nothing at all would look the same — so the scoped arm establishes that the triples are
+present and reachable, and only the <code>GRAPH</code> clause separates "in the store" from "enforced".</p>
+<h2 id="what-each-verb-does"><a class="header" href="#what-each-verb-does">What each verb does</a></h2>
+<h3 id="share-pull--always-stages-never-promotes"><a class="header" href="#share-pull--always-stages-never-promotes"><code>share pull</code> — always stages, never promotes</a></h3>
+<pre><code class="language-console">$ yupana share pull ./bundle --to http://quipu.example
+quarantined: 15 triples from ./bundle
+  share:   sha256:a350c7a7…
+  staged:  urn:quipu:import:quarantine:a350c7a7…
+  blocked: off_vocabulary
+  next:    /usr/local/bin/yupana share policy urn:quipu:import:quarantine:a350c7a7… --to http://quipu.example
+</code></pre>
+<p><strong>A quarantine is a success, and <code>pull</code> exits 0 for it.</strong> Pulling from a publisher whose vocabulary
+you do not govern is the DEFAULT case, not the exceptional one. If staging exited nonzero, every
+script wrapping this verb would treat the correct outcome as a failure, and the eventual "fix" for
+that is auto-promotion — which is the silent vocabulary widening the quarantine exists to prevent.</p>
+<p>Nonzero is reserved for two things: a bundle that fails verification, and an endpoint that would not
+serve the request.</p>
+<p>Before anything is sent, Yupana checks the manifest's SHA-256 over <code>export.nt</code> and <code>shapes.ttl</code>
+against the bytes it holds. Quipu's server checks them again — this is deliberate duplication,
+because a local refusal is a <em>different finding</em>: it says the bundle you were handed is not the
+bundle its manifest describes, which is a story about your download and not about the graph.</p>
+<pre><code class="language-console">$ yupana share pull ./tampered --to http://quipu.example
+Error: share error: share graph hash MISMATCH for export.nt: manifest declares sha256:edd17844…,
+the bytes here hash to sha256:1f181001…. Nothing was sent to quipu. …
+$ echo $?
+1
+</code></pre>
+<p><strong>Pulling the same bundle twice is a no-op.</strong> Quipu keys the staged graph on the share's content
+hash, so a byte-identical re-pull reports <code>unchanged</code> and writes nothing — measured, with the graph
+count unmoved:</p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>outcome</th><th>graphs</th></tr></thead><tbody>
+<tr><td>first pull</td><td><code>quarantined</code>, 4 triples</td><td>1</td></tr>
+<tr><td>identical re-pull</td><td><strong><code>unchanged</code></strong>, 4 triples</td><td><strong>1</strong></td></tr>
+</tbody></table>
+</div>
+<p>That matters because the honest response to a lost or ambiguous reply is to re-run the pull, and it
+must not be possible for that to duplicate anything.</p>
+<h3 id="share-policy--what-would-this-share-contribute"><a class="header" href="#share-policy--what-would-this-share-contribute"><code>share policy</code> — what would this share contribute?</a></h3>
+<p>The share is staged and invisible to the guard. Before deciding whether to admit it, ask what
+admitting it would mean:</p>
+<pre><code class="language-console">$ yupana share policy urn:quipu:import:staging:a350c7a7… --to http://quipu.example
+policy this share would contribute to urn:quipu:import:staging:a350c7a7…:
+  structural policies: 1
+    - publisher rule: no TODO in comments [deny]
+  text rules:          1
+    - no-internal-host
+</code></pre>
+<p>This runs Yupana's <strong>own</strong> projection queries and decoders, scoped into the staging graph — not a
+second query written to resemble them. The catalogue's definition of "a policy" is intricate, and a
+hand-written preview would be a parallel definition that drifts silently, showing you a different
+rule set from the one that will actually be enforced. Reusing the constants means the preview is
+wrong only if the guard is wrong too.</p>
+<p>One consequence worth knowing: if the publisher ships a policy whose vocabulary Yupana cannot
+decode, this verb <strong>fails loudly</strong> rather than reporting zero policies. A share carrying rules your
+tooling does not understand is a thing you want to be told about.</p>
+<p><code>share policy</code> is a read, so it falls back to the configured <code>[yupana.quipu] endpoint</code>. <code>pull</code> and
+<code>promote</code> are writes and require <code>--to</code> — that key is set host-wide so every agent's pre-edit guard
+can fetch the rule catalogue, and a read credential must not silently become a write one.</p>
+<h3 id="share-promote--the-governance-decision"><a class="header" href="#share-promote--the-governance-decision"><code>share promote</code> — the governance decision</a></h3>
+<pre><code class="language-console">$ yupana share promote sha256:a350c7a7… --to http://quipu.example
+promoted sha256:a350c7a7…: 15 triples admitted at tx 8
+</code></pre>
+<p>Quipu refuses to promote a share that is still blocked, and Yupana relays the refusal rather than
+dressing it up:</p>
+<pre><code class="language-console">$ yupana share promote sha256:2b9610a4… --to http://quipu.example
+Error: share error: … refused with 400: {"error":"no eligible staged import for sha256:2b9610a4…"}
+$ echo $?
+1
+</code></pre>
+<p>To clear an <code>off_vocabulary</code> block, the receiving store must govern the types the publisher used.
+That is a deliberate act on the receiving store — adopting a publisher's vocabulary is a governance
+change, and Yupana does not perform it as a side effect of fetching bytes. Load the shapes you
+intend to govern (the bundle ships its own <code>shapes.ttl</code> for exactly this purpose), then pull again:
+the same bundle that quarantined will come back <code>staged</code>.</p>
+<h2 id="what-pull-does-not-take-and-why"><a class="header" href="#what-pull-does-not-take-and-why">What <code>pull</code> does NOT take, and why</a></h2>
+<p><strong>A <code>.qpack.db</code>, and a bundle archive.</strong> Both are refused by name, with the command that does work:</p>
+<pre><code class="language-console">$ yupana share pull ./graph1.qpack.db --to http://quipu.example
+Error: share error: ./graph1.qpack.db is a packed graph (`.qpack.db`), and yupana cannot load it:
+quipu's `unpack`/`pack` exist only on the CLI against a LOCAL store, and yupana talks to a quipu
+SERVER over HTTP. Load it with the quipu CLI on the machine holding the store:
+    quipu pack --verify ./graph1.qpack.db
+    quipu unpack ./graph1.qpack.db --db &lt;store.db&gt;
+</code></pre>
+<p>This is an architectural fact rather than a missing feature. Quipu's <code>pack</code>/<code>unpack</code> have no REST
+route — they operate on a local store file — and Yupana has no local store: every Quipu interaction
+it has, including <code>promote</code> and the policy projection, is HTTP to an endpoint whose database lives
+somewhere else. There is no honest way for Yupana to unpack a pack, and a verb that accepted one and
+failed at the far end would be worse than one that says so up front.</p>
+<p>The refusal names commands that run. Yupana emits <strong>no</strong> suggestion it has not made runnable: every
+emitted command names an absolute path to the running binary and the endpoint that just worked, and
+the test suite parses each one with the real CLI definition rather than asserting on its spelling.</p>
+<h2 id="where-the-endpoint-and-credentials-come-from"><a class="header" href="#where-the-endpoint-and-credentials-come-from">Where the endpoint and credentials come from</a></h2>
+<div class="table-wrapper"><table><thead><tr><th></th><th>resolution</th></tr></thead><tbody>
+<tr><td>endpoint</td><td><code>--to</code> (required for <code>pull</code>/<code>promote</code>); <code>[yupana.quipu] endpoint</code> for <code>share policy</code></td></tr>
+<tr><td>bearer</td><td><code>QUIPU_AUTH_TOKEN</code>, else <code>QUIPU_AUTH_TOKEN_FILE</code>, else <code>~/.config/quipu/token</code></td></tr>
+</tbody></table>
+</div>
+<p><code>/import</code> and <code>/import/promote</code> are write endpoints and need Quipu's bearer; reads on the same
+endpoint stay open, so a working <code>yupana impact</code> proves nothing about whether a pull will be
+authorized. A 401 says so explicitly rather than surfacing as a generic failure — and a 404 is
+reported as "this Quipu has no <code>/import</code> route" rather than as a failed import, because those want
+opposite responses from the reader.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="e2e-grounding-eval"><a class="header" href="#e2e-grounding-eval">E2E Grounding Eval</a></h1>
 <p><code>just e2e</code> stands up the real pair — a <code>quipu-server</code> on a freshly seeded
 store, and this repo's <code>yupana</code> pre-edit guard pointed at it — and proves
