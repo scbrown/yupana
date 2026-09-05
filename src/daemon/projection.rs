@@ -209,7 +209,7 @@ impl ResidentProjection {
     pub fn spawn_refresher(&self, interval: Duration) -> RefresherHandle {
         let inner = Arc::clone(&self.inner);
         let stop = Arc::clone(&self.stop);
-        let handle = std::thread::Builder::new()
+        let _thread = std::thread::Builder::new()
             .name("yupana-projection".into())
             .spawn(move || {
                 const RETRY_FLOOR: Duration = Duration::from_secs(15);
@@ -257,7 +257,6 @@ impl ResidentProjection {
             .ok();
         RefresherHandle {
             stop: Arc::clone(&self.stop),
-            handle,
         }
     }
 }
@@ -289,6 +288,10 @@ pub fn for_config(config: &crate::config::YupanaConfig) -> Option<Arc<ResidentPr
 #[must_use]
 pub fn spawn_for(engine: &super::ResidentEngine) -> Option<RefresherHandle> {
     let resident = engine.projection()?;
+    // This process's quipu requests are the SINGLE-FLIGHT refresh, not a hook's.
+    // Declared before the first refresh so no request is attributed to the very
+    // caller this daemon exists to replace.
+    crate::quipu_label::set(crate::quipu_label::DAEMON);
     let ttl = engine.config().quipu.projection_cache_ttl_secs.max(2);
     let interval = Duration::from_secs(ttl / 2);
     eprintln!(
@@ -298,19 +301,27 @@ pub fn spawn_for(engine: &super::ResidentEngine) -> Option<RefresherHandle> {
     Some(resident.spawn_refresher(interval))
 }
 
-/// Stops the background refresher when dropped, so a daemon shutdown does not
-/// leave a thread holding a quipu connection.
+/// Stops the background refresher when dropped.
+///
+/// **Signals, and deliberately does NOT join.** Joining looks tidier and it
+/// breaks daemon shutdown: the refresher can be inside a quipu request, whose
+/// timeout is far longer than the 10s SIGTERM budget `tests/daemon.rs` holds the
+/// daemon to, so a join makes clean shutdown wait on the very store whose
+/// slowness this module exists to tolerate. Measured — that test failed with
+/// "daemon did not exit within 10s of SIGTERM", and only on the arm where both
+/// the daemon and the refresher exist.
+///
+/// Signalling alone is sufficient for what the flag is FOR: it stops the next
+/// iteration. An in-flight request finishing inside a process that is exiting
+/// anyway harms nothing, and the thread observes the flag and returns at its
+/// next check.
 pub struct RefresherHandle {
     stop: Arc<AtomicBool>,
-    handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Drop for RefresherHandle {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
-        }
     }
 }
 

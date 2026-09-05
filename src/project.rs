@@ -72,6 +72,10 @@ pub(crate) fn query(endpoint: &str, sparql: &str) -> Result<String> {
         .timeout(http_timeout())
         .set("Content-Type", "application/json")
         .set("Accept", "application/sparql-results+json")
+        // WHICH yupana caller this is. The hook and the daemon's single-flight
+        // refresher both reach here, and telling them apart from the store side
+        // is how the aegis-x894x2 herd is seen to collapse.
+        .set("X-Quipu-Client", crate::quipu_label::current())
         .send_string(&body)
         .map_err(|e| Error::Projection(format!("POST {url} failed: {e}")))?;
     resp.into_string()

@@ -1458,7 +1458,7 @@ drops landed outside the phase numbering entirely — the game-state harness
 (FR-35..FR-39) and the golden-path guard (FR-40..FR-42) — each behind its own
 Cargo feature and its own addendum.
 
-**Source layout (`src/`, 185 `.rs` files, ~49,174 lines):** the 400-line soft
+**Source layout (`src/`, 206 `.rs` files, ~53,226 lines):** the 400-line soft
 cap is a warn-not-fail target and 30 non-test files currently exceed it, led by
 `promote.rs` (625), `export.rs` (605) and `hook/rule_planes.rs` (555). Those
 three are the only entries in `scripts/file-size-baseline.txt`: the ratchet
@@ -1531,7 +1531,7 @@ only with its real JSON-RPC client, `Tier::served()` arm, and CI matrix. This
 preserves the lesson from the former empty `cpg = []` / `lsp = []` flags: a
 feature that can be enabled without an implementation advertises a lie.
 
-**Tests: 911** (`cargo test --all-features -- --list`), of which 2 are
+**Tests: 988** (`cargo test --all-features -- --list`), of which 2 are
 `#[ignore]`d and both declare why in the attribute: `shape_agreement`'s Layer 2
 verdict-agreement test needs a live `QUIPU_URL`, and `promote_test`'s chunk
 soak needs `YUPANA_CHUNK_SOAK_PAYLOAD` and runs in minutes. `cargo test` on

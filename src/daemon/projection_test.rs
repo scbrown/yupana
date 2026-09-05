@@ -138,9 +138,13 @@ fn nothing_ever_obtained_reports_absence_not_an_empty_catalogue() {
     assert!(reply.age_secs.is_none(), "an absent projection has no age");
 }
 
-/// The refresher stops when its handle is dropped. Without this a daemon
-/// shutdown leaves a thread holding a quipu connection open — the resource this
-/// module exists to economise.
+/// Dropping the handle must return PROMPTLY, not wait on the refresher.
+///
+/// This is the daemon-shutdown SLO in miniature: `tests/daemon.rs` holds the
+/// daemon to exiting within 10s of SIGTERM, and the refresher can be inside a
+/// quipu request whose timeout is longer than that. An earlier version joined
+/// the thread on drop and failed exactly that test — so this asserts the
+/// property that regression violated, not merely that drop works.
 #[test]
 fn dropping_the_handle_stops_the_refresher() {
     let dir = tempfile::tempdir().unwrap();
