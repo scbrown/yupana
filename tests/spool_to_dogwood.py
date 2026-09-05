@@ -40,6 +40,19 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(events[0].count('session: "s"'), 2)
         self.assertEqual(events[0].count('item: "i"'), 2)
 
+    def test_exposure_and_repo_survive_replay_without_inventing_legacy_values(self):
+        for exposure in ("public", "internal", "unknown", "n/a"):
+            events, tally = convert([
+                '{"kind":"guard","ts":1,"session":"s","rule":"r",'
+                '"exposure":"%s","repo":"artifact"}' % exposure
+            ])
+            self.assertEqual(tally["written"], 1)
+            self.assertIn('exposure: "%s"' % exposure, events[0])
+            self.assertIn('repo: "artifact"', events[0])
+        events, _ = convert(['{"kind":"guard","ts":1,"session":"s"}'])
+        self.assertNotIn("exposure:", events[0])
+        self.assertNotIn("repo:", events[0])
+
     def test_a_resolved_action_carries_its_verb(self):
         events, _ = convert([
             '{"kind":"action","ts":1,"agent":"a","session":"s","verb":"ssh",'

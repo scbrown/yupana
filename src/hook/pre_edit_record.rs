@@ -143,6 +143,13 @@ pub(super) fn guard_recorded(
             .map_or(serde_json::Value::Null, Into::into),
     ));
 
+    // Carry the deciding plane's values, without a second lookup or a join to
+    // another spool line. Session, rule and exposure can now be replayed together.
+    if let Some((exposure, repo)) = &decision.governed_context {
+        fields.push(("exposure", (*exposure).into()));
+        fields.push(("repo", repo.clone().into()));
+    }
+
     // The SUBJECT of the decision (yupana #77). Recorded for allow as well as
     // deny, deliberately and under the same knob: scope that can only be
     // inferred from the absence of denies cannot be verified at all, and an

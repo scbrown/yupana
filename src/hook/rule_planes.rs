@@ -415,7 +415,7 @@ pub(super) fn governed_check(
             ("structural", (structural_violations.len() as u64).into()),
             ("blocking", any_blocking.into()),
             ("exposure", exposure_label.into()),
-            ("repo", repo_label.into()),
+            ("repo", repo_label.clone().into()),
             // WHICH catalogue said so. A soak that groups governed firings
             // without this cannot tell a verdict from the current policy set
             // from one computed against a cached catalogue, and those are not
@@ -489,11 +489,9 @@ pub(super) fn governed_check(
     // The projection's REAL sync state, not an assumption: a verdict computed
     // against a registry that could not be refreshed is stale, and saying so is
     // the whole point of carrying the field.
-    Some(Decision::evaluated(
-        outcome,
-        evaluations,
-        registry.freshness(),
-    ))
+    let mut decision = Decision::evaluated(outcome, evaluations, registry.freshness());
+    decision.governed_context = Some((exposure_label, repo_label));
+    Some(decision)
 }
 
 /// The absolute path of the file this edit actually writes to, which is the
