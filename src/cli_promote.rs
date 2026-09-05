@@ -8,6 +8,64 @@ use super::*;
 
 use crate::promote_trigger::{decide, Decision, Trigger};
 
+/// The arguments to `yupana promote`.
+///
+/// Flattened out of the `Commands` enum so promotion's surface lives beside
+/// promotion's code: every one of these is an authorization or an identity the
+/// caller must state, and their reasoning belongs next to the checks that
+/// enforce it rather than in the dispatcher.
+#[derive(clap::Args, Debug)]
+pub struct PromoteArgs {
+    /// Commit-ish to promote.
+    #[arg(long, default_value = "HEAD")]
+    pub commit: String,
+    /// Quipu base URL to promote into (e.g. `http://localhost:8080`).
+    /// REQUIRED for a write, and it is the ONLY thing that authorizes one: a
+    /// discovered `[yupana.quipu] endpoint` is deliberately NOT enough, because
+    /// that key is set host-wide so the pre-edit guard can READ the rule
+    /// catalogue. Without `--to`, promotion refuses and names the endpoint it
+    /// found. `--dry-run` needs no target.
+    #[arg(long)]
+    pub to: Option<String>,
+    /// Extract and SHACL-validate the projection, then STOP — write nothing.
+    /// Answers "would this promotion conform?" without touching the graph.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Replace the complete per-repository code snapshot atomically. This
+    /// is explicit because it authorizes absence (including an empty tree)
+    /// to retract facts from the prior snapshot.
+    #[arg(long)]
+    pub replace_snapshot: bool,
+    /// Repository name to attribute promoted entities to. Defaults to the
+    /// `origin` remote's repo name; with no origin, promotion refuses rather
+    /// than deriving identity from the directory name (a worktree's dir name
+    /// mints wrong IRIs and fragments the graph).
+    #[arg(long)]
+    pub repo: Option<String>,
+    /// The event that invoked this promotion, for a git hook or CI step to
+    /// declare. `[yupana.quipu] promote_on` decides whether that event
+    /// promotes (FR-19); the default `manual` always does.
+    #[arg(long, value_enum, default_value_t = crate::promote_trigger::Trigger::Manual)]
+    pub trigger: crate::promote_trigger::Trigger,
+    /// Write only the files changed since `--base`, each under its own
+    /// per-file producer key, instead of replacing the repo-wide snapshot.
+    /// The tree is still extracted in FULL, so cross-file references resolve
+    /// as they always do; what shrinks is the WRITE. Needs `--base`, and
+    /// conflicts with `--replace-snapshot` — this IS that, per file.
+    #[arg(long, requires = "base", conflicts_with = "replace_snapshot")]
+    pub subset: bool,
+    /// Base commit-ish for `--subset`. MUST be the last SUCCESSFULLY
+    /// PROMOTED commit, never the last commit SEEN: a marker advanced on a
+    /// poll that skipped the promote leaves every commit in between silently
+    /// unwritten forever. Advance your marker only on exit 0, and only to
+    /// the `promoted-commit:` sha this prints. See `cli_promote.rs`.
+    #[arg(long)]
+    pub base: Option<String>,
+    /// Directory to promote (defaults to current dir).
+    #[arg(default_value = ".")]
+    pub path: PathBuf,
+}
+
 impl Cli {
     /// Does `[yupana.quipu] promote_on` admit a promotion invoked by `trigger`?
     ///
@@ -50,7 +108,13 @@ impl Cli {
     /// Promote a tree's structural facts into Quipu: emit Turtle, SHACL-validate it
     /// in-process, and write it iff it conforms (FR-19/20/21).
     #[cfg(feature = "quipu")]
-    #[allow(clippy::unused_self)] // method form for call-site symmetry with the stub arm
+    #[allow(clippy::unused_self)]
+    // method form for call-site symmetry with the stub arm
+    // Eight, and each one is a distinct authorization the caller must state
+    // explicitly: the target, the identity, the ref, and three separate
+    // opt-ins to a write. Bundling them into a struct would let a caller
+    // build a default and get a live graph write it never named.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn promote(
         &self,
         path: &Path,
@@ -59,6 +123,7 @@ impl Cli {
         repo: Option<&str>,
         dry_run: bool,
         replace_snapshot: bool,
+        subset_base: Option<&str>,
     ) -> anyhow::Result<()> {
         // `--to` IS THE AUTHORIZATION, and it is the only one (aegis-o2h97).
         //
@@ -135,6 +200,14 @@ impl Cli {
                 path.display()
             );
         }
+        // `--subset` preconditions answered here, BEFORE the tree is read: a bad
+        // base should cost a message, not a full projection.
+        let subset_changed = match subset_base {
+            Some(base) => Some(crate::promote_subset_cli::subset_preflight(
+                path, base, commit,
+            )?),
+            None => None,
+        };
         let mut turtle = crate::export::to_turtle_at(path, &repo, commit)?;
         // A promotion that extracted NOTHING is not a promotion — it is a green
         // empty write (measured: a Python repo "promoted: 0 triples" with a
@@ -142,7 +215,11 @@ impl Cli {
         // its done-marker over the void). Say so and refuse (exit 2, the
         // could-not-promote code), so a marker-disciplined caller retries
         // instead of booking emptiness as done.
-        if !replace_snapshot && !turtle.contains("bobbin:CodeModule") {
+        // A subset promote replaces per-file snapshots, so like `--replace-snapshot`
+        // it legitimately authorizes absence — a deleted file's partition IS empty.
+        // The refusal below is for the OTHER shape: a promote that meant to assert
+        // a tree and extracted nothing.
+        if !replace_snapshot && subset_base.is_none() && !turtle.contains("bobbin:CodeModule") {
             eprintln!(
                 "yupana promote: extracted NOTHING from {} — no parseable source                  files under this tree for the grammars in this build. Refusing                  to promote an empty graph as success. (Is the language behind                  the `langs-extra` feature? Is the path right?)",
                 path.display()
@@ -177,6 +254,22 @@ impl Cli {
         let resolved =
             crate::git::resolve_commit(path, commit).unwrap_or_else(|| commit.to_string());
         let source = format!("yupana promote {repo}@{resolved} (cli)");
+        // SUBSET: write only the changed files' partitions, each under its own
+        // producer key. Diverges here, AFTER the projection is complete, because
+        // the whole point is that the READ is unchanged — see `promote_subset`.
+        if let (Some(base), Some(changed)) = (subset_base, subset_changed.as_ref()) {
+            return crate::promote_subset_cli::promote_subset(
+                path,
+                base,
+                commit,
+                &repo,
+                changed,
+                &turtle,
+                &source,
+                endpoint.as_deref(),
+                dry_run,
+            );
+        }
         let outcome = match (dry_run, &endpoint) {
             (true, ep) => crate::promote::dry_run(ep.as_deref(), &turtle, &source)?,
             (false, Some(ep)) if replace_snapshot => {
@@ -208,7 +301,12 @@ impl Cli {
     /// binary, took exit 0 as success, and advanced its promote marker past a
     /// commit that was never promoted.
     #[cfg(not(feature = "quipu"))]
-    #[allow(clippy::unused_self)] // method form for call-site symmetry with the quipu arm
+    // Same eight arguments as the feature arm, and for the same reason: the two
+    // signatures must match exactly or the call site stops compiling in one
+    // build and not the other. The default-feature clippy arm is the ONLY one
+    // that sees this function — `--features quipu` compiles the other half — so
+    // a lint satisfied only there is a false green.
+    #[allow(clippy::unused_self, clippy::too_many_arguments)]
     pub(super) fn promote(
         &self,
         _path: &Path,
@@ -217,6 +315,7 @@ impl Cli {
         _repo: Option<&str>,
         _dry_run: bool,
         _replace_snapshot: bool,
+        _subset_base: Option<&str>,
     ) -> anyhow::Result<()> {
         self.planned(
             "promote",

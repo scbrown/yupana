@@ -27,7 +27,7 @@ mod cli_export;
 #[path = "cli_hook.rs"]
 mod cli_hook;
 #[path = "cli_promote.rs"]
-mod cli_promote;
+pub mod cli_promote;
 #[path = "cli_serve.rs"]
 mod cli_serve;
 #[cfg(feature = "quipu")]
@@ -238,42 +238,7 @@ enum Commands {
         policy: Option<String>,
     },
     /// Promote a commit's structural facts into Quipu (Phase 4).
-    Promote {
-        /// Commit-ish to promote.
-        #[arg(long, default_value = "HEAD")]
-        commit: String,
-        /// Quipu base URL to promote into (e.g. `http://localhost:8080`).
-        /// REQUIRED for a write, and it is the ONLY thing that authorizes one: a
-        /// discovered `[yupana.quipu] endpoint` is deliberately NOT enough, because
-        /// that key is set host-wide so the pre-edit guard can READ the rule
-        /// catalogue. Without `--to`, promotion refuses and names the endpoint it
-        /// found. `--dry-run` needs no target.
-        #[arg(long)]
-        to: Option<String>,
-        /// Extract and SHACL-validate the projection, then STOP — write nothing.
-        /// Answers "would this promotion conform?" without touching the graph.
-        #[arg(long)]
-        dry_run: bool,
-        /// Replace the complete per-repository code snapshot atomically. This
-        /// is explicit because it authorizes absence (including an empty tree)
-        /// to retract facts from the prior snapshot.
-        #[arg(long)]
-        replace_snapshot: bool,
-        /// Repository name to attribute promoted entities to. Defaults to the
-        /// `origin` remote's repo name; with no origin, promotion refuses rather
-        /// than deriving identity from the directory name (a worktree's dir name
-        /// mints wrong IRIs and fragments the graph).
-        #[arg(long)]
-        repo: Option<String>,
-        /// The event that invoked this promotion, for a git hook or CI step to
-        /// declare. `[yupana.quipu] promote_on` decides whether that event
-        /// promotes (FR-19); the default `manual` always does.
-        #[arg(long, value_enum, default_value_t = crate::promote_trigger::Trigger::Manual)]
-        trigger: crate::promote_trigger::Trigger,
-        /// Directory to promote (defaults to current dir).
-        #[arg(default_value = ".")]
-        path: PathBuf,
-    },
+    Promote(cli_promote::PromoteArgs),
     /// Watch a tree and re-extract changed files, debounced and tiered (FR-17).
     Watch {
         /// Directory to watch (defaults to the current directory).
@@ -444,15 +409,18 @@ impl Cli {
                 spool.as_deref(),
                 policy.as_deref(),
             ),
-            Commands::Promote {
-                commit,
-                to,
-                dry_run,
-                replace_snapshot,
-                repo,
-                trigger,
-                path,
-            } => {
+            Commands::Promote(a) => {
+                let (commit, to, dry_run, replace_snapshot, repo, trigger, subset, base, path) = (
+                    &a.commit,
+                    &a.to,
+                    &a.dry_run,
+                    &a.replace_snapshot,
+                    &a.repo,
+                    &a.trigger,
+                    &a.subset,
+                    &a.base,
+                    &a.path,
+                );
                 // THE WRITE GUARD, made real (aegis-ltjo). Promotion is the write
                 // yupana performs, so `serve.read_only` must refuse it — BEFORE any
                 // work, so the guard holds regardless of feature.
@@ -467,6 +435,9 @@ impl Cli {
                 if !self.trigger_admits(path, commit, *trigger)? {
                     return Ok(());
                 }
+                // `--subset` and its base travel as ONE value, so "subset with
+                // no base" is unrepresentable below rather than merely refused
+                // by clap. The two are meaningless apart.
                 self.promote(
                     path,
                     commit,
@@ -474,6 +445,7 @@ impl Cli {
                     repo.as_deref(),
                     *dry_run,
                     *replace_snapshot,
+                    subset.then(|| base.as_deref()).flatten(),
                 )
             }
         }

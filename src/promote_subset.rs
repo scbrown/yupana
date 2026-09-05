@@ -188,6 +188,184 @@ pub fn file_key(repo: &str, file: &str) -> String {
     format!("code:{repo}:{file}")
 }
 
+/// The producer key for facts that belong to no single file.
+///
+/// Commit provenance is the case that exists today: `commit → touched entities`
+/// nodes carry no `filePath`, so no file's snapshot can own them. Under the
+/// repo-wide key they were replaced wholesale on every promote; this key
+/// reproduces that exactly rather than quietly changing their lifecycle.
+///
+/// `::` cannot collide with a real path: git never yields an empty path segment,
+/// so no repo-relative file is ever spelled `:provenance`.
+#[must_use]
+pub fn provenance_key(repo: &str) -> String {
+    format!("code:{repo}::provenance")
+}
+
+/// Why a particular key is being written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Why {
+    /// The file changed and has facts: replace its snapshot with them.
+    Changed,
+    /// The file changed and has NO facts in the projection — deleted, or its
+    /// content no longer produces any. Its snapshot is replaced with an EMPTY
+    /// document, which is what retracts the facts it used to own.
+    ///
+    /// Kept DISTINCT from `Changed` because the two are indistinguishable in the
+    /// payload (an empty partition is just a short one) and they are the two
+    /// outcomes an operator most needs told apart: one asserts, the other
+    /// retracts everything under that key.
+    Retracted,
+    /// Facts belonging to no file, carried under [`provenance_key`].
+    Unfiled,
+}
+
+/// One snapshot write a subset promote will perform.
+#[derive(Debug, Clone)]
+pub struct SubsetWrite {
+    /// Producer key to replace.
+    pub key: String,
+    /// Repo-relative file the key stands for, or `None` for the unfiled key.
+    pub file: Option<String>,
+    /// The Turtle document to write.
+    pub turtle: String,
+    /// Triples in it — 0 for a retraction.
+    pub triples: usize,
+    /// Whether this key is being asserted, retracted, or carries unfiled facts.
+    pub why: Why,
+}
+
+/// What a subset promote would do, before any of it is done.
+#[derive(Debug, Default)]
+pub struct SubsetPlan {
+    /// The writes, in a stable order.
+    pub writes: Vec<SubsetWrite>,
+    /// Subjects whose facts belong to no file, with a triple count — the
+    /// content of the [`provenance_key`] write.
+    ///
+    /// REPORTED rather than silent: these are the facts a per-file key cannot
+    /// express, and an operator reading a subset promote's output should be able
+    /// to see that they were carried rather than assume it.
+    pub unfiled_subjects: BTreeMap<String, usize>,
+    /// Files in the projection that did NOT change and are therefore untouched.
+    /// The whole point of the exercise, so it is reported rather than implied.
+    pub unchanged_files: usize,
+}
+
+impl SubsetPlan {
+    /// Triples this plan would write.
+    #[must_use]
+    pub fn triples(&self) -> usize {
+        self.writes.iter().map(|w| w.triples).sum()
+    }
+
+    /// Keys whose snapshot becomes empty — i.e. pure retractions.
+    #[must_use]
+    pub fn retractions(&self) -> usize {
+        self.writes
+            .iter()
+            .filter(|w| w.why == Why::Retracted)
+            .count()
+    }
+}
+
+/// Plan the writes for a subset promote.
+///
+/// `turtle` is the FULL promoted projection, exactly as the repo-wide path would
+/// write it — branch-qualified, provenance appended. Partitioning anything less
+/// is the wrong-graph defect this module exists to avoid: [`crate::export`]
+/// resolves references ACROSS files, so a projection built from the changed
+/// files alone omits their edges into unchanged files, and `replace_snapshot`
+/// then retracts edges that are still true.
+///
+/// `changed_files` is the repo-relative path set from the git diff.
+///
+/// ## Every fact ends up under exactly one key, and none is ever dropped
+///
+/// Facts belonging to a file go under that file's key. Facts belonging to NO
+/// file — commit provenance is the case that exists today — go under
+/// [`provenance_key`], which is written on every subset promote. That preserves
+/// the invariant the repo-wide key gave for free: one owner per fact. Omitting
+/// them instead would leave them stale forever, or retract them on the next full
+/// resync.
+///
+/// ## Every changed file gets a write, including ones with no facts
+///
+/// A changed file absent from the partition is planned as an EMPTY snapshot, not
+/// skipped. Skipping is what leaves a deleted file's entities in the graph
+/// forever, and it is the tempting bug because "nothing to send" reads as
+/// "nothing to do".
+///
+/// A changed file this build has no grammar for gets one too, and that is safe
+/// in both directions: if it never had facts, replacing an empty snapshot with
+/// an empty snapshot is a no-op; if it DID have facts and no longer parses, the
+/// retraction is correct — the graph should not keep asserting symbols from a
+/// file this build can no longer read.
+pub fn plan(repo: &str, turtle: &str, changed_files: &[String]) -> Result<SubsetPlan> {
+    let partition = partition_by_file(turtle)?;
+    let mut out = SubsetPlan {
+        unfiled_subjects: partition.unowned.clone(),
+        ..SubsetPlan::default()
+    };
+
+    // Sorted and de-duplicated: the write order must not depend on the order git
+    // happened to print the diff, or two runs over the same change produce
+    // different transaction sequences and a failure part-way through is not
+    // reproducible.
+    let mut files: Vec<&String> = changed_files.iter().collect();
+    files.sort_unstable();
+    files.dedup();
+
+    for file in &files {
+        let (body, triples, why) = match partition.by_file.get(*file) {
+            Some(t) => (
+                t.clone(),
+                partition.counts.get(*file).copied().unwrap_or(0),
+                Why::Changed,
+            ),
+            None => (empty_snapshot(), 0, Why::Retracted),
+        };
+        out.writes.push(SubsetWrite {
+            key: file_key(repo, file),
+            file: Some((*file).clone()),
+            turtle: body,
+            triples,
+            why,
+        });
+    }
+
+    out.unchanged_files = partition
+        .by_file
+        .keys()
+        .filter(|f| files.binary_search(f).is_err())
+        .count();
+
+    // The unfiled key is written UNCONDITIONALLY, including when it is empty.
+    //
+    // Writing it empty is not a wasted call: it is the retraction that keeps a
+    // previous commit's provenance from outliving the commit. Writing it only
+    // when non-empty would make provenance accumulate under a key nothing ever
+    // clears — the opposite of what the repo-wide snapshot did, and invisible
+    // because the extra facts are all true, just no longer current.
+    let mut unfiled = PREFIXES.to_string();
+    let mut unfiled_triples = 0usize;
+    for (s, p, o) in parse(turtle)? {
+        if partition.unowned.contains_key(&s) {
+            unfiled.push_str(&format!("{s} {p} {o} .\n", s = term(&s), p = term(&p)));
+            unfiled_triples += 1;
+        }
+    }
+    out.writes.push(SubsetWrite {
+        key: provenance_key(repo),
+        file: None,
+        turtle: unfiled,
+        triples: unfiled_triples,
+        why: Why::Unfiled,
+    });
+
+    Ok(out)
+}
+
 fn parse(turtle: &str) -> Result<Vec<(String, String, String)>> {
     let mut out = Vec::new();
     for triple in oxttl::TurtleParser::new().for_reader(turtle.as_bytes()) {
@@ -207,13 +385,6 @@ fn literal(term: &str) -> Option<String> {
     // Stop at the closing quote so a datatype or language tag is not folded in.
     let end = inner.rfind('"')?;
     Some(inner[..end].to_string())
-}
-
-/// The IRI of an IRI term, or `None` for literals and blank nodes.
-fn iri(term: &str) -> Option<String> {
-    term.strip_prefix('<')?
-        .strip_suffix('>')
-        .map(str::to_string)
 }
 
 /// Render a term as it must appear in the output. `oxrdf`'s `Display` already
