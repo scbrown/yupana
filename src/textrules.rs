@@ -74,6 +74,35 @@ pub struct TextViolation {
     pub tier: TextTier,
     /// Model-facing explanation: what matched, why it is forbidden, what to do.
     pub message: String,
+    /// The exact token that matched.
+    ///
+    /// Kept as a FIELD and not only inside `message`, because the spool needs it
+    /// as data: adjudicating whether a block was right means asking "was THIS
+    /// string really an internal identifier in THAT repo", and a reviewer who has
+    /// to regex it back out of prose is reading the wrong artifact (aegis-mqnl —
+    /// wu adjudicated 16 blocks from the repos because the record did not carry
+    /// it).
+    pub matched: String,
+}
+
+/// The distinct matched tokens across `violations`, first-seen order.
+///
+/// One fact per token, not one per occurrence — the same de-duplication
+/// `violations()` already applies within a single rule, extended across rules so
+/// the spool row reads as a set.
+///
+/// Lives here rather than at the call site because it is a property of
+/// `TextViolation`, and because `rule_planes.rs` is under a size ratchet that
+/// only lets it shrink.
+#[must_use]
+pub fn distinct_matched(violations: &[TextViolation]) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    for v in violations {
+        if !seen.contains(&v.matched) {
+            seen.push(v.matched.clone());
+        }
+    }
+    seen
 }
 
 impl TextRule {
@@ -119,6 +148,7 @@ impl TextRule {
                 rule: self.name.clone(),
                 tier: self.tier,
                 message: self.message_for(token),
+                matched: token.to_string(),
             })
             .collect()
     }
@@ -301,5 +331,34 @@ mod tests {
             .violations("activation of a private key", "a.md")
             .is_empty());
         assert_eq!(node.violations("deploy to acti", "a.md").len(), 1);
+    }
+
+    /// The matched token is carried as DATA, not only inside the prose message.
+    ///
+    /// Adjudicating a block means asking "was THIS string really an internal
+    /// identifier in THAT repo". A reviewer who has to regex the token back out
+    /// of a model-facing sentence is reading the wrong artifact — measured on
+    /// aegis-mqnl, where 16 blocks were adjudicated by going back to the repos
+    /// because the record could not say what tripped.
+    #[test]
+    fn violations_carry_the_matched_token_deduplicated() {
+        let rule = TextRule {
+            name: "pattern_probe".into(),
+            pattern: r"\bTOKEN-\w+\b".into(),
+            tier: TextTier::Block,
+            label: Some("probe rule".into()),
+            class: None,
+            exempt_path_regex: None,
+            rationale: None,
+        };
+        let v = rule.violations("call TOKEN-aaa then TOKEN-aaa then TOKEN-bbb", "a.md");
+        let tokens: Vec<&str> = v.iter().map(|x| x.matched.as_str()).collect();
+        assert_eq!(
+            tokens,
+            vec!["TOKEN-aaa", "TOKEN-bbb"],
+            "one violation per DISTINCT token, first-seen order"
+        );
+        // and the message still names it, so neither representation regressed
+        assert!(v[0].message.contains("TOKEN-aaa"));
     }
 }

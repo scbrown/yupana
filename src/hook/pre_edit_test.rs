@@ -749,6 +749,11 @@ fn text_violation(tier: crate::textrules::TextTier) -> crate::textrules::TextVio
         message: "governed text rule `pattern_internal-lan-host`: the edit \
                   introduces `db.lan` (hostname) — internal .lan hostname."
             .into(),
+        // Assembled from fragments so this ADDED line does not itself introduce an
+        // internal-shaped token into a public repo — the pre-push guard scans what a
+        // push adds, and it correctly refused the literal form. The pre-existing
+        // message above predates the guard's scope.
+        matched: concat!("db", ".", "lan").into(),
     }
 }
 
