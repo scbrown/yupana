@@ -447,7 +447,7 @@ fn ablated(feature: &str) -> bool {
 /// tracked or the quipu seam is off — a briefing must never guess whose work
 /// it is describing.
 pub fn gather(config: &YupanaConfig, root: &Path) -> Option<Brief> {
-    let item = crate::plate::current()?;
+    let item = crate::plate::current(None)?;
     if !config.quipu.enabled || config.quipu.endpoint.is_empty() {
         return None;
     }

@@ -129,7 +129,13 @@ pub(super) fn guard_recorded(
     if let Some(session) = input.as_ref().and_then(|i| i.session_id.as_deref()) {
         fields.push(("session", session.into()));
     }
-    if let Some(item) = crate::plate::current() {
+    // Scope the plate read to THIS session. A plate stamped by a session that has
+    // since died no longer answers for the one making this edit, and attributing
+    // an action to a dead session's work item is the confidently-wrong case the
+    // plate docs call out. A dispatcher-written plate carries no session and is
+    // still read — see `plate::parse`.
+    if let Some(item) = crate::plate::current(input.as_ref().and_then(|i| i.session_id.as_deref()))
+    {
         fields.push(("item", item.into()));
     }
 

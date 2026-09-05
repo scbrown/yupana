@@ -113,7 +113,7 @@ pub fn emit_to(path: &std::path::Path, kind: &str, fields: &[(&str, serde_json::
         // UNKNOWN rather than recorded as null or a guess: a record that omits
         // the field is honestly silent, whereas one asserting the wrong item
         // would be replayed later as justification for a rule.
-        if let Some(item) = crate::plate::current() {
+        if let Some(item) = crate::plate::current(None) {
             obj.insert("item".into(), item.into());
         }
         for (k, v) in fields {

@@ -102,7 +102,7 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
         git_ref,
         ref_assumed,
         agent: acting_agent(),
-        bead: crate::plate::current(),
+        bead: crate::plate::current(None),
     };
     let decision = decide(&authority, &request);
 
