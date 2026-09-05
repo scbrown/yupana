@@ -279,15 +279,11 @@ pub(super) fn advisory(input_json: &str) -> Option<String> {
     if payload.get("tool_name").and_then(Value::as_str) != Some("Read") {
         return None;
     }
-    let transcript = read_transcript(&payload);
-    let outcome = transcript
-        .as_deref()
-        .map_or(Verdict::Unknown, |text| evaluate(&payload, text));
-    let evidence = if outcome == Verdict::Unknown {
-        unknown_evidence(&payload, transcript.as_deref())
-    } else {
-        "evaluated"
-    };
+    let (outcome, evidence, attempts) = observe_with(
+        &payload,
+        || read_transcript(&payload),
+        || std::thread::sleep(std::time::Duration::from_millis(50)),
+    );
     let label = match outcome {
         Verdict::Candidate => "candidate",
         Verdict::NoMatch => "no_match",
@@ -300,12 +296,39 @@ pub(super) fn advisory(input_json: &str) -> Option<String> {
         &[
             ("result", label.into()),
             ("evidence", evidence.into()),
+            ("snapshot_attempts", attempts.into()),
             ("observation", observation.into()),
         ],
     );
     (outcome == Verdict::Candidate).then(|| String::from(
         "Yupana reread candidate: this Read returned the same text and region as a completed read before this request, with no recorded edit or compaction between them. Reuse the earlier result if it is still in context. Unreported eviction cannot be ruled out; a necessary context refresh is legitimate. Advisory only.",
     ))
+}
+
+/// The harness can invoke a hook before its current request has reached disk.
+/// Retry only incomplete snapshots, at most four waits (200 ms total). Never
+/// synthesize an absent request or infer sequential reads from completion order.
+fn observe_with(
+    payload: &Value,
+    mut read: impl FnMut() -> Option<String>,
+    mut wait: impl FnMut(),
+) -> (Verdict, &'static str, u32) {
+    for attempt in 1..=5 {
+        let transcript = read();
+        let outcome = transcript
+            .as_deref()
+            .map_or(Verdict::Unknown, |text| evaluate(payload, text));
+        let evidence = if outcome == Verdict::Unknown {
+            unknown_evidence(payload, transcript.as_deref())
+        } else {
+            "evaluated"
+        };
+        if attempt == 5 || !matches!(evidence, "current_request_absent" | "malformed_snapshot") {
+            return (outcome, evidence, attempt);
+        }
+        wait();
+    }
+    unreachable!("the bounded observation loop always returns")
 }
 
 /// Classify missing evidence from the SAME bounded snapshot used to evaluate.

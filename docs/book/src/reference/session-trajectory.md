@@ -133,6 +133,10 @@ or returned text. The `evidence` field classifies UNKNOWN from the same snapshot
 missing current request, malformed snapshot, unavailable structured response,
 argument mismatch, or incomplete/unavailable ancestry. This distinguishes a
 hook-time evidence gap from later successful replay; it does not relax the guard.
+An absent current request or malformed snapshot triggers up to four 50 ms waits
+and fresh bounded reads. `snapshot_attempts` records the number of observations.
+Evidence still missing after the bounded retry remains UNKNOWN; the hook never
+synthesizes a request or treats completion order as request order.
 A candidate metric records evaluation, not delivery after
 suppression, and zero candidates cannot establish a residual false-positive rate.
 
