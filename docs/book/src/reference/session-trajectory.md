@@ -122,8 +122,11 @@ the harness did not record. The existing per-session advice suppression limits
 repeated notices. This is a Claude structured-Read adapter; it does not claim
 coverage of shell reads or Codex tool output.
 
-Transcript reads are capped at 16 MiB. Missing, oversized, unreadable or
-unrecognized evidence produces `unknown`, not a clean result. Each Read hook
+Transcript reads use the most recent 16 MiB, discarding a partial initial record.
+Large sessions can still establish a candidate from a connected pair of reads
+inside that window; they do not need the session root. Missing ancestry before
+the window cannot manufacture a clean pass when no pair is found. Missing,
+unreadable or unrecognized evidence produces `unknown`. Each Read hook
 evaluation emits `reread_evaluated` metrics with `candidate`, `no_match`, or
 `unknown` and a hash of the session/request identity. Metrics contain no paths
 or returned text. A candidate metric records evaluation, not delivery after

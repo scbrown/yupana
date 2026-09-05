@@ -5,10 +5,10 @@
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 
-// Bound hook I/O and memory. Oversize or unreadable evidence is UNKNOWN, not a
-// clean pass. Starting in the middle could silently omit a context boundary.
+// Bound hook I/O and memory to recent evidence, not total session length.
+// Candidates require a connected ancestry segment entirely inside this window.
 const MAX_TRANSCRIPT: u64 = 16 * 1024 * 1024;
 
 #[derive(Clone, PartialEq)]
@@ -66,7 +66,7 @@ enum Verdict {
 
 /// Follow the current request's parent UUIDs. Chronological order alone can
 /// borrow text from an abandoned conversation branch after a rewind.
-fn active_records<'a>(transcript: &'a str, request_id: &str) -> Option<Vec<&'a str>> {
+fn active_records<'a>(transcript: &'a str, request_id: &str) -> Option<(Vec<&'a str>, bool)> {
     let lines: Vec<_> = transcript.lines().collect();
     let records: Vec<Value> = lines
         .iter()
@@ -97,6 +97,7 @@ fn active_records<'a>(transcript: &'a str, request_id: &str) -> Option<Vec<&'a s
     let current = current?;
     let mut cursor = current;
     let mut active = HashSet::new();
+    let mut complete = true;
     loop {
         if !active.insert(cursor) {
             return None;
@@ -110,19 +111,25 @@ fn active_records<'a>(transcript: &'a str, request_id: &str) -> Option<Vec<&'a s
         if parent.is_null() {
             break;
         }
-        let previous = *by_uuid.get(parent.as_str()?)?;
+        let Some(&previous) = by_uuid.get(parent.as_str()?) else {
+            // The window can start after the session root. A connected pair of
+            // reads inside it remains evidence; absence before it is UNKNOWN.
+            complete = false;
+            break;
+        };
         if previous >= cursor {
             return None;
         }
         cursor = previous;
     }
-    Some(
+    Some((
         lines
             .into_iter()
             .enumerate()
             .filter_map(|(i, line)| (active.contains(&i) || i > current).then_some(line))
             .collect(),
-    )
+        complete,
+    ))
 }
 
 /// Evaluate only the current completed Read, never replay old warnings. A prior
@@ -158,7 +165,7 @@ fn evaluate(payload: &Value, transcript: &str) -> Verdict {
     let mut pending = HashMap::new();
     let mut prior: Option<(Value, TextRead)> = None;
     let mut at_request = None;
-    let Some(active) = active_records(transcript, id) else {
+    let Some((active, complete)) = active_records(transcript, id) else {
         return Verdict::Unknown;
     };
     for line in active {
@@ -238,7 +245,7 @@ fn evaluate(payload: &Value, transcript: &str) -> Verdict {
                         if block.get("is_error").and_then(Value::as_bool) == Some(true) {
                             return Verdict::Unknown;
                         }
-                        return verdict(at_request);
+                        return verdict(at_request, complete);
                     }
                     if let Some(args) = pending.remove(result_id) {
                         // toolUseResult is the harness's structured return, the
@@ -255,13 +262,14 @@ fn evaluate(payload: &Value, transcript: &str) -> Verdict {
             }
         }
     }
-    verdict(at_request)
+    verdict(at_request, complete)
 }
 
-fn verdict(at_request: Option<bool>) -> Verdict {
+fn verdict(at_request: Option<bool>, complete: bool) -> Verdict {
     match at_request {
         Some(true) => Verdict::Candidate,
-        Some(false) => Verdict::NoMatch,
+        Some(false) if complete => Verdict::NoMatch,
+        Some(false) => Verdict::Unknown,
         None => Verdict::Unknown,
     }
 }
@@ -294,16 +302,22 @@ pub(super) fn advisory(input_json: &str) -> Option<String> {
 
 fn read_transcript(payload: &Value) -> Option<String> {
     let path = payload.get("transcript_path")?.as_str()?;
-    let file = std::fs::File::open(path).ok()?;
+    let mut file = std::fs::File::open(path).ok()?;
     let metadata = file.metadata().ok()?;
-    if !metadata.is_file() || metadata.len() > MAX_TRANSCRIPT {
+    if !metadata.is_file() {
         return None;
     }
-    let mut text = String::new();
-    file.take(MAX_TRANSCRIPT + 1)
-        .read_to_string(&mut text)
-        .ok()?;
-    (text.len() as u64 <= MAX_TRANSCRIPT).then_some(text)
+    let offset = metadata.len().saturating_sub(MAX_TRANSCRIPT);
+    file.seek(SeekFrom::Start(offset)).ok()?;
+    let mut bytes = Vec::new();
+    file.take(MAX_TRANSCRIPT).read_to_end(&mut bytes).ok()?;
+    if offset > 0 {
+        // Discard a possibly partial UTF-8/JSON line before decoding. Even an
+        // exact line boundary may discard one complete record conservatively.
+        let newline = bytes.iter().position(|b| *b == b'\n')?;
+        bytes.drain(..=newline);
+    }
+    String::from_utf8(bytes).ok()
 }
 
 #[cfg(test)]

@@ -212,3 +212,39 @@ fn rewound_branches_and_missing_lineage_cannot_supply_context() {
         .join("\n");
     assert_eq!(evaluate(&payload(), &text), Verdict::Unknown);
 }
+
+#[test]
+fn large_transcripts_use_recent_connected_evidence_without_needing_the_root() {
+    use std::io::{Seek, Write};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("large.jsonl");
+    let mut file = std::fs::File::create(&path).unwrap();
+    // A sparse, oversized old record simulates an arbitrarily long session.
+    // Its partial bytes must be discarded before UTF-8/JSON decoding.
+    file.set_len(MAX_TRANSCRIPT + 100).unwrap();
+    file.seek(std::io::SeekFrom::End(0)).unwrap();
+    let mut records = linked(&baseline());
+    records[0]["parentUuid"] = "outside-window".into();
+    let recent = records
+        .iter()
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    write!(file, "\n{recent}\n").unwrap();
+    let mut p = payload();
+    p["transcript_path"] = path.to_str().unwrap().into();
+    let tail = read_transcript(&p).expect("large sessions must preserve recent evidence");
+    assert!(tail.len() < MAX_TRANSCRIPT as usize);
+    assert_eq!(evaluate(&p, &tail), Verdict::Candidate);
+    // No prior match inside an incomplete window is UNKNOWN, not a clean pass.
+    let only_current = records[2].to_string();
+    assert_eq!(evaluate(&p, &only_current), Verdict::Unknown);
+    // A context boundary on the connected segment still invalidates the pair.
+    records[1]["isCompactSummary"] = true.into();
+    let compacted = records
+        .iter()
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_eq!(evaluate(&p, &compacted), Verdict::NoMatch);
+}
