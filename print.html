@@ -2562,6 +2562,8 @@ somebody hands you gets into the graph Yupana reads, and what it can and cannot 
 <pre><code class="language-bash">yupana share pull    &lt;bundle-dir|url&gt; --to &lt;quipu-url&gt;   # stage it, and say where you stand
 yupana share policy  &lt;staging-graph&gt;  [--to &lt;quipu-url&gt;] # what policy would this contribute?
 yupana share promote &lt;share-id&gt;       --to &lt;quipu-url&gt;   # admit it (the governance decision)
+yupana share align   &lt;graph&gt; --against &lt;local-graph&gt;     # which of their concepts are yours?
+yupana share reshare &lt;graph&gt; --output &lt;dir&gt;              # publish it back out, as a delta
 </code></pre>
 <h2 id="the-one-property-to-understand-first"><a class="header" href="#the-one-property-to-understand-first">The one property to understand first</a></h2>
 <p><strong>A pulled share is inert until you promote it.</strong></p>
@@ -2654,6 +2656,40 @@ That is a deliberate act on the receiving store — adopting a publisher's vocab
 change, and Yupana does not perform it as a side effect of fetching bytes. Load the shapes you
 intend to govern (the bundle ships its own <code>shapes.ttl</code> for exactly this purpose), then pull again:
 the same bundle that quarantined will come back <code>staged</code>.</p>
+<h3 id="share-reshare--publishing-it-back-out-as-a-delta"><a class="header" href="#share-reshare--publishing-it-back-out-as-a-delta"><code>share reshare</code> — publishing it back out, as a delta</a></h3>
+<p>A share that came from someone else and goes back out changed is a <strong>delta</strong>, and a delta that does
+not name its parent has lost the only thing that makes it one. So the parent is <strong>derived, not
+asked for</strong>:</p>
+<pre><code class="language-console">$ yupana share reshare urn:quipu:import:quarantine:a350c7a7… --output ./delta --to http://quipu.example
+shared sha256:a146eb19…
+  output: ./delta
+  files:  export.nt, manifest.json, manifest.ttl, shapes.ttl
+  parent: sha256:a350c7a7… (delta — derived from the pulled graph's own IRI)
+</code></pre>
+<p>Quipu names a staged graph after the share it came from, so the lineage is already written on the
+graph IRI and re-sharing can recover it without being told. The manifest records it as
+<code>parent_share</code>, which is where a consumer will look — not in this command's output.</p>
+<p>The derivation is deliberately narrow. A graph that is not a pulled share yields <strong>no</strong> parent, and
+so do the near-misses: a truncated IRI, or one carrying the right prefix and a non-hex body.
+Inventing a parent for a local graph is a worse failure than omitting one, because a false lineage
+claim gets published in a manifest and believed downstream.</p>
+<p>To publish a pulled graph as a <strong>new</strong> lineage, say so — and the output names what was discarded:</p>
+<pre><code class="language-console">$ yupana share reshare urn:quipu:import:quarantine:a350c7a7… --output ./new --to … --root
+  parent: NONE — published as a new lineage with --root, discarding sha256:a350c7a7…
+</code></pre>
+<p><code>--root</code> and <code>--parent</code> conflict at parse time (exit 2, nothing written): a lineage claim cannot be
+both absent and specified.</p>
+<p>Files are written <strong>verbatim</strong>, because the manifest's hashes are over those exact bytes — anything
+that reformats on the way through, even pretty-printing the manifest, produces a bundle whose own
+<code>share_id</code> no longer verifies.</p>
+<h4 id="the-round-trip-measured"><a class="header" href="#the-round-trip-measured">The round trip, measured</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>step</th><th>result</th></tr></thead><tbody>
+<tr><td>pull a share into receiver A</td><td><code>quarantined</code>, 15 triples</td></tr>
+<tr><td><code>reshare</code> that staged graph</td><td>new share id, <code>parent_share</code> recorded in the manifest</td></tr>
+<tr><td>pull the delta into a fresh receiver B</td><td><code>quarantined</code>, 15 triples, exit 0</td></tr>
+<tr><td>pull the delta <strong>again</strong>, byte-identical</td><td><strong><code>unchanged</code></strong>, still 1 graph</td></tr>
+</tbody></table>
+</div>
 <h2 id="what-pull-does-not-take-and-why"><a class="header" href="#what-pull-does-not-take-and-why">What <code>pull</code> does NOT take, and why</a></h2>
 <p><strong>A <code>.qpack.db</code>, and a bundle archive.</strong> Both are refused by name, with the command that does work:</p>
 <pre><code class="language-console">$ yupana share pull ./graph1.qpack.db --to http://quipu.example
