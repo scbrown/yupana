@@ -117,6 +117,9 @@ pub mod promote_branch;
 /// §9.7's `commit → touched entities` provenance edge, produced inside yupana at
 /// promotion time (feeds quipu#37's work-item co-occurrence).
 pub mod promote_provenance;
+/// Partition a promoted projection by owning file (aegis-8o7r10).
+#[cfg(feature = "quipu")]
+pub mod promote_subset;
 /// When promotion runs: `[yupana.quipu] promote_on` × the declared trigger.
 /// Ungated on purpose — the policy is meaningful (and testable) in a build
 /// without `quipu`, where it decides whether the feature-off refusal is even
