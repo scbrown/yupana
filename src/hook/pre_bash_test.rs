@@ -261,3 +261,88 @@ mod scope_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod record_tests {
+    // Test names shout the invariant they turn on — the emphasis used in
+    // `post_bash_test` and `daemon::tests`. Scoped to tests.
+    #![allow(non_snake_case)]
+
+    use super::super::*;
+    // -----------------------------------------------------------------------
+    // THE WORK ITEM ON THE ACTION RECORD (aegis-1mp1ls).
+    //
+    // `action` records are the highest-volume kind in the spool and the ones
+    // the enforcement evals replay first, so the work item they assert is the
+    // field a derived rule is built on. Both outcomes, because the failure
+    // shape here is a field that is ALWAYS filled — by the unscoped fallback in
+    // `metrics::emit` — and a one-sided test cannot see the difference between
+    // "correctly present" and "present no matter what".
+    // -----------------------------------------------------------------------
+
+    fn item_of(fields: &[(&str, serde_json::Value)]) -> Option<serde_json::Value> {
+        fields
+            .iter()
+            .find(|(k, _)| *k == "item")
+            .map(|(_, v)| v.clone())
+    }
+
+    /// An ABSTAINED item must be CLAIMED as Null, never left unpushed.
+    ///
+    /// Leaving it unpushed is precisely the aegis-1mp1ls defect: `metrics::emit`
+    /// then resolves the plate ITSELF, UNSCOPED, and the record carries the work
+    /// item of whichever session last stamped the plate — measured live as an
+    /// `action` row attributed to a session that had already ended.
+    #[test]
+    fn an_ABSTAINED_item_is_CLAIMED_so_the_unscoped_fallback_cannot_refill_it() {
+        let a = action::resolve("ssh build-01 uptime");
+        let fields = action_record_fields(&a, None, None, serde_json::Value::Null);
+        let item = item_of(&fields);
+        assert!(
+            item.is_some(),
+            "the field must be CLAIMED even when the scoped plate read abstained              — an unclaimed field is refilled UNSCOPED by metrics::emit: {fields:?}"
+        );
+        assert!(
+            item.unwrap().is_null(),
+            "an abstention is Null, which emit drops: {fields:?}"
+        );
+    }
+
+    /// The other direction, so the arm above means "correctly abstained".
+    #[test]
+    fn a_RESOLVED_item_is_carried_onto_the_action_record() {
+        let a = action::resolve("ssh build-01 uptime");
+        let fields = action_record_fields(&a, None, None, "aegis-1mp1ls".into());
+        assert_eq!(
+            item_of(&fields)
+                .as_ref()
+                .and_then(serde_json::Value::as_str),
+            Some("aegis-1mp1ls")
+        );
+    }
+
+    /// The item does not displace the join id: both ride the same record.
+    #[test]
+    fn the_item_and_the_correlation_id_ride_the_same_record() {
+        let a = action::resolve("ssh build-01 uptime");
+        let fields = action_record_fields(
+            &a,
+            None,
+            Some("toolu_01LZuzmpbrEofYJYn4F177Vq".into()),
+            "aegis-1mp1ls".into(),
+        );
+        assert_eq!(
+            fields
+                .iter()
+                .find(|(k, _)| *k == "action_id")
+                .and_then(|(_, v)| v.as_str()),
+            Some("toolu_01LZuzmpbrEofYJYn4F177Vq")
+        );
+        assert_eq!(
+            item_of(&fields)
+                .as_ref()
+                .and_then(serde_json::Value::as_str),
+            Some("aegis-1mp1ls")
+        );
+    }
+}

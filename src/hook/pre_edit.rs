@@ -162,12 +162,18 @@ fn guard_inner(
     // the tracked work item's OBSERVED scope (advisory), else UNKNOWN scope,
     // which advises once per session rather than allowing silently.
     let (Some(tenant), Some(scope)) = (tenant, config.policy.scope_for(tenant)) else {
+        // Session-scoped, like the record path (aegis-1mp1ls). The ladder's
+        // middle rung trusts the work item's OBSERVED ground; reading a plate
+        // left by a session that has since died would ground this edit against
+        // somebody else's work — advising confidently about the wrong scope,
+        // which is worse than the UNKNOWN rung it falls through to.
+        let item = crate::plate::current(input.session_id.as_deref());
         return scope_arm::ladder_fallback(
             &config,
             &input,
             tenant,
             &rel,
-            crate::plate::current(None).as_deref(),
+            item.as_deref(),
             scope_plane.as_ref(),
         );
     };

@@ -102,7 +102,11 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
         git_ref,
         ref_assumed,
         agent: acting_agent(),
-        bead: crate::plate::current(None),
+        // Session-scoped (aegis-1mp1ls). This one rides a SIGNED certification
+        // record as `item`, so an unscoped read does not merely mislabel a
+        // trace row — it puts a dead session's work item under a signature, and
+        // the signature is what makes the record admissible later.
+        bead: crate::plate::current(input.session_id.as_deref()),
     };
     let decision = decide(&authority, &request);
 
