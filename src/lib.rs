@@ -56,6 +56,9 @@ pub mod graph;
 pub mod grounding;
 pub mod hook;
 pub mod hosting;
+/// The action selector for LANDINGS — `git push` / `gh pr merge` — which the
+/// governed single-writer policy is written against.
+pub mod landing;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 pub mod metrics;
@@ -81,6 +84,11 @@ pub mod project_exposure;
 /// with it.
 #[cfg(feature = "quipu")]
 pub mod project_grounding;
+/// Governed LANDING policy — who may put code on a repository's protected ref.
+/// Holds the owner-of predicate, whose evidence is a graph fact rather than
+/// anything readable from the command line. Gated with the projection it reads.
+#[cfg(feature = "quipu")]
+pub mod project_landing;
 /// Governed host-memory command policies, projected from Quipu.
 #[cfg(feature = "quipu")]
 pub mod project_memory;

@@ -29,3 +29,9 @@ __pycache__/
 state.json
 CLAUDE.local.md
 search-debug.json
+
+# Session planning scratch (planning-with-files skill) — never committed:
+# they carry crew names, work-item ids and host paths, and this repo is public.
+task_plan.md
+findings.md
+progress.md

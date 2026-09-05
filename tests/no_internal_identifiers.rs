@@ -255,6 +255,10 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "src/hook/disk_guard.rs",
         "src/project_disk.rs",
         "src/project_exposure.rs",
+        // The governed LANDING catalogue query names the same deployed ontology
+        // its sibling projections do: which repository declares a landing rule,
+        // and who owns it, are facts under this base.
+        "src/project_landing.rs",
         // Project-memory policy asks the governed graph which commands are
         // memory-heavy, so its SPARQL uses the same deployed vocabulary as
         // the other project query surfaces.
@@ -277,6 +281,11 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         // what left its provenance edges unjoinable (GH #5) — so the literal
         // has to be here or the assertion checks nothing.
         "tests/cli.rs",
+        // A captured LIVE `/query` reply for the landing catalogue. The IRIs are
+        // the fixture's whole point: it exists to pin the real label x altLabel
+        // cross-product the decoder has to fold, and rewriting the base would
+        // make it a fixture of something that never comes back over the wire.
+        "tests/fixtures/landing-policy-live.json",
         "tests/no_internal_identifiers.rs",
     ]
     .iter()

@@ -101,6 +101,21 @@ pub struct CachedProjection {
     /// "nothing is in scope".
     #[serde(default)]
     pub work_item_scopes: Option<crate::policy::WorkItemScopes>,
+    /// Last-known governed LANDING policies.
+    ///
+    /// `Option`, and the distinction is load-bearing rather than tidy. `None`
+    /// is a cache written BEFORE this plane existed: it cannot speak about
+    /// landings at all, so the landing authority is UNKNOWN and a protected-ref
+    /// landing is refused. `Some(vec![])` is a cache that carries the plane and
+    /// found no governed repository, which is a real answer and allows.
+    ///
+    /// A plain `Vec` with `#[serde(default)]` collapses those two into "nothing
+    /// is governed" — MEASURED 2026-09-05, and it silently disabled the guard
+    /// on any host with a warm pre-upgrade cache, because `refresh_or_cached`
+    /// serves a fresh cache without contacting quipu at all. The comment that
+    /// used to sit here called that behaviour honest. It was not.
+    #[serde(default)]
+    pub landing_policies: Option<Vec<crate::project_landing::RepoLanding>>,
     /// The parent map behind the DERIVED rung. Defaulted to `None` on older
     /// caches for the same reason as the scope map above: no parents known is
     /// UNKNOWN — the rung simply does not fire — never an empty map that would
