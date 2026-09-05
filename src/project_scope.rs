@@ -60,7 +60,7 @@ fn parent_query(item: &str) -> String {
 /// to resolve a scope for, and the query would add a round-trip to every
 /// edit for a map nothing reads.
 pub fn fetch_work_item_scopes(endpoint: &str) -> Option<WorkItemScopes> {
-    let item = crate::plate::current()?;
+    let item = crate::plate::current(None)?;
     fetch_work_item_context_for(endpoint, &item).0
 }
 
@@ -70,7 +70,7 @@ pub fn fetch_work_item_scopes(endpoint: &str) -> Option<WorkItemScopes> {
 pub fn fetch_work_item_context(
     endpoint: &str,
 ) -> (Option<WorkItemScopes>, Option<WorkItemParents>) {
-    let Some(item) = crate::plate::current() else {
+    let Some(item) = crate::plate::current(None) else {
         return (None, None);
     };
     fetch_work_item_context_for(endpoint, &item)
@@ -117,7 +117,7 @@ fn fetch_work_item_context_for(
 /// stops inheriting its parent's, which returns the ladder to exactly the
 /// behaviour it had before this rung existed.
 pub fn fetch_work_item_parents(endpoint: &str) -> Option<WorkItemParents> {
-    let item = crate::plate::current()?;
+    let item = crate::plate::current(None)?;
     fetch_work_item_parents_for(endpoint, &item)
 }
 

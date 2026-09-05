@@ -167,7 +167,7 @@ fn guard_inner(
             &input,
             tenant,
             &rel,
-            crate::plate::current().as_deref(),
+            crate::plate::current(None).as_deref(),
             scope_plane.as_ref(),
         );
     };

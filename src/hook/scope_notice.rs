@@ -75,7 +75,7 @@ pub(super) fn notice(rel: &str, root: &Path, config: &YupanaConfig) -> Option<St
     if effective_rung(config) == Mode::Off {
         return None;
     }
-    let item = crate::plate::current()?;
+    let item = crate::plate::current(None)?;
 
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
     let cache_age = match registry.refresh_or_cached(
