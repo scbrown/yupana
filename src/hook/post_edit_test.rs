@@ -13,6 +13,19 @@ mod tests {
     use super::super::*;
 
     #[test]
+    fn a_read_does_not_report_an_edit_or_update_the_resident_graph() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.rs"), "fn leaf() {}\n").unwrap();
+        std::fs::write(dir.path().join("b.rs"), "fn mid() { leaf(); }\n").unwrap();
+        let payload = serde_json::json!({
+            "tool_name": "Read", "cwd": dir.path(),
+            "tool_input": {"file_path": dir.path().join("a.rs")},
+        })
+        .to_string();
+        assert_eq!(advisory_for(&payload, dir.path(), None), None);
+    }
+
+    #[test]
     fn advises_on_cross_file_impact() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.rs"), "fn leaf() {}\n").unwrap();
