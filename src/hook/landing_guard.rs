@@ -144,15 +144,36 @@ fn acting_agent() -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+/// The directory a remote NAME must be resolved in.
+///
+/// The command's own `cd` wins over the payload's cwd, because the payload
+/// carries the SESSION's directory and the command may have moved. A relative
+/// `cd` is joined onto the session cwd, which is what the shell would do.
+#[cfg(feature = "quipu")]
+fn effective_root(landing: &Landing, root: &std::path::Path) -> std::path::PathBuf {
+    match landing.cwd_hint.as_deref() {
+        Some(dir) => {
+            let p = std::path::Path::new(dir);
+            if p.is_absolute() {
+                p.to_path_buf()
+            } else {
+                root.join(p)
+            }
+        }
+        None => root.to_path_buf(),
+    }
+}
+
 /// Resolve the command's repository reference to a bare repository name.
 #[cfg(feature = "quipu")]
 fn resolve_repo(landing: &Landing, root: &std::path::Path) -> Option<String> {
+    let root = effective_root(landing, root);
     match &landing.repo {
         RepoRef::Url(url) => crate::git::repo_name_from_url(url.trim()),
         RepoRef::Slug(slug) => slug.rsplit('/').next().map(str::to_string),
-        RepoRef::Remote(name) => crate::git::run(root, &["remote", "get-url", name])
+        RepoRef::Remote(name) => crate::git::run(&root, &["remote", "get-url", name])
             .and_then(|url| crate::git::repo_name_from_url(url.trim())),
-        RepoRef::Cwd => crate::git::origin_repo_name(root),
+        RepoRef::Cwd => crate::git::origin_repo_name(&root),
     }
 }
 
@@ -163,6 +184,7 @@ fn resolve_repo(landing: &Landing, root: &std::path::Path) -> Option<String> {
 /// those separately without re-deriving anything.
 #[cfg(feature = "quipu")]
 fn resolve_ref(landing: &Landing, root: &std::path::Path) -> (String, bool) {
+    let root = &effective_root(landing, root);
     match &landing.git_ref {
         RefTarget::Named(r) => (r.clone(), false),
         RefTarget::Unstated => match landing.verb {

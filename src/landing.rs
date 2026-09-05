@@ -99,6 +99,20 @@ pub struct Landing {
     /// The matched segment, trimmed — evidence for the verdict record. A
     /// refusal that cannot show what it matched is not auditable.
     pub evidence: String,
+    /// The directory an earlier segment of the SAME command line changed to, if
+    /// any.
+    ///
+    /// This exists because a bare remote name is meaningless without a
+    /// directory, and the hook payload's `cwd` is the SESSION's, not the
+    /// command's. Measured 2026-09-05: `cd <governed repo> && git push origin
+    /// main` resolved `origin` in the agent's own workspace, found an
+    /// ungoverned repository, and allowed — a one-line bypass of the whole
+    /// rule. Splitting compound lines to FIND the verb while ignoring the `cd`
+    /// that gives the verb its meaning is half a job.
+    ///
+    /// `None` means no `cd` was seen and the caller should use the payload cwd,
+    /// which is the pre-existing behaviour and correct for a plain command.
+    pub cwd_hint: Option<String>,
 }
 
 /// Strip heredoc bodies. See the module note: bodies are data, not command
@@ -180,6 +194,24 @@ fn program(w: &[&str]) -> Option<(usize, String)> {
 /// Does this word look like a remote URL or path rather than a remote name?
 fn looks_like_url(word: &str) -> bool {
     word.contains("://") || word.contains(':') && word.contains('/') || word.starts_with('.')
+}
+
+/// The directory a `cd` segment moves to, if it names one.
+///
+/// A bare `cd`, `cd -` and `cd ~`-with-no-path are deliberately NOT tracked:
+/// they name a directory this function cannot know, and guessing one would put
+/// a fabricated path into a refusal.
+fn cd_target(seg: &str) -> Option<String> {
+    let w = words(seg);
+    let (start, prog) = program(&w)?;
+    if prog != "cd" {
+        return None;
+    }
+    let arg = w.get(start + 1)?;
+    if arg.starts_with('-') || *arg == "~" {
+        return None;
+    }
+    Some((*arg).to_string())
 }
 
 /// Resolve one segment, or abstain.
@@ -266,6 +298,7 @@ fn resolve_git_push(rest: &[&str], seg: &str) -> Option<Landing> {
         repo,
         git_ref,
         evidence: seg.trim().to_string(),
+        cwd_hint: None,
     })
 }
 
@@ -312,6 +345,7 @@ fn resolve_gh(rest: &[&str], seg: &str) -> Option<Landing> {
         // branch: see `RefTarget::Unstated`.
         git_ref: RefTarget::Unstated,
         evidence: seg.trim().to_string(),
+        cwd_hint: None,
     })
 }
 
@@ -338,146 +372,20 @@ fn api_merge_slug(word: &str) -> Option<String> {
 #[must_use]
 pub fn resolve(cmd: &str) -> Option<Landing> {
     let stripped = strip_heredocs(cmd);
-    segments(&stripped).into_iter().find_map(resolve_segment)
+    let mut cwd_hint: Option<String> = None;
+    for seg in segments(&stripped) {
+        if let Some(dir) = cd_target(seg) {
+            cwd_hint = Some(dir);
+            continue;
+        }
+        if let Some(mut landing) = resolve_segment(seg) {
+            landing.cwd_hint = cwd_hint;
+            return Some(landing);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
-// Test names shout the invariant they turn on, the repo's house convention.
-#[allow(non_snake_case)]
-mod tests {
-    use super::*;
-
-    fn r(cmd: &str) -> Option<Landing> {
-        resolve(cmd)
-    }
-
-    #[test]
-    fn a_plain_push_names_its_remote_and_ref() {
-        let l = r("git push origin main").expect("a push is a landing");
-        assert_eq!(l.verb, LandingVerb::Push);
-        assert_eq!(l.repo, RepoRef::Remote("origin".into()));
-        assert_eq!(l.git_ref, RefTarget::Named("main".into()));
-    }
-
-    #[test]
-    fn a_url_push_is_distinguished_from_a_remote_NAME() {
-        let l = r("git push git@github.com:scbrown/yupana.git main").unwrap();
-        assert_eq!(
-            l.repo,
-            RepoRef::Url("git@github.com:scbrown/yupana.git".into())
-        );
-        // The distinction is the whole point: a URL needs no lookup, a name does.
-        assert!(!matches!(l.repo, RepoRef::Remote(_)));
-    }
-
-    #[test]
-    fn a_refspec_resolves_to_the_ref_that_RECEIVES_the_write() {
-        // `wt/grant:main` writes to main. Reading the left side would let any
-        // agent land on a protected branch by naming a topic branch first.
-        let l = r("git push origin wt/grant:main").unwrap();
-        assert_eq!(l.git_ref, RefTarget::Named("main".into()));
-        let forced = r("git push origin +wt/grant:main").unwrap();
-        assert_eq!(forced.git_ref, RefTarget::Named("main".into()));
-    }
-
-    #[test]
-    fn an_unnamed_ref_is_UNSTATED_never_assumed() {
-        assert_eq!(r("git push origin").unwrap().git_ref, RefTarget::Unstated);
-        assert_eq!(r("git push").unwrap().repo, RepoRef::Cwd);
-    }
-
-    #[test]
-    fn force_flags_do_not_hide_a_push() {
-        let l = r("git push --force-with-lease origin main").unwrap();
-        assert_eq!(l.git_ref, RefTarget::Named("main".into()));
-        assert_eq!(l.repo, RepoRef::Remote("origin".into()));
-    }
-
-    #[test]
-    fn git_leading_options_and_their_values_are_skipped() {
-        let l = r("git -C /tmp/repo push origin main").unwrap();
-        assert_eq!(l.verb, LandingVerb::Push);
-        assert_eq!(l.repo, RepoRef::Remote("origin".into()));
-    }
-
-    #[test]
-    fn non_landing_git_subcommands_abstain() {
-        for cmd in [
-            "git fetch origin",
-            "git pull origin main",
-            "git commit -m x",
-        ] {
-            assert!(r(cmd).is_none(), "{cmd} is not a landing");
-        }
-    }
-
-    #[test]
-    fn gh_pr_merge_resolves_with_and_without_an_explicit_repo() {
-        let explicit = r("gh pr merge 12 -R scbrown/quipu").unwrap();
-        assert_eq!(explicit.verb, LandingVerb::Merge);
-        assert_eq!(explicit.repo, RepoRef::Slug("scbrown/quipu".into()));
-        let implicit = r("gh pr merge 12").unwrap();
-        assert_eq!(implicit.repo, RepoRef::Cwd);
-    }
-
-    #[test]
-    fn the_REST_spelling_of_merge_is_the_same_verb() {
-        let l = r("gh api repos/scbrown/quipu/pulls/12/merge -X PUT").unwrap();
-        assert_eq!(l.verb, LandingVerb::Merge);
-        assert_eq!(l.repo, RepoRef::Slug("scbrown/quipu".into()));
-    }
-
-    #[test]
-    fn a_non_merge_gh_api_call_abstains() {
-        assert!(r("gh api repos/scbrown/quipu/pulls/12").is_none());
-        assert!(r("gh pr view 12").is_none());
-        assert!(r("gh pr list").is_none());
-    }
-
-    #[test]
-    fn a_landing_hidden_in_a_COMPOUND_line_is_still_found() {
-        // The bypass this module exists to close: `action::resolve` abstains
-        // here, and abstaining in a guard is not caution, it is a hole.
-        let l = r("cd /tmp/repo && git push origin main").unwrap();
-        assert_eq!(l.git_ref, RefTarget::Named("main".into()));
-        assert!(r("true; gh pr merge 3 -R scbrown/quipu").is_some());
-    }
-
-    #[test]
-    fn env_prefixes_do_not_hide_the_program() {
-        let l = r("GIT_SSH_COMMAND=ssh git push origin main").unwrap();
-        assert_eq!(l.verb, LandingVerb::Push);
-    }
-
-    #[test]
-    fn an_absolute_path_does_not_hide_the_program() {
-        assert!(r("/usr/bin/gh pr merge 4 -R scbrown/quipu").is_some());
-        assert!(r("/usr/bin/git push origin main").is_some());
-    }
-
-    #[test]
-    fn a_heredoc_BODY_naming_the_verb_is_data_not_a_landing() {
-        // Documenting the hazard must not trip the guard that forbids it.
-        let cmd = "cat > /tmp/note.md <<'EOF'\nnever run git push origin main here\ngh pr merge 1 -R scbrown/quipu\nEOF";
-        assert!(r(cmd).is_none());
-    }
-
-    #[test]
-    fn a_heredoc_does_not_swallow_a_REAL_landing_after_it_closes() {
-        let cmd = "cat > /tmp/n <<'EOF'\ntext\nEOF\ngit push origin main";
-        assert_eq!(
-            r(cmd).unwrap().git_ref,
-            RefTarget::Named("main".into()),
-            "the landing after the delimiter is command position again"
-        );
-    }
-
-    #[test]
-    fn unrelated_commands_abstain() {
-        for cmd in ["ls -la", "cargo test", "echo git push origin main | wc -l"] {
-            // The echo case resolves nothing because `echo` is not a landing
-            // program; the pipe segment `wc -l` is not either.
-            assert!(r(cmd).is_none(), "{cmd}");
-        }
-    }
-}
+#[path = "landing_test.rs"]
+mod landing_test;
