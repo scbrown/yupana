@@ -46,6 +46,9 @@ pub fn run_post_edit(tenant: Option<&str>) -> anyhow::Result<()> {
     // edit happened to have interesting callers, or its coverage would depend on
     // a property of the file that has nothing to do with the rule.
     let mut sections: Vec<String> = Vec::new();
+    if let Some(text) = super::reread::advisory(&buf) {
+        sections.push(text);
+    }
     if let Some(text) = super::credential_output::advisory(&buf) {
         sections.push(text);
     }
@@ -96,6 +99,12 @@ pub fn run_post_edit(tenant: Option<&str>) -> anyhow::Result<()> {
 #[must_use]
 pub fn advisory_for(input_json: &str, default_root: &Path, tenant: Option<&str>) -> Option<String> {
     let input = HookInput::parse(input_json)?;
+    if !matches!(
+        input.tool_name.as_deref(),
+        Some("Edit" | "Write" | "MultiEdit")
+    ) {
+        return None;
+    }
     let file_path = input.tool_input.file_path.clone()?;
     let file = PathBuf::from(&file_path);
     if file.extension().and_then(OsStr::to_str) != Some("rs") {

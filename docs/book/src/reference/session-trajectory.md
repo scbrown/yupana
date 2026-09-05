@@ -99,6 +99,36 @@ unobservable. This replay is not automatically installed as a hook.
 `just session-guard --selftest` exercises the discriminators and exits nonzero on
 failure. Both `just test` and the pre-commit/CI quality gate run this suite.
 
+## Live Read advisory
+
+The existing `yupana hook post-edit` command also evaluates Claude `Read`
+completions. Its `PostToolUse` matcher must include `Read` (an all-tool matcher
+already does). It needs `session_id`, `tool_use_id`, `transcript_path`, the exact
+`tool_input`, and a successful structured text `tool_response`. No additional
+hook or background process is needed.
+
+Only the current completed read can produce advice. The earlier structured
+result must precede its request on the current conversation's parent-UUID chain;
+abandoned branches cannot supply context. Identical returned text, actual line
+span and requested arguments are required. Recorded compaction, edits, malformed
+or missing lineage, failed/image results and task-output polling invalidate or
+exclude evidence. The live adapter conservatively invalidates after **every
+shell command**, since a script can write a file without naming it in the command.
+This is narrower than the offline replay's filename heuristic.
+
+The advisory asks the agent to reuse earlier text **if it remains in context**.
+It does not assert that a reread was wasteful, and cannot observe eviction that
+the harness did not record. The existing per-session advice suppression limits
+repeated notices. This is a Claude structured-Read adapter; it does not claim
+coverage of shell reads or Codex tool output.
+
+Transcript reads are capped at 16 MiB. Missing, oversized, unreadable or
+unrecognized evidence produces `unknown`, not a clean result. Each Read hook
+evaluation emits `reread_evaluated` metrics with `candidate`, `no_match`, or
+`unknown` and a hash of the session/request identity. Metrics contain no paths
+or returned text. A candidate metric records evaluation, not delivery after
+suppression, and zero candidates cannot establish a residual false-positive rate.
+
 ## Handoff advice from measured depth
 
 The same command exposes a read-only depth evaluator:

@@ -46,6 +46,7 @@ mod post_edit;
 mod pre_bash;
 mod pre_bash_grounding;
 mod pre_edit;
+mod reread;
 mod scope_notice;
 #[cfg(feature = "quipu")]
 mod session_start;
