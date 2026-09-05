@@ -47,6 +47,24 @@ use crate::types::Freshness;
 /// stall for another.
 const DAEMON_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1500);
 
+/// How long to wait on `/exposure`, which is NOT the same budget as
+/// [`DAEMON_TIMEOUT`].
+///
+/// `/projection` answers from memory, so 1.5s is generous. `/exposure` answers
+/// from memory only on a HIT; on a MISS the daemon does the live
+/// `POST /policy/check`, measured at 2.4-7.2s. Giving that the projection's
+/// budget would time out mid-call and be strictly WORSE than no cache: the hook
+/// would print a spurious daemon-down notice and then make its OWN live call, so
+/// a cold repo would cost TWO `/policy/check` round-trips instead of one.
+///
+/// So this must exceed the live path's own ceiling (`project::http_timeout`,
+/// default 10s), not merely the loopback hop. The margin covers the hop itself —
+/// giving up one tick before the daemon answers would produce exactly the double
+/// call this exists to prevent.
+fn daemon_exposure_timeout() -> std::time::Duration {
+    crate::project::http_timeout() + std::time::Duration::from_secs(2)
+}
+
 /// Try the resident daemon. See the module docs for the three outcomes.
 pub(super) fn from_daemon(
     config: &YupanaConfig,
@@ -133,7 +151,7 @@ pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project:
             &config.serve.bind_address,
             config.serve.mcp_http_port,
             repo,
-            DAEMON_TIMEOUT,
+            daemon_exposure_timeout(),
         ) {
             Ok(reply) => return reply.exposure(),
             Err(why) => eprintln!(

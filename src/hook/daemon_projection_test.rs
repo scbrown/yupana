@@ -220,3 +220,26 @@ fn use_daemon_false_resolves_exposure_live() {
         crate::project::RepoExposure::Internal
     );
 }
+
+/// The exposure budget must EXCEED the live path's own ceiling.
+///
+/// `/exposure` answers from memory on a hit, but on a MISS the daemon makes the
+/// live `POST /policy/check` — measured at 2.4-7.2s. If the hook gave up first it
+/// would print a spurious daemon-down notice and then make its OWN live call, so
+/// a cold repo would cost TWO round-trips: strictly worse than having no cache
+/// at all. Pinned as a relationship rather than a number, so raising
+/// `http_timeout` cannot silently reintroduce it.
+#[test]
+fn the_exposure_budget_outlasts_the_live_call_it_may_wait_on() {
+    let live = crate::project::http_timeout();
+    let exposure = super::daemon_exposure_timeout();
+    assert!(
+        exposure > live,
+        "exposure budget {exposure:?} must outlast the live call {live:?} the daemon \
+         may be making on a miss, or a miss costs two /policy/check calls"
+    );
+    assert!(
+        exposure > super::DAEMON_TIMEOUT,
+        "and it is deliberately NOT the projection budget, which answers from memory"
+    );
+}
