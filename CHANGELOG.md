@@ -4,6 +4,62 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-09-05
+
+### Added
+
+- Add LSP position precision([bb6fdf4](https://github.com/scbrown/yupana/commit/bb6fdf4adc939b7f49ff1b9701a497672ab8e147))
+- Add Quipu-backed disk impact advisory([e1b83ba](https://github.com/scbrown/yupana/commit/e1b83ba217105d85cd240e3a061dfd09ae98e4e4))
+- *(ci)* Advise relevant local checks before push([4eb0341](https://github.com/scbrown/yupana/commit/4eb03413f2d065dca7da61ccb490e0624eb1f2ce))
+- *(config)* Guard st artifacts against graph drift([a085c8a](https://github.com/scbrown/yupana/commit/a085c8a9c7e60d37e4559bdf378bee01d513a0f2))
+- Sign agent action certifications([9080fd9](https://github.com/scbrown/yupana/commit/9080fd9cd9ec9a6383bdbc5640d1c128bc412c00))
+- *(policy)* Refresh projection cache out of band([593dc16](https://github.com/scbrown/yupana/commit/593dc162c82e1f21e59db697e04df3003abbf978))
+
+### CI/CD
+
+- Pin markdownlint-cli2, so the same commit cannot go red on the clock (#21)([bc57e14](https://github.com/scbrown/yupana/commit/bc57e14d57e99549b01acf5731df8eaefc4bf548))
+
+### Changed
+
+- *(project)* Keep cache install below size gates([417d261](https://github.com/scbrown/yupana/commit/417d2614718b76b97530a92a02f5ea2e61a1fb8f))
+- Keep certify dispatch behind module boundary([a5892e7](https://github.com/scbrown/yupana/commit/a5892e75e389018d98e136fb83bc586f3c685d6b))
+
+### Documentation
+
+- Refresh implementation appendix([9f5a617](https://github.com/scbrown/yupana/commit/9f5a61799adf2b4eceb770242a4185158e958bf2))
+
+### Fixed
+
+- *(project)* Serve fresh cache before live refresh([562f52d](https://github.com/scbrown/yupana/commit/562f52d16d3e155ca1d8fdd8082c28303cabd789))
+- *(hook)* Split credential output advisory module([96c3216](https://github.com/scbrown/yupana/commit/96c3216908de9b62fffb62f610a53d4b6e42381f))
+- *(hooks)* Dedupe advisories by stable session cause([77c085a](https://github.com/scbrown/yupana/commit/77c085adbfe06d4aacf04676e16f84ab2eb37895))
+- *(ci)* Restore hook files below size gate([f910db5](https://github.com/scbrown/yupana/commit/f910db54e94c3c438e9b5cbcb5ae0d6dddaa5d7d))
+- *(ci)* Admit config drift ontology carrier([d35abde](https://github.com/scbrown/yupana/commit/d35abde56a4dedaad403dada98dedef1d86928c5))
+- *(ci)* Replay repository guards before push([804bc2e](https://github.com/scbrown/yupana/commit/804bc2e697b16d8e436a49473e73ab12c1b58ceb))
+- *(disk)* Conform observations to governed schema([74b34d4](https://github.com/scbrown/yupana/commit/74b34d489f9e810a94d0322a32872d3adc25f1b4))
+- *(security)* Bound OpenAI credential pattern([4c54920](https://github.com/scbrown/yupana/commit/4c54920cc85be7013a77133fe2eaf77d78506c77))
+- *(policy)* Keep projection fallback alive([1ded258](https://github.com/scbrown/yupana/commit/1ded2583c0aebe7de93eee936e4bfc858267ab81))
+- *(policy)* Distinguish valid cache verdict freshness([162c4a5](https://github.com/scbrown/yupana/commit/162c4a55f8b7a26b86b25e269829cfdbde5a3e3b))
+- *(policy)* Scope cache freshness claim to projection([6980b71](https://github.com/scbrown/yupana/commit/6980b7141c563aa96de4b09893eb042c425f12dc))
+- *(ci)* Make path gates always report([d9c5f0e](https://github.com/scbrown/yupana/commit/d9c5f0e4395dcfc9de33e10f88667e6399222e50))
+- *(ci)* Require the fail-capable docs gate([c2e2a4b](https://github.com/scbrown/yupana/commit/c2e2a4bdaac51602ce5372729a1726cd4229661d))
+- Reject conflicting certification record ids([5dd3126](https://github.com/scbrown/yupana/commit/5dd3126b2bec1b02509502709c22fb80ff8c0f3a))
+- Bind work scope queries to current item([147c04b](https://github.com/scbrown/yupana/commit/147c04bd25f15c52f2edec18a5b9b48d0cdb6be8))
+- Satisfy feature-matrix clippy([e502934](https://github.com/scbrown/yupana/commit/e5029343908f01c2670c78947e0b8060b77c862f))
+
+### Miscellaneous
+
+- Satisfy pre-bash file-size gate([dcf5411](https://github.com/scbrown/yupana/commit/dcf5411e5ff2cc175023c145ca951a426299b7ef))
+- Keep merged sources within size baselines([82b9905](https://github.com/scbrown/yupana/commit/82b9905924fe144e62857e0a047353bed573c343))
+
+### Testing
+
+- Align disk advisory scrub fixtures([9b13fe2](https://github.com/scbrown/yupana/commit/9b13fe2cc04a1fe5ba75b59a855251739c066d58))
+
+### Security
+
+- Advise on credential-shaped tool output([6275c15](https://github.com/scbrown/yupana/commit/6275c15e2724af3da4e5d1623b6e49996eb76512))
+
 ## [0.6.4] - 2026-09-01
 
 ### Added
