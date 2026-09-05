@@ -47,6 +47,24 @@ use crate::types::Freshness;
 /// stall for another.
 const DAEMON_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1500);
 
+/// How long to wait on `/exposure`, which is NOT the same budget as
+/// [`DAEMON_TIMEOUT`].
+///
+/// `/projection` answers from memory, so 1.5s is generous. `/exposure` answers
+/// from memory only on a HIT; on a MISS the daemon does the live
+/// `POST /policy/check`, measured at 2.4-7.2s. Giving that the projection's
+/// budget would time out mid-call and be strictly WORSE than no cache: the hook
+/// would print a spurious daemon-down notice and then make its OWN live call, so
+/// a cold repo would cost TWO `/policy/check` round-trips instead of one.
+///
+/// So this must exceed the live path's own ceiling (`project::http_timeout`,
+/// default 10s), not merely the loopback hop. The margin covers the hop itself —
+/// giving up one tick before the daemon answers would produce exactly the double
+/// call this exists to prevent.
+fn daemon_exposure_timeout() -> std::time::Duration {
+    crate::project::http_timeout() + std::time::Duration::from_secs(2)
+}
+
 /// Try the resident daemon. See the module docs for the three outcomes.
 pub(super) fn from_daemon(
     config: &YupanaConfig,
@@ -59,7 +77,7 @@ pub(super) fn from_daemon(
     let host = &config.serve.bind_address;
     let port = config.serve.mcp_http_port;
 
-    let reply = match crate::daemon::client::fetch_projection(host, port, DAEMON_TIMEOUT) {
+    let reply = match crate::daemon::client_policy::fetch_projection(host, port, DAEMON_TIMEOUT) {
         Ok(reply) => reply,
         Err(why) => {
             // LOUD, per the daemon-down contract: `use_daemon` is only set by an
@@ -113,6 +131,37 @@ pub(super) fn from_daemon(
          to a projection path that is already failing",
         reply.consecutive_failures
     )))
+}
+
+/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56).
+///
+/// The measured reason this exists: `POST /policy/check` took 2.4-7.2s and ran
+/// once per governed edit, uncached, from every agent — the CONSTANT half of the
+/// guard's quipu load, next to which the projection (~200us once resident) is
+/// noise.
+///
+/// A DOWN daemon falls through to the live path, exactly as the projection does.
+/// It must never be read as "unknown exposure": unknown DOWNGRADES block-tier
+/// rules to warnings, so folding a transport failure into it would silently
+/// weaken enforcement every time one process was not running — a policy change
+/// wearing the costume of a connection error.
+pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project::RepoExposure {
+    if config.serve.use_daemon {
+        match crate::daemon::client_policy::fetch_exposure(
+            &config.serve.bind_address,
+            config.serve.mcp_http_port,
+            repo,
+            daemon_exposure_timeout(),
+        ) {
+            Ok(reply) => return reply.exposure(),
+            Err(why) => eprintln!(
+                "yupana: resident daemon expected at {}:{} but exposure not usable ({why}) \
+                 — resolving live instead",
+                config.serve.bind_address, config.serve.mcp_http_port
+            ),
+        }
+    }
+    crate::project::fetch_repo_exposure(&config.quipu.endpoint, repo)
 }
 
 #[cfg(test)]

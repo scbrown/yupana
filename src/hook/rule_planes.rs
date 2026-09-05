@@ -327,9 +327,7 @@ pub(super) fn governed_check(
             .as_deref()
             .and_then(crate::git::origin_repo_name);
         let exposure = match (&target_root, &repo) {
-            (Some(_), Some(repo)) => {
-                crate::project::fetch_repo_exposure(&config.quipu.endpoint, repo)
-            }
+            (Some(_), Some(repo)) => crate::hook::daemon_projection::exposure_for(config, repo),
             (Some(tr), None) => RepoExposure::Unknown(format!(
                 "the tree containing this file ({}) has no `origin` remote, so \
                  its exposure cannot be resolved",

@@ -40,6 +40,17 @@ fn guarded_project(policy: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     } else {
         format!("{policy}\n\n[yupana.quipu]\nenabled = false\n")
     };
+    // The DAEMON plane gets the same seal, for the same reason and with the same
+    // symptom (aegis-x894x2). Measured 2026-09-05: enabling `use_daemon = true`
+    // in the host config made this fixture's guard report `notify` — the
+    // daemon-down notice — where the test asserts `allow`, on all 11 arms. That
+    // is the failure the comment above describes, arriving through a second
+    // plane. A fixture that does not declare a plane must not inherit one.
+    let policy = if policy.contains("[yupana.serve]") {
+        policy
+    } else {
+        format!("{policy}\n[yupana.serve]\nuse_daemon = false\n")
+    };
     std::fs::write(bobbin.join("config.toml"), policy).unwrap();
     let spool = dir.path().join("metrics.jsonl");
     (dir, spool)
