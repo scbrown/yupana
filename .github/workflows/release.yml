@@ -200,3 +200,81 @@ jobs:
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # THE REAL CRATES LANE (aegis-pz5crt, ported from quipu's aegis-pb4rzi fix).
+  # It lives HERE, not in crates.yml, for exactly the reason the `binary` job
+  # above already explains at length: release-plz creates the release and the tag
+  # with GITHUB_TOKEN, and GitHub does not trigger workflows from GITHUB_TOKEN
+  # events. crates.yml triggers on `release: [published]`, so on a real release
+  # it never ran at all.
+  #
+  # On quipu that left crates.io six versions behind while the publish workflow
+  # showed a green run that moved nothing. Here it left the crate UNPUBLISHED —
+  # crates.io has no `yupana`, only the pre-rename `hank` at 0.4.0 from the
+  # archived repository.
+  crates:
+    name: Publish to crates.io
+    # AFTER the binary. A release whose artifact failed to build should not be
+    # announced to the registry, and a crates.io version is permanent.
+    needs: [release-plz, binary]
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/heads/') &&
+      needs.release-plz.outputs.releases_created == 'true' &&
+      needs.binary.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # THE TAG, NOT Cargo.toml. The action refuses to publish when the crate is
+      # not at the version the caller intended, and that check is only worth
+      # anything if the two numbers come from different places. Reading git refs
+      # is independent of the manifest; deriving it with `cargo metadata` would
+      # compare a number to itself.
+      - name: Resolve the released version from the tag
+        id: want
+        run: |
+          set -euo pipefail
+          git fetch --tags --quiet
+          TAG="$(git tag --points-at HEAD | grep '^v[0-9]' | head -1 || true)"
+          if [ -z "$TAG" ]; then
+            echo "::error::release-plz reported a release but no v* tag points at" \
+                 "HEAD. Refusing to publish a version this run cannot name."
+            exit 1
+          fi
+          echo "want=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "tag ${TAG} -> version ${TAG#v}"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+
+      # ⛔ THE FIRST REAL PUBLISH CLAIMS THE NAME, AND THAT IS STIWI'S CALL.
+      #
+      # `yupana` does not exist on crates.io. Making this lane work does not
+      # resume a practice, it starts one — and a crates.io name cannot be
+      # released, nor a version unpublished (only yanked). The decision sits on
+      # the Desk CRATES card as a first publish under Stiwi's own token.
+      #
+      # So until the repository variable CRATES_PUBLISH_ENABLED is set to
+      # "true", this runs in DRY-RUN mode: every guard, the packaging, and the
+      # registry read all execute, and nothing is published.
+      #
+      # This is a VARIABLE rather than a comment because a merge gate that lives
+      # only in prose does not survive the merge. It is deliberately NOT a
+      # skipped job either — a skipped job is invisible, whereas the dry-run
+      # branch says in the log that it published nothing, which is the whole
+      # point of defect 2 above.
+      #
+      # AND IT IS NOT "SAFE BECAUSE TRUSTED PUBLISHING IS UNCONFIGURED". That
+      # reasoning expires silently the moment TP is configured. This gate does
+      # not consult TP, and neither do any of the refusals in the action.
+      - uses: ./.github/actions/crates-publish
+        with:
+          expected-version: ${{ steps.want.outputs.want }}
+          dry-run: ${{ vars.CRATES_PUBLISH_ENABLED != 'true' }}

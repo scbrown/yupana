@@ -1,0 +1,191 @@
+name: Publish yupana to crates.io
+description: >-
+  Publish the crate, refuse anything that is not the version we meant to ship,
+  and VERIFY the registry actually moved. THE ONE DEFINITION both crates.yml and
+  release.yml use.
+
+# WHY THIS EXISTS (aegis-pz5crt, ported from the quipu fix for aegis-pb4rzi).
+#
+# On quipu, three defects in a byte-identical crates.yml left crates.io six
+# versions behind while the publish workflow had a GREEN run that moved nothing.
+# This repo has all three, plus a fourth:
+#
+#  1. IT NEVER FIRES ON A REAL RELEASE. crates.yml triggers on
+#     `release: [published]`, but release-plz creates the release with
+#     GITHUB_TOKEN, and events raised by GITHUB_TOKEN never trigger workflows —
+#     the same mechanism that stops its tag pushes firing anything, which the
+#     `binary` job in release.yml already documents at length. Fixed by calling
+#     this action as a JOB INSIDE release.yml: same run, no event to be
+#     swallowed.
+#
+#  2. A DRY RUN IS INDISTINGUISHABLE FROM A PUBLISH. The dry-run branch skips
+#     both the authentication and the publish steps, so the job's conclusion is
+#     `success` and nothing about it says the registry did not move. A publish
+#     job whose success is compatible with the registry not moving is a check
+#     that cannot fail.
+#
+#  3. NOTHING EVER ASKED THE REGISTRY. Ask the service, not the workflow. This
+#     action ends by reading crates.io back and FAILING if the version it was
+#     asked to publish is not the version the registry now serves.
+#
+#  4. THERE WAS NO PRERELEASE GUARD AT ALL. quipu's publish job gained an `if:`
+#     refusing prereleases; this repo's never had one, so a prerelease release
+#     event went straight to `cargo publish`.
+#
+# AND THE STAKES HERE ARE HIGHER THAN ON QUIPU, because this crate has never
+# been published: crates.io has no `yupana` at all, only the pre-rename `hank`
+# at 0.4.0 from the archived repository. Repairing quipu's lane RESUMED an
+# established practice. Repairing this one would START one and permanently claim
+# a name — a crates.io version cannot be unpublished, only yanked. That decision
+# is Stiwi's (Desk CRATES card), so release.yml gates the real publish on an
+# explicit opt-in and runs in dry-run mode until it is set.
+#
+# SAFETY IS INTRINSIC HERE, NOT INHERITED FROM A BROKEN DEPENDENCY. It would be
+# easy to call this lane safe today because crates.io Trusted Publishing is
+# unconfigured, so a stray publish cannot succeed. That is not safety, it is an
+# untested procedure standing behind someone else's outage — and it expires
+# silently the moment TP is configured. Every refusal below holds with TP fully
+# working:
+#
+#   * the version must equal the version the caller intended (`expected-version`)
+#   * a prerelease version is refused outright
+#   * a rehearsal ref is refused outright, by name
+#
+# `cargo publish` publishes whatever is in Cargo.toml regardless of which tag
+# invoked it, so "which version are we publishing" is not knowable from the tag
+# and must be asserted, not assumed.
+
+inputs:
+  expected-version:
+    description: >-
+      The version this run intends to publish, WITHOUT a leading v. Compared
+      against the crate's actual version and the registry afterwards. Required:
+      a default would let a caller publish whatever Cargo.toml happens to hold,
+      which is defect 3 in a different costume.
+    required: true
+  dry-run:
+    description: 'Set to "true" to run cargo publish --dry-run and publish nothing.'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Refuse a rehearsal, a prerelease, or the wrong version
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.expected-version }}
+        REF_NAME: ${{ github.ref_name }}
+      run: |
+        set -euo pipefail
+
+        # cargo metadata, not a grep of Cargo.toml: the published version is
+        # what cargo resolves, and that is the only number that matters here.
+        ACTUAL="$(cargo metadata --no-deps --format-version 1 \
+          | jq -r '.packages[] | select(.name == "yupana") | .version')"
+
+        # The refusals live in a script so they can be OBSERVED rather than
+        # asserted: scripts/ci/crates-publish-guard.sh --selftest proves all of
+        # them, plus a control arm, without cutting a release. A safety property
+        # that has only ever been reasoned about is a claim.
+        bash scripts/ci/crates-publish-guard.sh "$EXPECTED" "$ACTUAL" "$REF_NAME"
+
+    # The registry BEFORE, so the verification afterwards can tell "we published
+    # it" from "it was already there" — which matters on a re-run of a lane that
+    # partly succeeded, and is the difference between a real check and one that
+    # passes because nothing changed.
+    - name: Record what crates.io serves now
+      id: before
+      shell: bash
+      run: |
+        set -euo pipefail
+        # crates.io REQUIRES a User-Agent. Without one it answers 403, which
+        # reads as "blocked" or "absent" and sent the first pass of aegis-pb4rzi
+        # down the wrong path entirely. A 403 from a public read is usually a
+        # missing header, not a permission.
+        #
+        # `none` is the EXPECTED answer here today, not an error: the crate does
+        # not exist yet, so the API returns {"errors":[...]} with no .crate and
+        # jq falls through to the default. Do not "fix" that into a failure — a
+        # first publish is exactly the case where before is legitimately absent.
+        BEFORE="$(curl -sS --retry 3 --retry-delay 2 \
+          -H 'User-Agent: yupana-release-ci (github.com/scbrown/yupana)' \
+          https://crates.io/api/v1/crates/yupana \
+          | jq -r '.crate.max_version // "none"')"
+        echo "before=${BEFORE}" >> "$GITHUB_OUTPUT"
+        echo "crates.io currently serves: ${BEFORE}"
+
+        # ALREADY-PUBLISHED IS A SUCCESS, NOT A FAILURE. This action runs after
+        # the asset jobs, so it will be re-run whenever one of those is re-run,
+        # and `cargo publish` on an existing version exits non-zero. A lane that
+        # cannot be re-run is a lane people work around by hand, which is how
+        # publishing stops being automatic in the first place.
+        #
+        # Skipping the publish is safe here precisely because the version was
+        # asserted equal to the caller's intent in the step above: this can only
+        # mean "the version we meant to ship is the version being served".
+        if [ "$BEFORE" = "${{ inputs.expected-version }}" ]; then
+          echo "already=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::crates.io already serves ${BEFORE} — nothing to publish."
+        else
+          echo "already=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Verify package
+      shell: bash
+      run: cargo package --no-verify
+
+    - name: Publish (dry run)
+      if: inputs.dry-run == 'true'
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.expected-version }}
+      run: |
+        set -euo pipefail
+        cargo publish --dry-run
+        # Say it in the log, because the job's CONCLUSION cannot. A dry run and
+        # a real publish both end in `success`, and that indistinguishability is
+        # defect 2 above.
+        echo "::notice::DRY RUN — nothing was published. crates.io still serves" \
+             "${{ steps.before.outputs.before }}, not ${EXPECTED}."
+
+    - name: Authenticate with crates.io
+      if: inputs.dry-run != 'true' && steps.before.outputs.already != 'true'
+      id: crates-auth
+      uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1
+
+    - name: Publish to crates.io
+      if: inputs.dry-run != 'true' && steps.before.outputs.already != 'true'
+      shell: bash
+      run: cargo publish
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+
+    # ASK THE REGISTRY. This is the step whose absence let a green run coexist
+    # with a registry six versions behind. `cargo publish` exiting 0 means the
+    # upload was accepted, not that the index has the version — so poll, and
+    # fail if it never appears.
+    - name: Verify crates.io actually moved
+      if: inputs.dry-run != 'true'
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.expected-version }}
+        BEFORE: ${{ steps.before.outputs.before }}
+      run: |
+        set -euo pipefail
+        for attempt in $(seq 1 10); do
+          NOW="$(curl -sS --retry 3 --retry-delay 2 \
+            -H 'User-Agent: yupana-release-ci (github.com/scbrown/yupana)' \
+            https://crates.io/api/v1/crates/yupana \
+            | jq -r '.crate.max_version // "none"')"
+          echo "attempt ${attempt}: crates.io serves ${NOW} (want ${EXPECTED})"
+          if [ "$NOW" = "$EXPECTED" ]; then
+            echo "::notice::crates.io moved ${BEFORE} -> ${NOW}"
+            exit 0
+          fi
+          sleep 15
+        done
+        echo "::error::cargo publish succeeded but crates.io still serves ${NOW}," \
+             "not ${EXPECTED}. The publish did not take effect — do NOT read this" \
+             "lane's earlier green steps as evidence that it did (aegis-pb4rzi)."
+        exit 1
