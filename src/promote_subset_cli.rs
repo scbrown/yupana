@@ -130,6 +130,7 @@ pub(crate) fn promote_subset(
     source: &str,
     endpoint: Option<&str>,
     dry_run: bool,
+    list_keys: bool,
 ) -> anyhow::Result<()> {
     // `--all` writes every partition, so the file set is the projection's own —
     // resolved here rather than in the preflight, because it is not knowable
@@ -160,6 +161,15 @@ pub(crate) fn promote_subset(
     }
 
     let plan = crate::promote_subset::plan(repo, turtle, &changed)?;
+
+    // LIST ONLY. Before any reporting, so the output is exactly the keys and
+    // nothing a caller has to filter out of a pipe.
+    if list_keys {
+        for w in &plan.writes {
+            println!("{}", w.key);
+        }
+        return Ok(());
+    }
     let files = plan.writes.iter().filter(|w| w.file.is_some()).count();
     println!(
         "yupana promote --subset ({scope}): {files} file(s), {} retraction(s), \

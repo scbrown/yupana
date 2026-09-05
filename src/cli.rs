@@ -410,17 +410,14 @@ impl Cli {
                 policy.as_deref(),
             ),
             Commands::Promote(a) => {
-                let (commit, to, dry_run, replace_snapshot, repo, trigger, subset, base, path) = (
-                    &a.commit,
-                    &a.to,
-                    &a.dry_run,
-                    &a.replace_snapshot,
-                    &a.repo,
-                    &a.trigger,
-                    &a.subset,
-                    &a.base,
-                    &a.path,
-                );
+                let (commit, path) = (&a.commit, &a.path);
+                // `--subset` and its scope travel as ONE value, so "list the keys
+                // of a promote that is not a subset" and "a base with no subset"
+                // are unrepresentable below rather than merely refused by clap.
+                let subset = a.subset.then_some(cli_promote::Subset {
+                    base: a.base.as_deref(),
+                    list_keys: a.list_keys,
+                });
                 // THE WRITE GUARD, made real (aegis-ltjo). Promotion is the write
                 // yupana performs, so `serve.read_only` must refuse it — BEFORE any
                 // work, so the guard holds regardless of feature.
@@ -432,7 +429,7 @@ impl Cli {
                 self.load_config(path)?.write_guard("promotion")?;
                 // FR-19's trigger: `promote_on` decides whether the DECLARED
                 // event promotes at all, before any tree is read.
-                if !self.trigger_admits(path, commit, *trigger)? {
+                if !self.trigger_admits(path, commit, a.trigger)? {
                     return Ok(());
                 }
                 // `--subset` and its base travel as ONE value, so "subset with
@@ -441,12 +438,15 @@ impl Cli {
                 self.promote(
                     path,
                     commit,
-                    to.as_deref(),
-                    repo.as_deref(),
-                    *dry_run,
-                    *replace_snapshot,
-                    *subset,
-                    base.as_deref(),
+                    a.to.as_deref(),
+                    a.repo.as_deref(),
+                    a.dry_run,
+                    a.replace_snapshot,
+                    // `--subset` and its scope travel as ONE value, so "list the
+                    // keys of a promote that is not a subset" and "a base with no
+                    // subset" are unrepresentable here rather than merely refused
+                    // by clap.
+                    subset.as_ref(),
                 )
             }
         }

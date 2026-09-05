@@ -8,6 +8,22 @@ use super::*;
 
 use crate::promote_trigger::{decide, Decision, Trigger};
 
+/// What a `--subset` promote is scoped to, and whether it writes at all.
+///
+/// One value rather than three loose parameters, so the combinations the CLI
+/// forbids cannot be built at all: there is no "list the keys of a promote that
+/// is not a subset", and no base without a subset. It also keeps `promote`'s
+/// bool count down, which is the lint that forced this — correctly: four
+/// independent bools at a call site is four chances to transpose two of them,
+/// and two of these authorize writes.
+#[derive(Debug, Clone)]
+pub struct Subset<'a> {
+    /// Diff from this commit; `None` means `--all`, the whole projection.
+    pub base: Option<&'a str>,
+    /// Print the producer keys and write nothing.
+    pub list_keys: bool,
+}
+
 /// The arguments to `yupana promote`.
 ///
 /// Flattened out of the `Commands` enum so promotion's surface lives beside
@@ -66,6 +82,16 @@ pub struct PromoteArgs {
     /// silently so, because everything is still readable from the old key.
     #[arg(long, requires = "subset")]
     pub all: bool,
+    /// With `--subset`, print the producer keys that would be written, one per
+    /// line, and write NOTHING.
+    ///
+    /// The keys are otherwise unknowable from outside: they are derived from the
+    /// projection's own ownership, not from `git ls-files`, so a caller that has
+    /// to ENUMERATE them — a rollback retracting each one — cannot reconstruct
+    /// the set without re-implementing the partitioner. Listing is not a dry run:
+    /// it does no validation and contacts no endpoint.
+    #[arg(long, requires = "subset")]
+    pub list_keys: bool,
     /// Base commit-ish for `--subset`. MUST be the last SUCCESSFULLY
     /// PROMOTED commit, never the last commit SEEN: a marker advanced on a
     /// poll that skipped the promote leaves every commit in between silently
@@ -135,8 +161,7 @@ impl Cli {
         repo: Option<&str>,
         dry_run: bool,
         replace_snapshot: bool,
-        subset: bool,
-        subset_base: Option<&str>,
+        subset: Option<&Subset<'_>>,
     ) -> anyhow::Result<()> {
         // `--to` IS THE AUTHORIZATION, and it is the only one (aegis-o2h97).
         //
@@ -169,7 +194,11 @@ impl Cli {
             // A dry run writes nothing, so a discovered endpoint is safe to use —
             // and naming it is the useful half: it tells the operator which graph
             // a real run would have hit.
-            _ if dry_run => discovered,
+            //
+            // `--list-keys` writes nothing AND contacts nothing, so it must not be
+            // refused for want of a write authorization it will never use: a
+            // rollback has to enumerate the keys BEFORE it has decided to write.
+            _ if dry_run || subset.is_some_and(|s| s.list_keys) => discovered,
             _ => match discovered {
                 Some(found) => anyhow::bail!(
                     "refusing to promote into a DISCOVERED endpoint: {found}\n  \
@@ -215,14 +244,11 @@ impl Cli {
         }
         // `--subset` preconditions answered here, BEFORE the tree is read: a bad
         // base should cost a message, not a full projection.
-        let subset_changed = if subset {
-            Some(crate::promote_subset_cli::subset_preflight(
-                path,
-                subset_base,
-                commit,
-            )?)
-        } else {
-            None
+        let subset_changed = match subset {
+            Some(sub) => Some(crate::promote_subset_cli::subset_preflight(
+                path, sub.base, commit,
+            )?),
+            None => None,
         };
         let mut turtle = crate::export::to_turtle_at(path, &repo, commit)?;
         // A promotion that extracted NOTHING is not a promotion — it is a green
@@ -235,7 +261,7 @@ impl Cli {
         // it legitimately authorizes absence — a deleted file's partition IS empty.
         // The refusal below is for the OTHER shape: a promote that meant to assert
         // a tree and extracted nothing.
-        if !replace_snapshot && !subset && !turtle.contains("bobbin:CodeModule") {
+        if !replace_snapshot && subset.is_none() && !turtle.contains("bobbin:CodeModule") {
             eprintln!(
                 "yupana promote: extracted NOTHING from {} — no parseable source                  files under this tree for the grammars in this build. Refusing                  to promote an empty graph as success. (Is the language behind                  the `langs-extra` feature? Is the path right?)",
                 path.display()
@@ -273,10 +299,10 @@ impl Cli {
         // SUBSET: write only the changed files' partitions, each under its own
         // producer key. Diverges here, AFTER the projection is complete, because
         // the whole point is that the READ is unchanged — see `promote_subset`.
-        if let Some(changed) = subset_changed.as_ref() {
+        if let (Some(changed), Some(sub)) = (subset_changed.as_ref(), subset) {
             return crate::promote_subset_cli::promote_subset(
                 path,
-                subset_base,
+                sub.base,
                 commit,
                 &repo,
                 changed.as_deref(),
@@ -284,6 +310,7 @@ impl Cli {
                 &source,
                 endpoint.as_deref(),
                 dry_run,
+                sub.list_keys,
             );
         }
         let outcome = match (dry_run, &endpoint) {
@@ -331,8 +358,7 @@ impl Cli {
         _repo: Option<&str>,
         _dry_run: bool,
         _replace_snapshot: bool,
-        _subset: bool,
-        _subset_base: Option<&str>,
+        _subset: Option<&Subset<'_>>,
     ) -> anyhow::Result<()> {
         self.planned(
             "promote",

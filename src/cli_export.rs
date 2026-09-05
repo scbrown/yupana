@@ -28,7 +28,7 @@ impl crate::cli::Cli {
         match to {
             Some(_) => {
                 self.load_config(path)?.write_guard("promotion")?;
-                self.promote(path, "HEAD", to, repo, false, false, false, None)
+                self.promote(path, "HEAD", to, repo, false, false, None)
             }
             None => export(path, repo),
         }
