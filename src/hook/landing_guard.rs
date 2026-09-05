@@ -186,6 +186,77 @@ fn resolve_ref(landing: &Landing, root: &std::path::Path) -> (String, bool) {
     }
 }
 
+/// Where the signed action-certification records go.
+///
+/// `$YUPANA_ACTION_SPOOL`, else `$XDG_STATE_HOME/yupana/…`, else
+/// `~/.local/state/yupana/action-certifications.jsonl`.
+///
+/// NOT a bare relative filename, which is what this first shipped as. The hook
+/// is a short-lived process spawned in whatever directory the agent happens to
+/// be standing in, so a relative spool scatters records across the filesystem
+/// and none of them join a corpus anything reads. The variable and the default
+/// are deliberately the ones the host guard's certification adapter already
+/// passes to `yupana certify`, so a record written AT the gate lands in the same
+/// signed corpus as one written after the fact — which is the point of moving
+/// attestation to the gate, and the only way a soak can compare the two.
+///
+/// Pure, so the precedence is testable without touching the process environment.
+#[cfg(feature = "quipu")]
+#[must_use]
+pub fn resolve_spool(
+    explicit: Option<&str>,
+    xdg_state: Option<&str>,
+    home: Option<&str>,
+) -> Option<std::path::PathBuf> {
+    const FILE: &str = "action-certifications.jsonl";
+    if let Some(p) = explicit {
+        return Some(std::path::PathBuf::from(p));
+    }
+    if let Some(x) = xdg_state {
+        return Some(std::path::PathBuf::from(x).join("yupana").join(FILE));
+    }
+    home.map(|h| {
+        std::path::PathBuf::from(h)
+            .join(".local")
+            .join("state")
+            .join("yupana")
+            .join(FILE)
+    })
+}
+
+/// Where the signing key lives.
+///
+/// `$YUPANA_ACTION_KEY`, else the configured path *if it is absolute*, else
+/// `~/.config/aegis/yupana-signing.pk8`.
+///
+/// The absolute-only rule is the load-bearing part. `[yupana.quipu]
+/// signing_key_path` defaults to a bare filename, and resolving that against the
+/// hook's inherited working directory means the guard signs with whichever key
+/// happens to be underfoot — or, far more often, finds none and silently records
+/// nothing at all. A relative configured value is therefore ignored in favour of
+/// the deployment default rather than honoured against an arbitrary directory.
+#[cfg(feature = "quipu")]
+#[must_use]
+pub fn resolve_key_path(
+    explicit: Option<&str>,
+    configured: &str,
+    home: Option<&str>,
+) -> Option<std::path::PathBuf> {
+    if let Some(p) = explicit {
+        return Some(std::path::PathBuf::from(p));
+    }
+    let configured = std::path::Path::new(configured);
+    if configured.is_absolute() {
+        return Some(configured.to_path_buf());
+    }
+    home.map(|h| {
+        std::path::PathBuf::from(h)
+            .join(".config")
+            .join("aegis")
+            .join("yupana-signing.pk8")
+    })
+}
+
 /// Append a signed action-certification record for this decision.
 ///
 /// Fail-silent throughout: bookkeeping about enforcement must never be able to
@@ -199,9 +270,22 @@ fn record(
     decision: &Decision,
     landing: &Landing,
 ) {
-    let Some(key) =
-        crate::verdict_spool::existing_key(std::path::Path::new(&config.quipu.signing_key_path))
-    else {
+    let home = std::env::var("HOME").ok();
+    let Some(key_path) = resolve_key_path(
+        std::env::var("YUPANA_ACTION_KEY").ok().as_deref(),
+        &config.quipu.signing_key_path,
+        home.as_deref(),
+    ) else {
+        return;
+    };
+    let Some(key) = crate::verdict_spool::existing_key(&key_path) else {
+        return;
+    };
+    let Some(spool) = resolve_spool(
+        std::env::var("YUPANA_ACTION_SPOOL").ok().as_deref(),
+        std::env::var("XDG_STATE_HOME").ok().as_deref(),
+        home.as_deref(),
+    ) else {
         return;
     };
     let ts = crate::projection_cache::now_secs();
@@ -252,8 +336,7 @@ fn record(
         checks,
     };
     if let Ok(record) = crate::action_certification::sign(input, &key) {
-        let spool = std::path::Path::new("action-certifications.jsonl");
-        let _ = crate::action_certification::append(spool, &record);
+        let _ = crate::action_certification::append(&spool, &record);
     }
 }
 
@@ -271,6 +354,51 @@ fn md5_ish(text: &str) -> u64 {
 #[allow(non_snake_case)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_spool_is_NEVER_relative_to_the_hooks_working_directory() {
+        // The defect this pins: a bare filename sends every record to whatever
+        // directory the agent was standing in, so the corpus a soak reads is
+        // empty while the guard believes it is attesting.
+        let p = resolve_spool(None, None, Some("/home/x")).unwrap();
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/home/x/.local/state/yupana/action-certifications.jsonl")
+        );
+        assert!(p.is_absolute());
+        // XDG wins over HOME, and an explicit path wins over both — the same
+        // precedence the host certification adapter uses.
+        assert_eq!(
+            resolve_spool(None, Some("/state"), Some("/home/x")).unwrap(),
+            std::path::PathBuf::from("/state/yupana/action-certifications.jsonl")
+        );
+        assert_eq!(
+            resolve_spool(Some("/tmp/s.jsonl"), Some("/state"), Some("/home/x")).unwrap(),
+            std::path::PathBuf::from("/tmp/s.jsonl")
+        );
+    }
+
+    #[test]
+    fn a_RELATIVE_configured_key_is_ignored_not_resolved_against_the_cwd() {
+        // `signing_key_path` defaults to the bare "yupana-signing.pk8". Honouring
+        // that relative value would make the guard sign with whichever key is
+        // underfoot, or — the common case — find none and record nothing while
+        // reporting success.
+        assert_eq!(
+            resolve_key_path(None, "yupana-signing.pk8", Some("/home/x")).unwrap(),
+            std::path::PathBuf::from("/home/x/.config/aegis/yupana-signing.pk8")
+        );
+        // An ABSOLUTE configured path is a deliberate deployment choice and wins.
+        assert_eq!(
+            resolve_key_path(None, "/opt/k.pk8", Some("/home/x")).unwrap(),
+            std::path::PathBuf::from("/opt/k.pk8")
+        );
+        // The env var beats everything, matching the adapter's contract.
+        assert_eq!(
+            resolve_key_path(Some("/env/k.pk8"), "/opt/k.pk8", Some("/home/x")).unwrap(),
+            std::path::PathBuf::from("/env/k.pk8")
+        );
+    }
 
     #[test]
     fn the_routing_superset_admits_landings_and_skips_ordinary_work() {
