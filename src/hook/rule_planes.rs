@@ -392,6 +392,7 @@ pub(super) fn governed_check(
     // The leverage headline (aegis-0nng): WHICH governed rules fire, by name.
     // Text rules carry names; structural violations ride as a count (their
     // names live only inside composed messages today).
+    let repo_label = target_repo.unwrap_or_else(|| "unresolved".to_string());
     let rule_names: Vec<serde_json::Value> = text_violations
         .iter()
         .map(|v| v.rule.clone())
@@ -414,12 +415,7 @@ pub(super) fn governed_check(
             ("structural", (structural_violations.len() as u64).into()),
             ("blocking", any_blocking.into()),
             ("exposure", exposure_label.into()),
-            (
-                "repo",
-                target_repo
-                    .unwrap_or_else(|| "unresolved".to_string())
-                    .into(),
-            ),
+            ("repo", repo_label.into()),
             // WHICH catalogue said so. A soak that groups governed firings
             // without this cannot tell a verdict from the current policy set
             // from one computed against a cached catalogue, and those are not
@@ -429,6 +425,15 @@ pub(super) fn governed_check(
                 if cache_age.is_some() { "cache" } else { "live" }.into(),
             ),
             ("policy_age_secs", cache_age.unwrap_or(0).into()),
+            // WHAT MATCHED, so a block is adjudicable from the record instead of
+            // by re-reading the repos (aegis-mqnl). Safe only because the spool is
+            // internal-only and never pushed. The SUBJECT path stays behind
+            // `metrics.record_paths`: that knob is a deployment's opt-in, and
+            // widening it "only for blocks" still turns it on beneath one.
+            (
+                "matched",
+                crate::textrules::distinct_matched(&text_violations).into(),
+            ),
         ],
     );
     let blocks = config.policy.mode == Mode::Enforce && any_blocking;
