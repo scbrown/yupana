@@ -103,7 +103,7 @@ repos:
 
       - id: session-reread-tests
         name: session reread discrimination (python)
-        entry: just session-guard --selftest
+        entry: python3 scripts/session-reread-guard.py --selftest
         language: system
         files: ^(scripts/session-reread-guard\.py|justfile)$
         pass_filenames: false
