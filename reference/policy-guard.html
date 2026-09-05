@@ -307,6 +307,16 @@ stay that way. One is the guard enforcing last-known policy; the other is the
 guard not running. Collapsing them is what made a soak count unguarded edits
 as clean ones.</li>
 </ul>
+<h3 id="replay-exposure-faithfully"><a class="header" href="#replay-exposure-faithfully">Replay exposure faithfully</a></h3>
+<p>A <code>guard</code> metrics record produced by the governed plane includes <code>exposure</code> and
+<code>repo</code> alongside <code>session</code> and <code>rule</code>. These are the same values used for the
+decision and emitted on the <code>governed</code> record: <code>public</code>, <code>internal</code>, or <code>unknown</code>
+for a matching text rule, and <code>n/a</code> when exposure was not evaluated. The repo is
+the edited file's repository, with <code>unresolved</code> when no name was resolved. Other
+guard decisions omit both fields. Path recording remains opt-in.</p>
+<p>The Dogwood converter preserves these fields. Replay can score rule and exposure
+on one session-attributed action; it must not join records by agent and timestamp
+or interpret a missing field in older traffic as public exposure.</p>
 <h3 id="invoke-it-so-version-skew-cannot-block-the-fleet"><a class="header" href="#invoke-it-so-version-skew-cannot-block-the-fleet">Invoke it so version skew cannot block the fleet</a></h3>
 <p>Every row above fails open except one, and that one is not exotic: it is what
 you get by rolling the hook out ahead of the binary, which is the normal
