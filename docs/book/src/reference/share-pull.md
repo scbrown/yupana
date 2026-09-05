@@ -8,6 +8,8 @@ somebody hands you gets into the graph Yupana reads, and what it can and cannot 
 yupana share pull    <bundle-dir|url> --to <quipu-url>   # stage it, and say where you stand
 yupana share policy  <staging-graph>  [--to <quipu-url>] # what policy would this contribute?
 yupana share promote <share-id>       --to <quipu-url>   # admit it (the governance decision)
+yupana share align   <graph> --against <local-graph>     # which of their concepts are yours?
+yupana share reshare <graph> --output <dir>              # publish it back out, as a delta
 ```
 
 ## The one property to understand first
@@ -130,6 +132,52 @@ That is a deliberate act on the receiving store — adopting a publisher's vocab
 change, and Yupana does not perform it as a side effect of fetching bytes. Load the shapes you
 intend to govern (the bundle ships its own `shapes.ttl` for exactly this purpose), then pull again:
 the same bundle that quarantined will come back `staged`.
+
+### `share reshare` — publishing it back out, as a delta
+
+A share that came from someone else and goes back out changed is a **delta**, and a delta that does
+not name its parent has lost the only thing that makes it one. So the parent is **derived, not
+asked for**:
+
+```console
+$ yupana share reshare urn:quipu:import:quarantine:a350c7a7… --output ./delta --to http://quipu.example
+shared sha256:a146eb19…
+  output: ./delta
+  files:  export.nt, manifest.json, manifest.ttl, shapes.ttl
+  parent: sha256:a350c7a7… (delta — derived from the pulled graph's own IRI)
+```
+
+Quipu names a staged graph after the share it came from, so the lineage is already written on the
+graph IRI and re-sharing can recover it without being told. The manifest records it as
+`parent_share`, which is where a consumer will look — not in this command's output.
+
+The derivation is deliberately narrow. A graph that is not a pulled share yields **no** parent, and
+so do the near-misses: a truncated IRI, or one carrying the right prefix and a non-hex body.
+Inventing a parent for a local graph is a worse failure than omitting one, because a false lineage
+claim gets published in a manifest and believed downstream.
+
+To publish a pulled graph as a **new** lineage, say so — and the output names what was discarded:
+
+```console
+$ yupana share reshare urn:quipu:import:quarantine:a350c7a7… --output ./new --to … --root
+  parent: NONE — published as a new lineage with --root, discarding sha256:a350c7a7…
+```
+
+`--root` and `--parent` conflict at parse time (exit 2, nothing written): a lineage claim cannot be
+both absent and specified.
+
+Files are written **verbatim**, because the manifest's hashes are over those exact bytes — anything
+that reformats on the way through, even pretty-printing the manifest, produces a bundle whose own
+`share_id` no longer verifies.
+
+#### The round trip, measured
+
+| step | result |
+|---|---|
+| pull a share into receiver A | `quarantined`, 15 triples |
+| `reshare` that staged graph | new share id, `parent_share` recorded in the manifest |
+| pull the delta into a fresh receiver B | `quarantined`, 15 triples, exit 0 |
+| pull the delta **again**, byte-identical | **`unchanged`**, still 1 graph |
 
 ## What `pull` does NOT take, and why
 

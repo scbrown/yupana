@@ -54,10 +54,14 @@
 //! Pulling from a publisher whose vocabulary you do not govern is the DEFAULT
 //! case, not the exceptional one.
 
+use std::path::PathBuf;
+
 use clap::{Args, Subcommand};
 
 use crate::errors::{Error, Result};
-use crate::share_client::{align, policy_preview, promote, pull, PolicyPreview, PullVerdict};
+use crate::share_client::{
+    align, policy_preview, promote, pull, reshare, PolicyPreview, PullVerdict,
+};
 
 /// `yupana share <pull|promote|policy>`.
 #[derive(Debug, Args)]
@@ -111,6 +115,34 @@ enum ShareCmd {
         /// Quipu base URL. Defaults to the configured projection endpoint.
         #[arg(long)]
         to: Option<String>,
+    },
+    /// Publish a graph back out as a share bundle.
+    ///
+    /// A graph you PULLED re-shares as a DELTA naming the share it came from —
+    /// derived from the staging graph's own IRI, so the lineage cannot be lost
+    /// by forgetting a flag. Pass `--root` to publish it as a new lineage
+    /// instead, or `--parent` to name a different one; both are deliberate.
+    Reshare {
+        /// The graph to publish.
+        graph: String,
+        /// Directory to write the bundle into.
+        #[arg(long)]
+        output: PathBuf,
+        /// Quipu base URL. Defaults to the configured endpoint.
+        #[arg(long)]
+        to: Option<String>,
+        /// Name this parent instead of the one derived from the graph IRI.
+        #[arg(long, conflicts_with = "root")]
+        parent: Option<String>,
+        /// Publish as a NEW lineage, naming no parent, even for a pulled graph.
+        #[arg(long)]
+        root: bool,
+        /// Shape registry entries to ship in `shapes.ttl`.
+        #[arg(long = "shapes")]
+        shape_sets: Vec<String>,
+        /// Explicitly produce a shapes-free share.
+        #[arg(long)]
+        no_shapes: bool,
     },
     /// Which of the publisher's concepts are YOUR concepts?
     ///
@@ -183,6 +215,27 @@ impl ShareArgs {
                 });
                 Ok(())
             }
+            ShareCmd::Reshare {
+                graph,
+                output,
+                to,
+                parent,
+                root,
+                shape_sets,
+                no_shapes,
+            } => {
+                let endpoint = endpoint(to.as_deref(), configured_endpoint)?;
+                let derived = crate::share_reshare::parent_of(graph);
+                let chosen = if *root {
+                    None
+                } else {
+                    parent.as_deref().or(derived.as_deref())
+                };
+                let (payload, files) =
+                    reshare(endpoint, graph, chosen, shape_sets, *no_shapes, output)?;
+                self.print_reshare(&payload, &files, output, chosen, derived.as_deref(), *root);
+                Ok(())
+            }
             ShareCmd::Policy { staging_graph, to } => {
                 let endpoint = endpoint(to.as_deref(), configured_endpoint)?;
                 let preview = policy_preview(endpoint, staging_graph)?;
@@ -227,6 +280,52 @@ impl ShareArgs {
             (Some(next), _) => println!("  next:    {next}"),
             (None, Some(reason)) => println!("  next:    none — {reason}"),
             (None, None) => {}
+        }
+    }
+
+    fn print_reshare(
+        &self,
+        payload: &serde_json::Value,
+        files: &[String],
+        out: &std::path::Path,
+        chosen: Option<&str>,
+        derived: Option<&str>,
+        root: bool,
+    ) {
+        if self.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "output": out.display().to_string(),
+                    "files": files,
+                    "parent_share": chosen,
+                    "derived_parent": derived,
+                    "published_as_root": root,
+                    "manifest": payload.get("manifest"),
+                }))
+                .unwrap_or_default()
+            );
+            return;
+        }
+        let id = payload
+            .get("manifest")
+            .and_then(|m| m.get("share_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("(unknown)");
+        println!("shared {id}");
+        println!("  output: {}", out.display());
+        println!("  files:  {}", files.join(", "));
+        match (chosen, derived, root) {
+            // Say WHERE the parent came from. A lineage claim the operator did
+            // not type is one they should be able to see and disagree with.
+            (Some(p), Some(d), _) if p == d => {
+                println!("  parent: {p} (delta — derived from the pulled graph's own IRI)");
+            }
+            (Some(p), _, _) => println!("  parent: {p} (delta — named explicitly)"),
+            (None, Some(d), true) => {
+                println!("  parent: NONE — published as a new lineage with --root, discarding {d}");
+            }
+            (None, _, _) => println!("  parent: none (this graph was not pulled from a share)"),
         }
     }
 
