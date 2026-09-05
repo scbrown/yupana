@@ -25,6 +25,7 @@
 - [Resident Daemon](reference/daemon.md)
 - [Pre-Edit Policy Guard](reference/policy-guard.md)
   - [Replay: measuring a rule](reference/replay.md)
+  - [Session trajectory advice](reference/session-trajectory.md)
 - [Golden-Path Conformance](reference/golden-path.md)
 - [The Enforcement Trace](reference/enforcement-trace.md)
 - [Code Slices as Share Bundles](reference/share-bundles.md)

@@ -97,6 +97,9 @@ pub mod project_queries;
 /// from `project` for size and gated with it.
 #[cfg(feature = "quipu")]
 pub mod project_scope;
+/// Governed session trajectory advice.
+#[cfg(feature = "quipu")]
+pub mod project_trajectory;
 /// Governed tripwires — quipu's path-boundary policies, projected. Gated with
 /// the projection that serves them.
 #[cfg(feature = "quipu")]

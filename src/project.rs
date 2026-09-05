@@ -208,6 +208,7 @@ pub struct ProjectionRegistry {
     text_rules: Vec<TextRule>,
     pub(crate) tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
     pub(crate) memory_policies: Vec<crate::project_memory::MemoryPolicy>,
+    pub(crate) trajectory_policies: Option<Vec<crate::project_trajectory::TrajectoryPolicy>>,
     /// Last-known governed LANDING policies — which repositories declare who
     /// may put code on their protected refs.
     ///
@@ -274,6 +275,7 @@ impl ProjectionRegistry {
             text_rules: Vec::new(),
             tripwires: Vec::new(),
             memory_policies: Vec::new(),
+            trajectory_policies: None,
             landing_policies: None,
             grounded_rules: Vec::new(),
             grounding: None,
@@ -320,6 +322,7 @@ impl ProjectionRegistry {
             crate::project_tripwire::fetch_tripwires(&self.endpoint),
             crate::project_memory::fetch_memory_policies(&self.endpoint),
             crate::project_landing::fetch_landing_policies(&self.endpoint),
+            crate::project_trajectory::fetch_trajectory_policies(&self.endpoint),
         ) {
             (
                 Ok(policies),
@@ -328,6 +331,7 @@ impl ProjectionRegistry {
                 Ok(tripwires),
                 Ok(memory_policies),
                 Ok(landing_policies),
+                Ok(trajectory_policies),
             ) => {
                 report_overclaims(&policies);
                 self.policies = policies;
@@ -335,6 +339,7 @@ impl ProjectionRegistry {
                 self.tripwires = tripwires;
                 self.memory_policies = memory_policies;
                 self.landing_policies = Some(landing_policies);
+                self.trajectory_policies = Some(trajectory_policies);
                 self.grounded_rules = grounded_rules;
                 self.grounding = crate::project_grounding::fetch_grounding_set(
                     &self.endpoint,
@@ -347,12 +352,13 @@ impl ProjectionRegistry {
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
-            (Err(e), _, _, _, _, _)
-            | (_, Err(e), _, _, _, _)
-            | (_, _, Err(e), _, _, _)
-            | (_, _, _, Err(e), _, _)
-            | (_, _, _, _, Err(e), _)
-            | (_, _, _, _, _, Err(e)) => {
+            (Err(e), _, _, _, _, _, _)
+            | (_, Err(e), _, _, _, _, _)
+            | (_, _, Err(e), _, _, _, _)
+            | (_, _, _, Err(e), _, _, _)
+            | (_, _, _, _, Err(e), _, _)
+            | (_, _, _, _, _, Err(e), _)
+            | (_, _, _, _, _, _, Err(e)) => {
                 self.freshness = Freshness::Stale;
                 Err(e)
             }

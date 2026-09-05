@@ -91,6 +91,7 @@ fn a_projection(endpoint: &str, written_at: u64) -> CachedProjection {
         text_rules: vec![a_text_rule("internal-hostname")],
         tripwires: Vec::new(),
         memory_policies: Vec::new(),
+        trajectory_policies: None,
         landing_policies: None,
         grounded_rules: Vec::new(),
         grounding: None,
@@ -359,4 +360,17 @@ fn every_miss_has_a_stable_label_and_self_explaining_prose() {
     }
     .to_string()
     .contains("60"));
+}
+
+#[test]
+fn trajectory_cache_absence_is_unknown_and_empty_is_an_answer() {
+    let mut value = serde_json::to_value(a_projection("http://q", 10)).unwrap();
+    value.as_object_mut().unwrap().remove("trajectory_policies");
+    let old: CachedProjection = serde_json::from_value(value).unwrap();
+    assert!(old.trajectory_policies.is_none());
+    let mut current = a_projection("http://q", 10);
+    current.trajectory_policies = Some(Vec::new());
+    let current: CachedProjection =
+        serde_json::from_value(serde_json::to_value(current).unwrap()).unwrap();
+    assert_eq!(current.trajectory_policies, Some(Vec::new()));
 }

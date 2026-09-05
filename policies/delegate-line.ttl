@@ -1,0 +1,28 @@
+# Example governed advice. Import deliberately; binaries never seed this rule.
+@prefix aegis: <http://aegis.gastown.local/ontology/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+aegis:policy_delegate-line a aegis:Policy ;
+    rdfs:label "delegate line" ;
+    aegis:targets "session-trajectory" ;
+    aegis:claim "After attempting to create a work item, check whether subsequent edits belong to the session's assigned work." ;
+    aegis:boundary "action" ;
+    aegis:effect "warn" ;
+    aegis:constraintClass "soft" ;
+    aegis:verificationPoint "PAA" ;
+    aegis:enforcementTier "warn" ;
+    aegis:oncePer "session" ;
+    aegis:selector aegis:selector_delegate-artifact-command ;
+    aegis:predicate aegis:predicate_delegate-command-before-edit ;
+    rdfs:comment "You attempted to create a work item earlier in this session and are still editing. Investigating far enough to write a good work item is useful; implementing it may belong to its owner. Check that these edits are on YOUR assigned work: if they are, carry on; otherwise hand the new item to its owner. Only create counts: comments, updates and closes are ordinary traffic on existing work and must not trigger this advice. Command observation precedes execution and does not prove successful creation. A value-less long flag before the verb may cause a missed observation, never a claim of successful creation." .
+
+aegis:selector_delegate-artifact-command a aegis:Selector ;
+    aegis:name "artifact-producing command attempt" ;
+    aegis:evidenceSource "{\"programs\":[\"br\",\"bd\"],\"verbs\":[\"create\"]}" ;
+    aegis:tier "live" .
+
+aegis:predicate_delegate-command-before-edit a aegis:Predicate ;
+    aegis:name "command attempt precedes edit in the same session" ;
+    aegis:evidenceSource "command-before-edit" ;
+    aegis:matchType "must-exist" ;
+    aegis:tier "live" .

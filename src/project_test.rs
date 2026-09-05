@@ -625,6 +625,7 @@ fn stub_quipu(serve: usize) -> String {
                 || request.contains("?selector ?predicate")
                 || request.contains("aegis:MemoryHeavyCommand")
                 || request.contains("aegis:landingPolicy")
+                || request.contains("session-trajectory")
             {
                 empty_results_json()
             } else {
@@ -663,6 +664,7 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
             text_rules: Vec::new(),
             tripwires: Vec::new(),
             memory_policies: Vec::new(),
+            trajectory_policies: None,
             landing_policies: None,
             grounded_rules: Vec::new(),
             grounding: None,
@@ -763,14 +765,14 @@ fn no_cache_and_no_quipu_fails_open_rather_than_serving_an_empty_catalogue() {
 fn a_successful_refresh_persists_the_projection_for_the_next_process() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
-    // Six requests per refresh: the structural catalogue, the text rules,
+    // Seven requests per refresh: the structural catalogue, the text rules,
     // the grounded-predicate catalogue, the tripwire catalogue, the
-    // memory-policy catalogue, and the LANDING catalogue. (An empty grounded
+    // memory-policy catalogue, the LANDING catalogue, and session trajectories. (An empty grounded
     // catalogue asks for no grounding set — a further request would hang the
     // refresh here.) This count is an assertion, not a fixture detail: adding
     // a plane without updating it fails these tests, which is how a silently
     // half-projected registry gets caught.
-    let endpoint = stub_quipu(6);
+    let endpoint = stub_quipu(7);
 
     let mut registry = ProjectionRegistry::new(&endpoint);
     assert_eq!(
@@ -799,8 +801,8 @@ fn an_out_of_band_refresh_always_contacts_quipu_and_advances_the_cache() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
     seed_cache(&cache, "http://old-endpoint.invalid", 1_000);
-    // Six requests per refresh — see the sibling test for the enumeration.
-    let endpoint = stub_quipu(6);
+    // Seven requests per refresh — see the sibling test for the enumeration.
+    let endpoint = stub_quipu(7);
 
     let mut registry = ProjectionRegistry::new(&endpoint);
     registry
