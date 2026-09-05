@@ -97,7 +97,7 @@ repos:
         name: local install contract (one full-feature binary, two names)
         entry: scripts/selftest-install-local.sh
         language: script
-        files: ^(scripts/(install-local|selftest-install-local)\.sh|justfile|Cargo\.(toml|lock)|\.github/workflows/release\.yml)$
+        files: ^(scripts/(install-local|selftest-install-local)\.sh|scripts/install-artifacts\.py|tests/install_local\.py|examples/install-contract\.rs|tests/install_contract\.rs|justfile|Cargo\.(toml|lock)|\.github/workflows/release\.yml)$
         pass_filenames: false
         verbose: true
 

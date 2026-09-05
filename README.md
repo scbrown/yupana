@@ -195,6 +195,18 @@ just install
 # ~/.local/bin/hank -> yupana
 ```
 
+Local installation uses a private, temporary Cargo target under the disk cache
+(`$XDG_CACHE_HOME/yupana/install-builds`, falling back to `~/.cache`). It builds
+all features and checks every command help surface, including nested verbs,
+against a checker compiled from the same source. The installer verifies the
+staged and installed bytes, publishes atomically under an install lock, and
+prints the installed SHA-256. Build outputs are removed on exit.
+
+The installer requires Python 3, `flock`, and the usual Linux file utilities.
+`YUPANA_INSTALL_ROOT` selects the install prefix; `YUPANA_INSTALL_BUILD_ROOT`
+can select another disk-backed build parent. The explicit Cargo `--target-dir`
+keeps installation isolated even when a wrapper overrides `CARGO_TARGET_DIR`.
+
 ### Use
 
 ```bash
