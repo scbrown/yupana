@@ -30,6 +30,9 @@ mod cli_hook;
 mod cli_promote;
 #[path = "cli_serve.rs"]
 mod cli_serve;
+#[cfg(feature = "quipu")]
+#[path = "cli_share.rs"]
+mod cli_share;
 #[path = "cli_status.rs"]
 mod cli_status;
 #[path = "cli_status_rules.rs"]
@@ -315,6 +318,10 @@ enum Commands {
     },
     #[cfg(feature = "quipu")]
     Certify(crate::action_certification::CertifyArgs),
+    /// Pull a Quipu share into the graph yupana reads, see what policy it
+    /// would contribute, and admit it deliberately. Never promotes implicitly.
+    #[cfg(feature = "quipu")]
+    Share(crate::share_pull::ShareArgs),
 }
 /// Output formats for `yupana export`.
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -379,6 +386,8 @@ impl Cli {
             }
             #[cfg(feature = "quipu")]
             Commands::Certify(args) => args.run(),
+            #[cfg(feature = "quipu")]
+            Commands::Share(args) => Ok(args.run(self.quipu_endpoint().as_deref())?),
             Commands::Serve { http } => self.serve(*http).await,
             Commands::Daemon { port } => self.daemon(*port).await,
             Commands::Callers { symbol, path } => {
@@ -404,20 +413,7 @@ impl Cli {
                 repo,
                 format,
                 to,
-            } => {
-                let ExportFormat::Turtle = format;
-                match to {
-                    // `export --to quipu` IS promotion (spec §15's other spelling),
-                    // so it routes through the one promotion path — validate then
-                    // write — rather than a second implementation that could drift
-                    // from `promote`. It is a write, so honour the guard first.
-                    Some(_) => {
-                        self.load_config(path)?.write_guard("promotion")?;
-                        self.promote(path, "HEAD", to.as_deref(), repo.as_deref(), false, false)
-                    }
-                    None => cli_export::export(path, repo.as_deref()),
-                }
-            }
+            } => self.export_arm(path, repo.as_deref(), format, to.as_deref()),
             Commands::Dataflow {
                 function,
                 path,

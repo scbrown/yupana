@@ -214,7 +214,7 @@ fn parse_report(report: &str) -> Validation {
 /// unset against an open server and nothing changes. An empty value counts as
 /// unset — `Bearer ` (no token) would be sent as a real-but-wrong credential
 /// and turn a misconfigured env into a confusing 401.
-fn quipu_auth_token() -> Option<String> {
+pub(crate) fn quipu_auth_token() -> Option<String> {
     normalize_token(std::env::var("QUIPU_AUTH_TOKEN").ok()).or_else(token_from_file)
 }
 

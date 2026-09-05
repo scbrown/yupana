@@ -9,6 +9,32 @@ use std::path::Path;
 
 use crate::export;
 
+impl crate::cli::Cli {
+    /// The `yupana export` dispatch arm.
+    ///
+    /// Lives beside the exporter rather than in the match, because the decision
+    /// it makes is an export decision: `export --to <quipu>` IS promotion (spec
+    /// §15's other spelling), so it routes through the ONE promotion path —
+    /// validate, then write — rather than a second implementation that could
+    /// drift from `promote`. It is a write, so the guard is honoured first.
+    pub(super) fn export_arm(
+        &self,
+        path: &Path,
+        repo: Option<&str>,
+        format: &crate::cli::ExportFormat,
+        to: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let crate::cli::ExportFormat::Turtle = format;
+        match to {
+            Some(_) => {
+                self.load_config(path)?.write_guard("promotion")?;
+                self.promote(path, "HEAD", to, repo, false, false)
+            }
+            None => export(path, repo),
+        }
+    }
+}
+
 pub(crate) fn export(path: &Path, repo: Option<&str>) -> anyhow::Result<()> {
     // Identity chain: explicit --repo, else the origin remote's repo name, else
     // the directory basename. The dir-name fallback survives ONLY here — plain

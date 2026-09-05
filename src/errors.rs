@@ -29,6 +29,13 @@ pub enum Error {
     /// (`quipu` feature).
     #[error("projection error: {0}")]
     Projection(String),
+
+    /// A share bundle could not be read, verified, or imported into quipu
+    /// (`quipu` feature). Distinct from [`Error::Promote`]: promotion writes
+    /// facts yupana EXTRACTED, while this covers facts somebody else published
+    /// and we are deciding whether to admit.
+    #[error("share error: {0}")]
+    Share(String),
 }
 
 /// The crate-wide result alias.
