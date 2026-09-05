@@ -1,4 +1,4 @@
-//! Tests for `yupana share`. Child module of `share_pull`; size-exempt.
+//! Tests for the `yupana share` wire half. Child module of `share_client`; size-exempt.
 //!
 //! Two properties are pinned here that nothing else in the repo pins:
 //!
@@ -287,5 +287,58 @@ fn an_absent_actor_is_omitted_rather_than_sent_empty() {
     assert!(
         req.get("actor").is_none(),
         "an empty actor would be recorded as provenance nobody can trace"
+    );
+}
+
+/// `share align` is reachable and its shape is what quipu's `/align/propose`
+/// requires: two graphs, both named. `--against` is mandatory because an
+/// alignment against an unstated graph is not a thing quipu can answer.
+#[test]
+fn the_align_verb_parses_and_requires_both_graphs() {
+    let ok = <crate::cli::Cli as clap::Parser>::try_parse_from([
+        "yupana",
+        "share",
+        "align",
+        GRAPH,
+        "--against",
+        "urn:local:graph",
+        "--to",
+        "http://quipu.example",
+    ]);
+    assert!(ok.is_ok(), "the documented invocation must parse: {ok:?}");
+
+    let missing =
+        <crate::cli::Cli as clap::Parser>::try_parse_from(["yupana", "share", "align", GRAPH]);
+    assert!(
+        missing.is_err(),
+        "an alignment with only one graph must be refused at parse time, not sent \
+         to quipu as a half-formed request"
+    );
+}
+
+/// `candidates` is a COUNT, not a list.
+///
+/// Reading it as an array gives `None` -> 0 for EVERY response, so the summary
+/// line would report "0 candidate alignment(s)" no matter what quipu found —
+/// and it would look entirely reasonable doing it. The response body below is a
+/// real one, captured from quipu 0.3.36.
+#[test]
+fn the_align_candidate_count_is_read_as_a_number_not_a_list() {
+    let real: serde_json::Value = serde_json::from_str(
+        r#"{"candidates": 3, "set_aside": 1, "summary": "3 candidate(s); 1 set aside",
+            "expected_version": "sha256:ce548369"}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        real.get("candidates").and_then(serde_json::Value::as_u64),
+        Some(3),
+        "the count must be read as a number"
+    );
+    assert!(
+        real.get("candidates")
+            .and_then(serde_json::Value::as_array)
+            .is_none(),
+        "reading it as an array is the defect: it silently yields 0 for every \
+         response, including the ones with candidates in them"
     );
 }

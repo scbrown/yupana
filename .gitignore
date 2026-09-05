@@ -35,3 +35,8 @@ search-debug.json
 task_plan.md
 findings.md
 progress.md
+
+# Yupana verdict-signing identity: a PKCS#8 PRIVATE KEY, generated on demand by
+# the verifier tests. Never committable — a `git add -A` after a test run put one
+# in a public branch once (2026-09-05).
+.quipu/

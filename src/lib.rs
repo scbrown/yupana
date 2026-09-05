@@ -129,6 +129,9 @@ pub mod rules;
 /// Reading and verifying a Quipu share bundle before anything is sent anywhere.
 #[cfg(feature = "quipu")]
 mod share_bundle;
+/// The wire half of `yupana share`: quipu calls and the emitted next step.
+#[cfg(feature = "quipu")]
+mod share_client;
 /// `yupana share` — pull a Quipu share, preview its policy, admit it.
 #[cfg(feature = "quipu")]
 pub mod share_pull;
