@@ -31,7 +31,41 @@ pub enum RepoExposure {
 ///   satisfied   -> the repo has a public remote        -> Public
 ///   unsatisfied -> known repo, no public remote        -> Internal
 ///   unknown     -> the evidence probe found no repo    -> Unknown
-pub fn fetch_repo_exposure(endpoint: &str, repo: &str) -> RepoExposure {
+/// Whether quipu ANSWERED, distinct from what it answered (aegis-q4tt56).
+///
+/// `RepoExposure::Unknown` conflates two things a CACHE must treat oppositely:
+///
+/// * **quipu answered "I don't know this repo"** — a real, stable fact about the
+///   graph. Safe to cache: asking again in ten seconds gets the same answer.
+/// * **we never got an answer** — a timeout, a 502, an unparseable body. Caching
+///   this would freeze a transient failure for the whole TTL, converting a blip
+///   into hours of degraded enforcement, and it would do so during exactly the
+///   quipu trouble that produced it.
+///
+/// Both still degrade to `Unknown` for the DECISION — a governed rule never
+/// blocks on a guess either way. The distinction exists solely so the cache can
+/// store what the graph SAID and never store our failure to ask it.
+#[derive(Debug, Clone)]
+pub enum ExposureAnswer {
+    /// quipu responded. Cacheable.
+    Answered(RepoExposure),
+    /// We never got an answer. NEVER cacheable.
+    Unreachable(String),
+}
+
+impl ExposureAnswer {
+    /// The decision value, which is `Unknown` for both failure shapes.
+    #[must_use]
+    pub fn exposure(self) -> RepoExposure {
+        match self {
+            ExposureAnswer::Answered(e) => e,
+            ExposureAnswer::Unreachable(why) => RepoExposure::Unknown(why),
+        }
+    }
+}
+
+/// [`fetch_repo_exposure`], keeping whether quipu answered. See [`ExposureAnswer`].
+pub fn fetch_exposure_answer(endpoint: &str, repo: &str) -> ExposureAnswer {
     let url = format!("{}/policy/check", endpoint.trim_end_matches('/'));
     let target = format!("http://aegis.gastown.local/ontology/repo_{repo}");
     let body = serde_json::json!({ "policy": EXPOSURE_POLICY_IRI, "target": target }).to_string();
@@ -42,22 +76,36 @@ pub fn fetch_repo_exposure(endpoint: &str, repo: &str) -> RepoExposure {
         .send_string(&body)
     {
         Ok(r) => r,
-        Err(e) => return RepoExposure::Unknown(format!("POST {url} failed: {e}")),
+        Err(e) => return ExposureAnswer::Unreachable(format!("POST {url} failed: {e}")),
     };
     let text = match resp.into_string() {
         Ok(t) => t,
-        Err(e) => return RepoExposure::Unknown(format!("unreadable /policy/check reply: {e}")),
+        Err(e) => {
+            return ExposureAnswer::Unreachable(format!("unreadable /policy/check reply: {e}"))
+        }
     };
     let value: serde_json::Value = match serde_json::from_str(&text) {
         Ok(v) => v,
-        Err(e) => return RepoExposure::Unknown(format!("/policy/check reply is not JSON: {e}")),
+        Err(e) => {
+            return ExposureAnswer::Unreachable(format!("/policy/check reply is not JSON: {e}"))
+        }
     };
+    // Every arm below is an ANSWER: quipu replied and we understood the reply,
+    // including when the reply is "no such repo". An unrecognised outcome is the
+    // one that is NOT an answer — we reached quipu and could not read its verdict,
+    // which must not be cached as though it were one.
     match value.get("outcome").and_then(|o| o.as_str()) {
-        Some("satisfied") => RepoExposure::Public,
-        Some("unsatisfied") => RepoExposure::Internal,
-        Some("unknown") | None => RepoExposure::Unknown(format!(
+        Some("satisfied") => ExposureAnswer::Answered(RepoExposure::Public),
+        Some("unsatisfied") => ExposureAnswer::Answered(RepoExposure::Internal),
+        Some("unknown") | None => ExposureAnswer::Answered(RepoExposure::Unknown(format!(
             "repo `{repo}` is not in the graph (no `repo_{repo}` entity with remote facts)"
-        )),
-        Some(other) => RepoExposure::Unknown(format!("unrecognised outcome `{other}`")),
+        ))),
+        Some(other) => ExposureAnswer::Unreachable(format!("unrecognised outcome `{other}`")),
     }
+}
+
+/// Ask quipu whether `repo` is public. NEVER errors: any failure IS `Unknown`.
+#[must_use]
+pub fn fetch_repo_exposure(endpoint: &str, repo: &str) -> RepoExposure {
+    fetch_exposure_answer(endpoint, repo).exposure()
 }

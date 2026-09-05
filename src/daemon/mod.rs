@@ -34,6 +34,10 @@ use crate::hook::Sizing;
 use crate::policy::PolicyConfig;
 
 pub mod client;
+#[cfg(feature = "quipu")]
+pub mod client_policy;
+#[cfg(feature = "quipu")]
+pub mod exposure;
 #[cfg(feature = "mcp")]
 pub(crate) mod http;
 #[cfg(all(feature = "mcp", feature = "golden-path"))]
@@ -93,8 +97,7 @@ struct Engine {
     freshness:
         std::sync::Mutex<std::collections::HashMap<(String, String), crate::types::Freshness>>,
     /// The RESIDENT PROJECTED POLICY (aegis-x894x2). `None` when quipu is not
-    /// configured, so `/projection` 503s rather than serving an empty catalogue
-    /// that would read as "no rules apply". Details in [`projection`].
+    /// configured, so `/projection` 503s. Details in [`projection`].
     #[cfg(feature = "quipu")]
     projection: Option<Arc<projection::ResidentProjection>>,
 }

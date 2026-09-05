@@ -198,7 +198,12 @@ fn http_post(
 /// outcome. The shared shape under the typed fetches below — same
 /// `std::net`-only approach as [`probe`], and the same contract: an error is
 /// "the daemon could not answer", to be handled by falling back, never ignored.
-fn http_get(host: &str, port: u16, path: &str, timeout: Duration) -> Result<String, String> {
+pub(super) fn http_get(
+    host: &str,
+    port: u16,
+    path: &str,
+    timeout: Duration,
+) -> Result<String, String> {
     let addr = format!("{host}:{port}");
     let Ok(mut addrs) = addr.to_socket_addrs() else {
         return Err(format!("cannot resolve {addr}"));
@@ -236,7 +241,7 @@ fn http_get(host: &str, port: u16, path: &str, timeout: Duration) -> Result<Stri
 /// Percent-encode a query-string value. Symbols are code identifiers so this is
 /// nearly always a no-op, but a name must never be able to smuggle `&`/`?`/
 /// spaces into the request line.
-fn urlencode(s: &str) -> String {
+pub(super) fn urlencode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
@@ -274,31 +279,6 @@ pub fn fetch_root(host: &str, port: u16, timeout: Duration) -> Result<String, St
         .and_then(serde_json::Value::as_str)
         .map(str::to_string)
         .ok_or_else(|| format!("daemon at {host}:{port} status reports no root"))
-}
-
-/// The resident projected policy from `GET /projection` (aegis-x894x2).
-///
-/// This is the call that removes the guard's tail. A hook's projection cost
-/// becomes a localhost read of the daemon's memory instead of its own live
-/// quipu `/query` — measured p90 4584ms, p99 10055ms, max 26482ms, and 100% of
-/// fail-opens, all of them hooks WAITING on a contended `/query` after the
-/// shared disk cache expired.
-///
-/// `Err` means NO USABLE DAEMON and the caller must fall back to the live path.
-/// It must never be read as "no policy": that would collapse "daemon down" into
-/// "nothing to enforce", which is the cheapest possible bypass and the exact
-/// fact-vs-absence bug the rest of this client is built to prevent. A daemon
-/// that is up but holds no projection answers 503, which lands here too — also
-/// a fallback, never a clean allow.
-#[cfg(feature = "quipu")]
-pub fn fetch_projection(
-    host: &str,
-    port: u16,
-    timeout: Duration,
-) -> Result<super::projection::ProjectionReply, String> {
-    let body = http_get(host, port, "/projection", timeout)?;
-    serde_json::from_str(&body)
-        .map_err(|e| format!("daemon at {host}:{port} sent an unparseable projection ({e})"))
 }
 
 /// Direct callers/callees of `symbol` from the RESIDENT graph (`GET /callers`

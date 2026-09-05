@@ -125,6 +125,19 @@ fn write_policy(dir: &Path, body: &str) {
     } else {
         format!("{body}\n\n[yupana.quipu]\nenabled = false\n")
     };
+    // Pin the daemon OFF for the same reason quipu is pinned above: config is
+    // LAYERED, so a `[yupana.serve]` block in the host's own
+    // ~/.config/bobbin/config.toml reaches every test that does not state its
+    // own. Measured 2026-09-05, both arms: after `use_daemon = true` was enabled
+    // on this host, `allows_an_edit_within_the_blast_radius` FAILED against the
+    // real home and PASSED against an empty one — a test about blast radius,
+    // decided by an operator's daemon setting. Tests that ARE about the daemon
+    // set their own block (see `policy_with_daemon`) and are unaffected.
+    let body = if body.contains("[yupana.serve]") {
+        body
+    } else {
+        format!("{body}\n[yupana.serve]\nuse_daemon = false\n")
+    };
     std::fs::write(bobbin.join("config.toml"), body).unwrap();
 }
 

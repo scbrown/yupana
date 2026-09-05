@@ -42,10 +42,23 @@ fn pinned_config(dir: &tempfile::TempDir) -> std::path::PathBuf {
 /// the previous arrangement depended on each author remembering, and the
 /// failure it produces is a timeout in an unrelated assertion.
 fn hermetic(body: &str) -> String {
-    if body.contains("[yupana.quipu]") {
+    let body = if body.contains("[yupana.quipu]") {
         body.to_string()
     } else {
         format!("{body}\n\n[yupana.quipu]\nenabled = false\n")
+    };
+    // The daemon gets the same seal, and for the same reason one layer out:
+    // config is LAYERED, so a `[yupana.serve]` block in the HOST's own
+    // ~/.config/bobbin/config.toml reaches every fixture that does not state its
+    // own. Measured 2026-09-05 (aegis-x894x2): enabling `use_daemon = true` on
+    // this host turned `pre_edit_allows_an_ordinary_edit_silently` and a sibling
+    // unit test red on all 11 feature arms — an ordinary-edit assertion decided
+    // by an operator's daemon setting, with the symptom appearing nowhere near
+    // the change. Tests that ARE about the daemon state their own block.
+    if body.contains("[yupana.serve]") {
+        body
+    } else {
+        format!("{body}\n[yupana.serve]\nuse_daemon = false\n")
     }
 }
 

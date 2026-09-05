@@ -59,7 +59,7 @@ pub(super) fn from_daemon(
     let host = &config.serve.bind_address;
     let port = config.serve.mcp_http_port;
 
-    let reply = match crate::daemon::client::fetch_projection(host, port, DAEMON_TIMEOUT) {
+    let reply = match crate::daemon::client_policy::fetch_projection(host, port, DAEMON_TIMEOUT) {
         Ok(reply) => reply,
         Err(why) => {
             // LOUD, per the daemon-down contract: `use_daemon` is only set by an
@@ -113,6 +113,37 @@ pub(super) fn from_daemon(
          to a projection path that is already failing",
         reply.consecutive_failures
     )))
+}
+
+/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56).
+///
+/// The measured reason this exists: `POST /policy/check` took 2.4-7.2s and ran
+/// once per governed edit, uncached, from every agent — the CONSTANT half of the
+/// guard's quipu load, next to which the projection (~200us once resident) is
+/// noise.
+///
+/// A DOWN daemon falls through to the live path, exactly as the projection does.
+/// It must never be read as "unknown exposure": unknown DOWNGRADES block-tier
+/// rules to warnings, so folding a transport failure into it would silently
+/// weaken enforcement every time one process was not running — a policy change
+/// wearing the costume of a connection error.
+pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project::RepoExposure {
+    if config.serve.use_daemon {
+        match crate::daemon::client_policy::fetch_exposure(
+            &config.serve.bind_address,
+            config.serve.mcp_http_port,
+            repo,
+            DAEMON_TIMEOUT,
+        ) {
+            Ok(reply) => return reply.exposure(),
+            Err(why) => eprintln!(
+                "yupana: resident daemon expected at {}:{} but exposure not usable ({why}) \
+                 — resolving live instead",
+                config.serve.bind_address, config.serve.mcp_http_port
+            ),
+        }
+    }
+    crate::project::fetch_repo_exposure(&config.quipu.endpoint, repo)
 }
 
 #[cfg(test)]

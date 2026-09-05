@@ -161,3 +161,62 @@ fn a_daemon_projecting_a_foreign_endpoint_is_ignored() {
     );
     assert!(registry.policies().is_empty());
 }
+
+/// A stub answering `POST /policy/check` with `outcome`, once. Returns its port.
+fn stub_quipu(outcome: &str) -> u16 {
+    use std::io::{Read, Write};
+    let body = serde_json::json!({"outcome": outcome}).to_string();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        let Ok((mut stream, _)) = listener.accept() else {
+            return;
+        };
+        let mut chunk = [0u8; 4096];
+        let _ = stream.read(&mut chunk);
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let _ = stream.write_all(response.as_bytes());
+        let _ = stream.flush();
+    });
+    port
+}
+
+/// THE INVARIANT for exposure, and it is sharper than the projection's.
+///
+/// A down daemon must fall through to the LIVE `/policy/check`, not answer
+/// `unknown`. Unknown DOWNGRADES block-tier rules to warnings, so folding a
+/// transport failure into it would silently weaken enforcement every time one
+/// process was not running — a policy change wearing the costume of a
+/// connection error.
+///
+/// Proven by making the live path REACHABLE and the daemon dead: if the code
+/// short-circuited to unknown, the stub's `public` could never come back.
+#[test]
+fn a_DOWN_daemon_resolves_exposure_LIVE_rather_than_answering_unknown() {
+    let quipu_port = stub_quipu("satisfied");
+    let mut config = config_for(1, &format!("http://127.0.0.1:{quipu_port}"), true);
+    config.serve.mcp_http_port = 1; // refused immediately
+
+    let exposure = super::exposure_for(&config, "somerepo");
+    assert_eq!(
+        exposure,
+        crate::project::RepoExposure::Public,
+        "the live path answered; a down daemon must never become `unknown`, which \
+         would downgrade block-tier rules to warnings"
+    );
+}
+
+/// With the daemon off, exposure resolves live and nothing is contacted on the
+/// serve port — the default deployment is unchanged.
+#[test]
+fn use_daemon_false_resolves_exposure_live() {
+    let quipu_port = stub_quipu("unsatisfied");
+    let config = config_for(1, &format!("http://127.0.0.1:{quipu_port}"), false);
+    assert_eq!(
+        super::exposure_for(&config, "somerepo"),
+        crate::project::RepoExposure::Internal
+    );
+}

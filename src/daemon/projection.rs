@@ -101,6 +101,10 @@ pub struct ResidentProjection {
 
 struct Inner {
     endpoint: String,
+    /// Exposure verdicts, bound to the rule set this projection carries
+    /// (aegis-q4tt56). Held beside the projection because the projection's rule
+    /// set is what invalidates them.
+    exposure: crate::daemon::exposure::ExposureCache,
     /// Where the shared disk cache lives, so a successful resident refresh also
     /// serves every hook that is not a daemon client. `None` disables the write
     /// (tests, and any deployment with no resolvable state dir).
@@ -132,6 +136,7 @@ impl ResidentProjection {
         Self {
             inner: Arc::new(Inner {
                 endpoint: endpoint.to_string(),
+                exposure: crate::daemon::exposure::ExposureCache::default(),
                 cache_path,
                 state: Mutex::new(state),
             }),
@@ -159,6 +164,34 @@ impl ResidentProjection {
         }
     }
 
+    /// Resolve `repo`'s exposure, from the resident cache when it can be.
+    ///
+    /// Bound to the rule set of the projection currently held, so a policy
+    /// change cannot be outlived by a verdict computed under the old rules.
+    /// Falls back to a live `/policy/check` on a miss — and a failure to reach
+    /// quipu is answered but never stored (see [`crate::daemon::exposure`]).
+    pub fn exposure(
+        &self,
+        repo: &str,
+        ttl_secs: u64,
+        now: u64,
+    ) -> crate::daemon::exposure::ExposureReply {
+        let hash = {
+            let state = self
+                .inner
+                .state
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state
+                .current
+                .as_ref()
+                .map_or(0, crate::daemon::exposure::rules_hash)
+        };
+        self.inner
+            .exposure
+            .resolve(&self.inner.endpoint, repo, hash, ttl_secs, now)
+    }
+
     /// Contact quipu once and install the result. Returns the failure reason
     /// rather than an error type: it is recorded and served, not propagated.
     ///
@@ -179,6 +212,17 @@ impl ResidentProjection {
         match result {
             Ok(()) => {
                 let cached = registry.cached_projection(now);
+                // Invalidation by MEANING: when the refreshed rule set differs,
+                // every verdict computed against the old one is dropped. A
+                // stale-rules verdict would miss on its key anyway; clearing
+                // stops the map growing a dead entry per repo per policy change.
+                let moved = state.current.as_ref().is_none_or(|old| {
+                    crate::daemon::exposure::rules_hash(old)
+                        != crate::daemon::exposure::rules_hash(&cached)
+                });
+                if moved {
+                    self.inner.exposure.clear();
+                }
                 // Write through to the shared disk cache so non-client hooks
                 // get the same single-flight benefit. Fail-silent, like every
                 // other cache write: bookkeeping must not be able to change an

@@ -58,7 +58,9 @@ pub fn router(engine: ResidentEngine) -> Router {
     }
     #[cfg(feature = "quipu")]
     {
-        router = router.route("/projection", get(projection));
+        router = router
+            .route("/projection", get(projection))
+            .route("/exposure", get(exposure));
     }
     router.with_state(engine)
 }
@@ -91,6 +93,42 @@ async fn projection(
         Some(resident) => Ok(Json(resident.snapshot(crate::projection_cache::now_secs()))),
         None => Err(StatusCode::SERVICE_UNAVAILABLE),
     }
+}
+
+/// One repo's exposure, from the resident cache when it can be (aegis-q4tt56).
+///
+/// The endpoint that removes the CONSTANT half of the guard's quipu load:
+/// `POST /policy/check` was measured at 2.4-7.2s and ran once per governed edit,
+/// uncached, from every agent.
+///
+/// A miss still resolves live here — one process doing that is the point, rather
+/// than every hook doing it. 503 when this daemon has no projection, because the
+/// verdict is bound to a rule set and without one there is nothing to bind to;
+/// the client turns that into a fall-back-to-live, never a clean answer.
+#[cfg(feature = "quipu")]
+async fn exposure(
+    State(engine): State<ResidentEngine>,
+    Query(q): Query<ExposureQuery>,
+) -> Result<Json<super::exposure::ExposureReply>, StatusCode> {
+    let Some(resident) = engine.projection() else {
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    };
+    let ttl = engine.config().quipu.projection_cache_ttl_secs;
+    Ok(Json(resident.exposure(
+        &q.repo,
+        ttl,
+        crate::projection_cache::now_secs(),
+    )))
+}
+
+/// Query for [`exposure`].
+#[cfg(feature = "quipu")]
+#[derive(Deserialize)]
+struct ExposureQuery {
+    /// The repo LABEL (e.g. `yupana`), as `git::origin_repo_name` resolves it —
+    /// not an IRI. The daemon builds the entity IRI, so both paths build it the
+    /// same way and cannot disagree about which entity was asked about.
+    repo: String,
 }
 
 /// The resident graph's real facts — what an operator (or `yupana daemon status`,
