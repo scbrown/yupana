@@ -15,6 +15,9 @@ use crate::promote_trigger::{decide, Decision, Trigger};
 /// caller must state, and their reasoning belongs next to the checks that
 /// enforce it rather than in the dispatcher.
 #[derive(clap::Args, Debug)]
+#[command(group(
+    clap::ArgGroup::new("subset_scope").args(["base", "all"]).multiple(false)
+))]
 pub struct PromoteArgs {
     /// Commit-ish to promote.
     #[arg(long, default_value = "HEAD")]
@@ -52,14 +55,23 @@ pub struct PromoteArgs {
     /// The tree is still extracted in FULL, so cross-file references resolve
     /// as they always do; what shrinks is the WRITE. Needs `--base`, and
     /// conflicts with `--replace-snapshot` — this IS that, per file.
-    #[arg(long, requires = "base", conflicts_with = "replace_snapshot")]
+    #[arg(long, requires = "subset_scope", conflicts_with = "replace_snapshot")]
     pub subset: bool,
+    /// With `--subset`, write EVERY file's partition rather than a diff.
+    ///
+    /// This is the CUTOVER primitive, and the full resync under the per-file
+    /// scheme. `--base` cannot express it: a diff from any commit names the
+    /// files that CHANGED, and a file unchanged since the base has no per-file
+    /// key yet — so a diff-driven cutover leaves the graph half-migrated and
+    /// silently so, because everything is still readable from the old key.
+    #[arg(long, requires = "subset")]
+    pub all: bool,
     /// Base commit-ish for `--subset`. MUST be the last SUCCESSFULLY
     /// PROMOTED commit, never the last commit SEEN: a marker advanced on a
     /// poll that skipped the promote leaves every commit in between silently
     /// unwritten forever. Advance your marker only on exit 0, and only to
     /// the `promoted-commit:` sha this prints. See `cli_promote.rs`.
-    #[arg(long)]
+    #[arg(long, requires = "subset")]
     pub base: Option<String>,
     /// Directory to promote (defaults to current dir).
     #[arg(default_value = ".")]
@@ -123,6 +135,7 @@ impl Cli {
         repo: Option<&str>,
         dry_run: bool,
         replace_snapshot: bool,
+        subset: bool,
         subset_base: Option<&str>,
     ) -> anyhow::Result<()> {
         // `--to` IS THE AUTHORIZATION, and it is the only one (aegis-o2h97).
@@ -202,11 +215,14 @@ impl Cli {
         }
         // `--subset` preconditions answered here, BEFORE the tree is read: a bad
         // base should cost a message, not a full projection.
-        let subset_changed = match subset_base {
-            Some(base) => Some(crate::promote_subset_cli::subset_preflight(
-                path, base, commit,
-            )?),
-            None => None,
+        let subset_changed = if subset {
+            Some(crate::promote_subset_cli::subset_preflight(
+                path,
+                subset_base,
+                commit,
+            )?)
+        } else {
+            None
         };
         let mut turtle = crate::export::to_turtle_at(path, &repo, commit)?;
         // A promotion that extracted NOTHING is not a promotion — it is a green
@@ -219,7 +235,7 @@ impl Cli {
         // it legitimately authorizes absence — a deleted file's partition IS empty.
         // The refusal below is for the OTHER shape: a promote that meant to assert
         // a tree and extracted nothing.
-        if !replace_snapshot && subset_base.is_none() && !turtle.contains("bobbin:CodeModule") {
+        if !replace_snapshot && !subset && !turtle.contains("bobbin:CodeModule") {
             eprintln!(
                 "yupana promote: extracted NOTHING from {} — no parseable source                  files under this tree for the grammars in this build. Refusing                  to promote an empty graph as success. (Is the language behind                  the `langs-extra` feature? Is the path right?)",
                 path.display()
@@ -257,13 +273,13 @@ impl Cli {
         // SUBSET: write only the changed files' partitions, each under its own
         // producer key. Diverges here, AFTER the projection is complete, because
         // the whole point is that the READ is unchanged — see `promote_subset`.
-        if let (Some(base), Some(changed)) = (subset_base, subset_changed.as_ref()) {
+        if let Some(changed) = subset_changed.as_ref() {
             return crate::promote_subset_cli::promote_subset(
                 path,
-                base,
+                subset_base,
                 commit,
                 &repo,
-                changed,
+                changed.as_deref(),
                 &turtle,
                 &source,
                 endpoint.as_deref(),
@@ -315,6 +331,7 @@ impl Cli {
         _repo: Option<&str>,
         _dry_run: bool,
         _replace_snapshot: bool,
+        _subset: bool,
         _subset_base: Option<&str>,
     ) -> anyhow::Result<()> {
         self.planned(

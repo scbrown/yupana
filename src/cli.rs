@@ -445,7 +445,8 @@ impl Cli {
                     repo.as_deref(),
                     *dry_run,
                     *replace_snapshot,
-                    subset.then(|| base.as_deref()).flatten(),
+                    *subset,
+                    base.as_deref(),
                 )
             }
         }

@@ -43,10 +43,18 @@ pub(crate) fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Opti
 /// [`Self::promote`] follows. Returns the repo-relative paths to write.
 pub(crate) fn subset_preflight(
     path: &Path,
-    base: &str,
+    base: Option<&str>,
     commit: &str,
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<Option<Vec<String>>> {
     use crate::change::ChangedPaths;
+
+    // `--all` has no base and therefore no diff to precheck: its scope is the
+    // whole projection, resolved once the tree has been read. `None` says so —
+    // it is NOT "no files", which the diff arm can also return and which means
+    // the opposite.
+    let Some(base) = base else {
+        return Ok(None);
+    };
 
     // A base that is not an ANCESTOR of what is being promoted means the two
     // refs diverged, and `base..commit` then silently omits everything on the
@@ -80,7 +88,9 @@ pub(crate) fn subset_preflight(
     // success — the shape that lets a scheduler advance its marker over a
     // commit that was never promoted (aegis-ucoh).
     match crate::change::changed_paths_checked(path, base, commit) {
-        ChangedPaths::Diffed(paths) => Ok(paths.iter().map(|p| p.display().to_string()).collect()),
+        ChangedPaths::Diffed(paths) => Ok(Some(
+            paths.iter().map(|p| p.display().to_string()).collect(),
+        )),
         ChangedPaths::NoRepo => anyhow::bail!(
             "--subset needs a git work tree at {} to diff against `{base}`; \
              refusing rather than promoting an unknown file set.",
@@ -112,24 +122,34 @@ pub(crate) fn subset_preflight(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn promote_subset(
     path: &Path,
-    base: &str,
+    base: Option<&str>,
     commit: &str,
     repo: &str,
-    changed: &[String],
+    changed: Option<&[String]>,
     turtle: &str,
     source: &str,
     endpoint: Option<&str>,
     dry_run: bool,
 ) -> anyhow::Result<()> {
+    // `--all` writes every partition, so the file set is the projection's own —
+    // resolved here rather than in the preflight, because it is not knowable
+    // until the tree has been read. This is the CUTOVER and full-resync scope.
+    let changed: Vec<String> = match changed {
+        Some(c) => c.to_vec(),
+        None => crate::promote_subset::partition_by_file(turtle)?
+            .by_file
+            .keys()
+            .cloned()
+            .collect(),
+    };
+    let scope = base.map_or_else(|| "--all".to_string(), |b| format!("since {b}"));
+
     // An EMPTY diff is a measurement, not an error — and it must not be
     // dressed up as one. Nothing to write is the correct outcome for a
     // re-promote of an unchanged tree, which is exactly the case this whole
     // feature exists to make cheap.
     if changed.is_empty() {
-        println!(
-            "yupana promote --subset: no files changed between {base} and {commit} — \
-             nothing to write."
-        );
+        println!("yupana promote --subset ({scope}): no files to write for {commit}.");
         // The marker still advances here, and correctly: the graph is current
         // as of `commit` precisely because there was nothing to write.
         println!(
@@ -139,10 +159,10 @@ pub(crate) fn promote_subset(
         return Ok(());
     }
 
-    let plan = crate::promote_subset::plan(repo, turtle, changed)?;
+    let plan = crate::promote_subset::plan(repo, turtle, &changed)?;
     let files = plan.writes.iter().filter(|w| w.file.is_some()).count();
     println!(
-        "yupana promote --subset: {files} changed file(s), {} retraction(s), \
+        "yupana promote --subset ({scope}): {files} file(s), {} retraction(s), \
          {} triple(s) across {} key(s); {} file(s) in the projection untouched.",
         plan.retractions(),
         plan.triples(),
@@ -215,4 +235,57 @@ pub(crate) fn promote_subset(
         crate::git::resolve_commit(path, commit).unwrap_or_else(|| commit.to_string())
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `--all` must signal "the whole projection", NOT an empty file set.
+    ///
+    /// The two are one `Option` apart and they mean opposite things: `None` is
+    /// resolved to every partition once the tree is read, while `Some(vec![])`
+    /// is the diff arm's honest "nothing changed" and writes nothing. Collapsing
+    /// them makes `--subset --all` a silent no-op — which during a CUTOVER
+    /// leaves the graph owned by the old repo-wide key while the operator
+    /// believes it migrated, and everything still reads correctly.
+    #[test]
+    fn the_all_scope_is_not_an_empty_diff() {
+        let root = std::path::Path::new(".");
+        assert!(
+            subset_preflight(root, None, "HEAD").unwrap().is_none(),
+            "--all abstains from the diff; it does not report zero files"
+        );
+    }
+
+    /// The base arm still answers with a set, so the test above cannot pass by
+    /// `subset_preflight` having become unconditionally `None`.
+    #[test]
+    fn the_base_scope_still_returns_a_file_set() {
+        let root = std::path::Path::new(".");
+        // Skipped rather than failed outside a git checkout: this asserts on the
+        // repo's own history, and a missing repo is "could not look".
+        if crate::git::resolve_commit(root, "HEAD~1").is_none() {
+            return;
+        }
+        let files = subset_preflight(root, Some("HEAD~1"), "HEAD").unwrap();
+        assert!(files.is_some(), "the diff arm answers with a set, not None");
+    }
+
+    /// A base on a different line of history is refused, and the refusal names
+    /// the base rather than reading as a generic failure.
+    #[test]
+    fn a_non_ancestor_base_is_refused() {
+        let root = std::path::Path::new(".");
+        if crate::git::resolve_commit(root, "HEAD~1").is_none() {
+            return;
+        }
+        // HEAD is not an ancestor of HEAD~1, so this is the diverged shape with
+        // no fixture needed.
+        let err = subset_preflight(root, Some("HEAD"), "HEAD~1").unwrap_err();
+        assert!(
+            err.to_string().contains("not an ancestor"),
+            "the refusal must say which precondition failed: {err}"
+        );
+    }
 }
