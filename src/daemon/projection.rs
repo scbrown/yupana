@@ -262,6 +262,42 @@ impl ResidentProjection {
     }
 }
 
+/// The resident projection a config calls for, or `None` when quipu is not
+/// configured for this deployment.
+///
+/// Seeded from the shared disk cache, so there is no cold-start window in which
+/// every hook falls back to its own live query — the behaviour this exists to
+/// remove. Lives here rather than in `ResidentEngine::build` so construction
+/// sits beside the type it constructs.
+#[must_use]
+pub fn for_config(config: &crate::config::YupanaConfig) -> Option<Arc<ResidentProjection>> {
+    (config.quipu.enabled && !config.quipu.endpoint.is_empty()).then(|| {
+        Arc::new(ResidentProjection::new(
+            &config.quipu.endpoint,
+            crate::projection_cache::cache_path(),
+            crate::projection_cache::now_secs(),
+        ))
+    })
+}
+
+/// Start the refresher for a built engine, if it has a projection to refresh.
+///
+/// Lives here rather than in `serve` so the wiring sits beside the thing it
+/// wires. Refreshing at HALF the TTL means an expiry needs two consecutive
+/// failures rather than one — the measured failure was a single refresh miss
+/// aging the shared cache out from under every hook at once.
+#[must_use]
+pub fn spawn_for(engine: &super::ResidentEngine) -> Option<RefresherHandle> {
+    let resident = engine.projection()?;
+    let ttl = engine.config().quipu.projection_cache_ttl_secs.max(2);
+    let interval = Duration::from_secs(ttl / 2);
+    eprintln!(
+        "yupana daemon: resident projection refreshing every {}s (TTL {ttl}s)",
+        interval.as_secs()
+    );
+    Some(resident.spawn_refresher(interval))
+}
+
 /// Stops the background refresher when dropped, so a daemon shutdown does not
 /// leave a thread holding a quipu connection.
 pub struct RefresherHandle {

@@ -92,11 +92,9 @@ struct Engine {
     /// serve half is Phase 3 (FR-3).
     freshness:
         std::sync::Mutex<std::collections::HashMap<(String, String), crate::types::Freshness>>,
-    /// The RESIDENT PROJECTED POLICY (aegis-x894x2) — the measured half of
-    /// Phase 6. `None` when quipu is not configured, which is the honest
-    /// absence: a daemon that cannot project has nothing to serve, and saying
-    /// so is what lets `/projection` 503 instead of returning an empty
-    /// catalogue that reads as "no rules apply".
+    /// The RESIDENT PROJECTED POLICY (aegis-x894x2). `None` when quipu is not
+    /// configured, so `/projection` 503s rather than serving an empty catalogue
+    /// that would read as "no rules apply". Details in [`projection`].
     #[cfg(feature = "quipu")]
     projection: Option<Arc<projection::ResidentProjection>>,
 }
@@ -118,18 +116,8 @@ impl ResidentEngine {
         let registry = Base::build_at(root, "HEAD")
             .ok()
             .map(|base| RwLock::new(TenantRegistry::with_tenancy(base, config.tenancy.clone())));
-        // One resident projection per daemon, seeded from the shared disk cache
-        // so it serves immediately rather than leaving a cold-start window in
-        // which every hook falls back to its own live query — the exact
-        // behaviour this is here to remove.
         #[cfg(feature = "quipu")]
-        let projection = (config.quipu.enabled && !config.quipu.endpoint.is_empty()).then(|| {
-            Arc::new(projection::ResidentProjection::new(
-                &config.quipu.endpoint,
-                crate::projection_cache::cache_path(),
-                crate::projection_cache::now_secs(),
-            ))
-        });
+        let projection = projection::for_config(&config);
         Ok(Self {
             inner: Arc::new(Engine {
                 root: root.to_path_buf(),
@@ -154,9 +142,7 @@ impl ResidentEngine {
     pub fn projection(&self) -> Option<&Arc<projection::ResidentProjection>> {
         self.inner.projection.as_ref()
     }
-
-    /// The config snapshot taken at build time — the single trust point named
-    /// in the module docs, never re-read per request.
+    /// The build-time config snapshot — the single trust point, never re-read.
     #[must_use]
     pub fn config(&self) -> &YupanaConfig {
         &self.inner.config
@@ -385,21 +371,8 @@ pub async fn serve(
         "yupana daemon: resident graph built — {} nodes, {} edges from {}",
         status.nodes, status.edges, status.root
     );
-    // The single-flight refresher (aegis-x894x2). Held for the serve lifetime;
-    // dropping the handle stops the thread, so shutdown does not leave a quipu
-    // connection open. Refreshing at HALF the TTL means an expiry needs two
-    // consecutive failures rather than one — the measured failure was a single
-    // refresh miss aging the cache out from under every hook at once.
     #[cfg(feature = "quipu")]
-    let _refresher = engine.projection().map(|p| {
-        let ttl = engine.config().quipu.projection_cache_ttl_secs.max(2);
-        let interval = std::time::Duration::from_secs(ttl / 2);
-        eprintln!(
-            "yupana daemon: resident projection refreshing every {}s (TTL {ttl}s)",
-            interval.as_secs()
-        );
-        p.spawn_refresher(interval)
-    });
+    let _refresher = projection::spawn_for(&engine);
     http::serve(engine, bind, port).await
 }
 
