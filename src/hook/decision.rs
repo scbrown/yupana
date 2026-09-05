@@ -34,6 +34,9 @@ pub(super) struct Decision {
     /// fresh, while a projected registry may be serving a stale cache, and only
     /// the plane that evaluated the rules knows which.
     pub(super) freshness: crate::types::Freshness,
+    /// Exposure and repository used by the governed plane for THIS decision.
+    /// Absent when that plane did not produce it; never resolved by the recorder.
+    pub(super) governed_context: Option<(&'static str, String)>,
 }
 
 impl From<Outcome> for Decision {
@@ -41,6 +44,7 @@ impl From<Outcome> for Decision {
         Self {
             outcome,
             constraints: Vec::new(),
+            governed_context: None,
             // Nothing was evaluated, so there is no policy set whose currency
             // could be in question.
             freshness: crate::types::Freshness::Fresh,
@@ -66,6 +70,7 @@ impl Decision {
             outcome,
             constraints,
             freshness,
+            governed_context: None,
         }
     }
 

@@ -152,6 +152,19 @@ own silent failure:
   guard not running. Collapsing them is what made a soak count unguarded edits
   as clean ones.
 
+### Replay exposure faithfully
+
+A `guard` metrics record produced by the governed plane includes `exposure` and
+`repo` alongside `session` and `rule`. These are the same values used for the
+decision and emitted on the `governed` record: `public`, `internal`, or `unknown`
+for a matching text rule, and `n/a` when exposure was not evaluated. The repo is
+the edited file's repository, with `unresolved` when no name was resolved. Other
+guard decisions omit both fields. Path recording remains opt-in.
+
+The Dogwood converter preserves these fields. Replay can score rule and exposure
+on one session-attributed action; it must not join records by agent and timestamp
+or interpret a missing field in older traffic as public exposure.
+
 ### Invoke it so version skew cannot block the fleet
 
 Every row above fails open except one, and that one is not exotic: it is what

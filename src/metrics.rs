@@ -20,7 +20,7 @@
 //! this side, and "allowed clean" vs "allowed because unguarded" never share
 //! a label):
 //!   guard     {result: allow|deny|notify, parsed, `duration_ms`, ext, mode,
-//!              session?, item?, path?, rule?}                   every pre-edit
+//!              session?, item?, path?, rule?, exposure?, repo?}                   every pre-edit
 //!   `fail_open` {`fail_kind`}              the guard degraded, and why-kind
 //!   governed  {rules: [...], structural: n, blocking, exposure,
 //!              repo}                                            a rule spoke
