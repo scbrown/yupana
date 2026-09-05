@@ -100,3 +100,11 @@ repos:
         files: ^(scripts/(install-local|selftest-install-local)\.sh|justfile|Cargo\.(toml|lock)|\.github/workflows/release\.yml)$
         pass_filenames: false
         verbose: true
+
+      - id: session-reread-tests
+        name: session reread discrimination (python)
+        entry: just session-guard --selftest
+        language: system
+        files: ^(scripts/session-reread-guard\.py|justfile)$
+        pass_filenames: false
+        verbose: true
