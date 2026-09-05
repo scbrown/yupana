@@ -68,6 +68,18 @@ $ echo $?
 1
 ```
 
+**Pulling the same bundle twice is a no-op.** Quipu keys the staged graph on the share's content
+hash, so a byte-identical re-pull reports `unchanged` and writes nothing — measured, with the graph
+count unmoved:
+
+| | outcome | graphs |
+|---|---|---|
+| first pull | `quarantined`, 4 triples | 1 |
+| identical re-pull | **`unchanged`**, 4 triples | **1** |
+
+That matters because the honest response to a lost or ambiguous reply is to re-run the pull, and it
+must not be possible for that to duplicate anything.
+
 ### `share policy` — what would this share contribute?
 
 The share is staged and invisible to the guard. Before deciding whether to admit it, ask what
