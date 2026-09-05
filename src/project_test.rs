@@ -612,14 +612,19 @@ fn stub_quipu(serve: usize) -> String {
                 }
             }
             let request = String::from_utf8_lossy(&raw).to_string();
-            // The two queries are told apart by the class they target — the
+            // The queries are told apart by the class they target — the
             // same distinction quipu itself makes.
-            // Text-rule, grounded-predicate and tripwire queries get empty
-            // catalogues; the structural-policy query gets the canned one.
+            // Text-rule, grounded-predicate, tripwire, memory and landing
+            // queries get empty catalogues; the structural-policy query gets
+            // the canned one. A plane MISSING from this list is served the
+            // structural catalogue and fails to decode, which is how these
+            // tests caught the landing plane's arrival rather than passing
+            // over it — keep it that way.
             let body = if request.contains("aegis:TextRule")
                 || request.contains("candidateSource")
                 || request.contains("?selector ?predicate")
                 || request.contains("aegis:MemoryHeavyCommand")
+                || request.contains("aegis:landingPolicy")
             {
                 empty_results_json()
             } else {
@@ -658,6 +663,7 @@ fn seed_cache(path: &std::path::Path, endpoint: &str, written_at: u64) {
             text_rules: Vec::new(),
             tripwires: Vec::new(),
             memory_policies: Vec::new(),
+            landing_policies: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -757,11 +763,14 @@ fn no_cache_and_no_quipu_fails_open_rather_than_serving_an_empty_catalogue() {
 fn a_successful_refresh_persists_the_projection_for_the_next_process() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
-    // Five requests per refresh: the structural catalogue, the text rules,
-    // the grounded-predicate catalogue, the tripwire catalogue, and the
-    // memory-policy catalogue. (An empty grounded catalogue asks for no
-    // grounding set — a sixth request would hang the refresh here.)
-    let endpoint = stub_quipu(5);
+    // Six requests per refresh: the structural catalogue, the text rules,
+    // the grounded-predicate catalogue, the tripwire catalogue, the
+    // memory-policy catalogue, and the LANDING catalogue. (An empty grounded
+    // catalogue asks for no grounding set — a further request would hang the
+    // refresh here.) This count is an assertion, not a fixture detail: adding
+    // a plane without updating it fails these tests, which is how a silently
+    // half-projected registry gets caught.
+    let endpoint = stub_quipu(6);
 
     let mut registry = ProjectionRegistry::new(&endpoint);
     assert_eq!(
@@ -790,7 +799,8 @@ fn an_out_of_band_refresh_always_contacts_quipu_and_advances_the_cache() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("projection.json");
     seed_cache(&cache, "http://old-endpoint.invalid", 1_000);
-    let endpoint = stub_quipu(5);
+    // Six requests per refresh — see the sibling test for the enumeration.
+    let endpoint = stub_quipu(6);
 
     let mut registry = ProjectionRegistry::new(&endpoint);
     registry

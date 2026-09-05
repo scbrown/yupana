@@ -66,22 +66,22 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
         let ci = super::pre_edit::Outcome::Allow;
         #[cfg(feature = "quipu")]
         let disk = super::disk_guard::observe_and_check(&buf, &cmd);
+        #[cfg(not(feature = "quipu"))]
+        let disk = super::pre_edit::Outcome::Allow;
         let memory = super::memory_guard::check(&buf, &cmd);
+        // The governed LANDING policy — who may put code on a repository's
+        // protected ref. Same chain, so the mode stays the single ceiling.
+        let landing = super::landing_guard::check(&buf, &cmd);
         // The scope check rides AFTER the record, deliberately: the trace is
         // the product and must not depend on a policy decision succeeding.
         if let Some(text) = scope_refusal(&buf, &resolved) {
             println!("{}", super::deny_envelope(&text));
         } else {
-            let outcome = combine_advisories(combine_advisories(memory, ci), {
-                #[cfg(feature = "quipu")]
-                {
-                    disk
-                }
-                #[cfg(not(feature = "quipu"))]
-                {
-                    super::pre_edit::Outcome::Allow
-                }
-            });
+            // Folded rather than nested: a plane is added by extending this
+            // list, not by wrapping the expression one layer deeper.
+            let outcome = [memory, landing, ci, disk]
+                .into_iter()
+                .fold(super::pre_edit::Outcome::Allow, combine_advisories);
             match outcome {
                 super::pre_edit::Outcome::Allow => {}
                 super::pre_edit::Outcome::Deny(reason) => {

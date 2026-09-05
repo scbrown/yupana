@@ -26,6 +26,14 @@ mod config_drift;
 mod credential_output;
 #[cfg(feature = "quipu")]
 mod disk_guard;
+/// The governed landing policy's decision procedure — pure, every arm testable
+/// without a graph. Gated with the projection that resolves its authority.
+#[cfg(feature = "quipu")]
+pub mod landing_decision;
+/// The governed landing policy's I/O half — evidence gathering and the hook
+/// outcome. UNGATED like `memory_guard`: it carries its own no-op for a build
+/// without the projection, so the pre-bash chain has one shape in every build.
+mod landing_guard;
 mod measure;
 mod memory_guard;
 pub mod paa;

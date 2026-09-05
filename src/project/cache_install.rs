@@ -35,6 +35,7 @@ impl ProjectionRegistry {
             text_rules: self.text_rules.clone(),
             tripwires: self.tripwires.clone(),
             memory_policies: self.memory_policies.clone(),
+            landing_policies: self.landing_policies.clone(),
             grounded_rules: self.grounded_rules.clone(),
             grounding: self.grounding.clone(),
             work_item_scopes: self.work_item_scopes.clone(),
@@ -51,6 +52,7 @@ impl ProjectionRegistry {
         self.text_rules = cached.text_rules;
         self.tripwires = cached.tripwires;
         self.memory_policies = cached.memory_policies;
+        self.landing_policies = cached.landing_policies;
         self.grounded_rules = cached.grounded_rules;
         self.grounding = cached.grounding;
         self.work_item_scopes = cached.work_item_scopes;

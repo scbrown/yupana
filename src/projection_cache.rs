@@ -101,6 +101,12 @@ pub struct CachedProjection {
     /// "nothing is in scope".
     #[serde(default)]
     pub work_item_scopes: Option<crate::policy::WorkItemScopes>,
+    /// Last-known governed LANDING policies. Defaulted so a cache written
+    /// before this plane existed still loads, restoring an empty catalogue
+    /// honestly: that cache never held a landing rule, which resolves as
+    /// UNGOVERNED and allows, never as a silent enforcement of nothing.
+    #[serde(default)]
+    pub landing_policies: Vec<crate::project_landing::RepoLanding>,
     /// The parent map behind the DERIVED rung. Defaulted to `None` on older
     /// caches for the same reason as the scope map above: no parents known is
     /// UNKNOWN — the rung simply does not fire — never an empty map that would

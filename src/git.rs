@@ -276,7 +276,9 @@ pub fn repo_root_containing(path: &Path) -> Option<PathBuf> {
 /// The last path segment of a git remote URL, with a trailing `/` and a `.git`
 /// suffix stripped. Handles https, `ssh://`, scp-like `host:path`, and plain
 /// filesystem paths.
-fn repo_name_from_url(url: &str) -> Option<String> {
+/// Crate-visible so the landing guard can name the repo a `git push <url>`
+/// targets from the TEXT, rather than from wherever the agent is standing.
+pub(crate) fn repo_name_from_url(url: &str) -> Option<String> {
     let trimmed = url.trim_end_matches('/');
     // Last '/' segment covers https, ssh://, scp-like host:a/b, and file paths.
     // An scp-like URL with no '/' at all (`host:repo.git`) splits on ':' instead.

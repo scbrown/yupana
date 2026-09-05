@@ -208,6 +208,13 @@ pub struct ProjectionRegistry {
     text_rules: Vec<TextRule>,
     pub(crate) tripwires: Vec<crate::project_tripwire::ProjectedTripwire>,
     pub(crate) memory_policies: Vec<crate::project_memory::MemoryPolicy>,
+    /// Last-known governed LANDING policies — which repositories declare who
+    /// may put code on their protected refs. An EMPTY catalogue is a real
+    /// answer ("no repository declares a landing rule"), never an absent one:
+    /// the guard reads absence-from-catalogue as UNGOVERNED, and it may only
+    /// do that because a projection failure marks the whole registry stale
+    /// rather than leaving an empty set looking authoritative.
+    pub(crate) landing_policies: Vec<crate::project_landing::RepoLanding>,
     pub(crate) grounded_rules: Vec<crate::grounding::GroundedRule>,
     /// `None` when the grounding projection is missing or failed — which
     /// renders every grounded rule UNEVALUATED (loud), never satisfied-by-
@@ -265,6 +272,7 @@ impl ProjectionRegistry {
             text_rules: Vec::new(),
             tripwires: Vec::new(),
             memory_policies: Vec::new(),
+            landing_policies: Vec::new(),
             grounded_rules: Vec::new(),
             grounding: None,
             work_item_scopes: None,
@@ -309,6 +317,7 @@ impl ProjectionRegistry {
             crate::project_grounding::fetch_grounded_rules(&self.endpoint),
             crate::project_tripwire::fetch_tripwires(&self.endpoint),
             crate::project_memory::fetch_memory_policies(&self.endpoint),
+            crate::project_landing::fetch_landing_policies(&self.endpoint),
         ) {
             (
                 Ok(policies),
@@ -316,12 +325,14 @@ impl ProjectionRegistry {
                 Ok(grounded_rules),
                 Ok(tripwires),
                 Ok(memory_policies),
+                Ok(landing_policies),
             ) => {
                 report_overclaims(&policies);
                 self.policies = policies;
                 self.text_rules = text_rules;
                 self.tripwires = tripwires;
                 self.memory_policies = memory_policies;
+                self.landing_policies = landing_policies;
                 self.grounded_rules = grounded_rules;
                 self.grounding = crate::project_grounding::fetch_grounding_set(
                     &self.endpoint,
@@ -334,11 +345,12 @@ impl ProjectionRegistry {
                 self.freshness = Freshness::Fresh;
                 Ok(())
             }
-            (Err(e), _, _, _, _)
-            | (_, Err(e), _, _, _)
-            | (_, _, Err(e), _, _)
-            | (_, _, _, Err(e), _)
-            | (_, _, _, _, Err(e)) => {
+            (Err(e), _, _, _, _, _)
+            | (_, Err(e), _, _, _, _)
+            | (_, _, Err(e), _, _, _)
+            | (_, _, _, Err(e), _, _)
+            | (_, _, _, _, Err(e), _)
+            | (_, _, _, _, _, Err(e)) => {
                 self.freshness = Freshness::Stale;
                 Err(e)
             }
