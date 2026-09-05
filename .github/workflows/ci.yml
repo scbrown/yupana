@@ -106,6 +106,35 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-${{ matrix.name }}-
             ${{ runner.os }}-cargo-
+
+      # TEST STATE MUST NOT TRAVEL BETWEEN RUNS (aegis-beavto).
+      #
+      # `.cargo/config.toml` seals YUPANA_METRICS_PATH, YUPANA_VERDICT_PATH,
+      # YUPANA_PROJECTION_CACHE_PATH and YUPANA_FAILOPEN_MARKER_DIR into
+      # `target/test-state/` so tests never write the real fleet spool
+      # (aegis-0upyu). That seal is right. But it puts test state inside
+      # `target`, and the cache above restores `target` — so a run's scratch
+      # state becomes the NEXT run's starting state.
+      #
+      # That is not theoretical. It flaked ALL TEN Test arms of PR #26 at once
+      # (run 33964885630), then all ten passed on a re-run of the same commit:
+      # restored fail-open markers, keyed on a session containing only
+      # `std::process::id()`, matched the new test binary's PID and told three
+      # credential-advisory tests they had already spoken. The failing job's log
+      # shows `Cache restored from key: Linux-cargo-test-default-...` before the
+      # suite ran. The 24h marker prune is why it is intermittent rather than
+      # permanent.
+      #
+      # The tests are now individually immune (sessions carry a per-run nonce),
+      # but this closes the CLASS: the metrics and verdict spools live in the
+      # same directory and are just as capable of leaking one run into the next.
+      #
+      # Deleting rather than excluding the path from the cache: an `actions/cache`
+      # negation pattern would leave nothing to observe if it silently did not
+      # match, whereas this step either runs or does not.
+      - name: Discard test state restored from the cache
+        run: rm -rf target/test-state
+
       - run: cargo test ${{ matrix.flags }}
 
   # Feature arms join the matrix as their engines land, so a feature can never

@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn advises_once_for_an_unchanged_cause() {
-        let session = format!("credential-output-same-{}", std::process::id());
+        let session = crate::hook::unique_test_session("credential-output-same");
         let input = payload(
             &session,
             "Authorization: Bearer synthetic_token_0123456789abcdef",
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn re_advises_when_the_stable_cause_changes() {
-        let session = format!("credential-output-change-{}", std::process::id());
+        let session = crate::hook::unique_test_session("credential-output-change");
         let bearer = payload(
             &session,
             "Authorization: Bearer synthetic_token_0123456789abcdef",
@@ -109,10 +109,46 @@ mod tests {
 
     #[test]
     fn openai_key_shape_at_a_boundary_still_advises() {
-        let session = format!("credential-output-openai-boundary-{}", std::process::id());
+        let session = crate::hook::unique_test_session("credential-output-openai-boundary");
         let input = payload(&session, "value=sk-synthetic0123456789abcdef");
         let warning = advisory(&input).expect("boundary-delimited key shape must advise");
         assert!(warning.contains("openai"));
         assert!(!warning.contains("sk-synthetic"), "must never echo match");
+    }
+
+    /// The exact CI failure this file suffered (aegis-beavto), reproduced.
+    ///
+    /// A marker for the OLD session shape — prefix plus bare `std::process::id()`
+    /// — is planted first, standing in for one restored from the CI build cache
+    /// by a previous run that happened to get this PID. The advisory must still
+    /// fire, because the session a test mints now carries a per-run nonce.
+    ///
+    /// This fails on the pre-fix code and passes after, which is the only reason
+    /// it is worth having: it asserts the ISOLATION property, not the advisory's
+    /// behaviour, which the three tests above already cover.
+    #[test]
+    fn a_marker_cached_from_a_previous_run_does_not_silence_the_advisory() {
+        // Plant it exactly as first_notice_for_session would have written it.
+        let stale_session = format!("credential-output-same-{}", std::process::id());
+        let dir = crate::hook::fail_open_marker_dir();
+        std::fs::create_dir_all(&dir).unwrap();
+        let planted = dir.join(format!(
+            "{}{stale_session}-credential-output-bearer",
+            crate::hook::MARKER_PREFIX
+        ));
+        std::fs::write(&planted, b"").unwrap();
+
+        let input = payload(
+            &crate::hook::unique_test_session("credential-output-same"),
+            "Authorization: Bearer synthetic_token_0123456789abcdef",
+        );
+        let spoke = advisory(&input);
+
+        let _ = std::fs::remove_file(&planted);
+        assert!(
+            spoke.is_some(),
+            "a marker left by a previous run silenced a first-cause advisory — \
+             the session id is not unique per run (aegis-beavto)"
+        );
     }
 }

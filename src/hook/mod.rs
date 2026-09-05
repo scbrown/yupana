@@ -249,10 +249,10 @@ pub fn first_notice_for_session(session: Option<&str>, kind: &str) -> bool {
 /// written by an installed `hank` outlive the rename, and a prune that only matched
 /// the new prefix would leave them in the temp directory forever — the unbounded
 /// state this function exists to bound.
-const MARKER_PREFIX: &str = "yupana-guard-failopen-";
+pub(crate) const MARKER_PREFIX: &str = "yupana-guard-failopen-";
 const HANK_MARKER_PREFIX: &str = "hank-guard-failopen-";
 
-fn fail_open_marker_dir() -> PathBuf {
+pub(crate) fn fail_open_marker_dir() -> PathBuf {
     std::env::var_os("YUPANA_FAILOPEN_MARKER_DIR").map_or_else(std::env::temp_dir, PathBuf::from)
 }
 
@@ -282,6 +282,46 @@ fn prune_fail_open_markers(dir: &Path, now: SystemTime) {
             let _ = std::fs::remove_file(path);
         }
     }
+}
+
+/// A marker-safe session id that cannot collide with a previous test RUN.
+///
+/// WHY THIS EXISTS (aegis-beavto). Fail-open markers live in
+/// `YUPANA_FAILOPEN_MARKER_DIR`, which `.cargo/config.toml` seals to
+/// `target/test-state/failopen` so tests never touch the real fleet spool
+/// (aegis-0upyu). That seal is correct — and it puts test state INSIDE `target`,
+/// which CI caches (`actions/cache` with `path: ... target`). So markers survive
+/// from one CI run to the next inside the build cache.
+///
+/// A session keyed on `std::process::id()` alone is therefore not unique: CI
+/// runner PIDs are low and repeat, `prune_fail_open_markers` only removes
+/// markers older than 24h, and a restored cache within that window hands the
+/// test binary a marker for its own session id. `first_notice_for_session` then
+/// answers "already warned", the advisory returns `None`, and the test fails
+/// asserting that a first cause must speak.
+///
+/// MEASURED: yupana PR #26, run 33964885630 — ALL TEN `Test (*)` arms failed on
+/// three `credential_output` tests, and all ten passed on a re-run of the same
+/// commit. The failing job's log shows `Cache restored from key:
+/// Linux-cargo-test-default-...` before the suite ran.
+///
+/// The nanosecond stamp makes a session unique per RUN; the counter makes it
+/// unique per CALL, so two sessions minted in the same tick from parallel test
+/// threads cannot collide either. Both are needed: the stamp alone is not
+/// guaranteed distinct across threads on a coarse clock.
+#[cfg(test)]
+pub(crate) fn unique_test_session(prefix: &str) -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    format!(
+        "{prefix}-{}-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos(),
+        COUNTER.fetch_add(1, Ordering::Relaxed),
+    )
 }
 
 #[cfg(test)]
@@ -356,14 +396,7 @@ mod tests {
 
     #[test]
     fn advisory_delivery_dedupes_stable_causes_but_not_config_errors() {
-        let session = format!(
-            "advisory-delivery-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
+        let session = unique_test_session("advisory-delivery");
         let payload = serde_json::json!({"session_id": session}).to_string();
 
         assert_eq!(
@@ -386,7 +419,7 @@ mod tests {
 
     #[test]
     fn fail_open_notice_fires_once_per_session() {
-        let session = format!("test-{}", std::process::id());
+        let session = unique_test_session("test");
         assert!(first_notice_for_session(Some(&session), "config"));
         assert!(!first_notice_for_session(Some(&session), "config"));
         // A DIFFERENT kind of gap in the same session must still warn — the whole
