@@ -67,6 +67,7 @@ pub fn run_pre_bash() -> anyhow::Result<()> {
             &resolved,
             grounding,
             input.as_ref().and_then(|i| i.tool_use_id.clone()),
+            input.as_ref().and_then(|i| i.session_id.as_deref()),
         );
         #[cfg(feature = "quipu")]
         let ci = crate::ci_shift::hook_advisory(&buf, &cmd);
@@ -244,7 +245,43 @@ fn record(
         crate::turn_grounding::GroundingState,
     )>,
     action_id: Option<String>,
+    session: Option<&str>,
 ) {
+    // Scope the plate read to THIS session, then hand the resolved value to the
+    // pure builder. A plate stamped by a session that has since died no longer
+    // answers for the command being run now, and `plate::current(None)` — which
+    // is what this path took until aegis-1mp1ls — cannot tell the difference.
+    let item = crate::plate::current(session).map_or(serde_json::Value::Null, Into::into);
+    crate::metrics::emit(
+        "action",
+        &action_record_fields(a, grounding, action_id, item),
+    );
+}
+
+/// The fields of an `action` record.
+///
+/// PURE IN THE PLATE: the resolved work item is passed in rather than read
+/// here, so the contract that matters — that the field is ALWAYS claimed — is
+/// testable without an environment. That is the mutation-sensitive part, and
+/// it is the part that was missing: `metrics::emit` fills `item` from an
+/// UNSCOPED `plate::current(None)` for any caller that does not claim it, so a
+/// builder that merely omits the field on abstention has its abstention
+/// silently overridden (aegis-368cu.7 measured exactly that on the edit path;
+/// aegis-1mp1ls measured it still live here, an `action` record carrying a dead
+/// session's item).
+///
+/// `item` is `Null` for "I looked and abstained" — claimed, and dropped by
+/// `emit` rather than written, so the record stays honestly silent.
+#[must_use]
+pub fn action_record_fields<'a>(
+    a: &'a action::Action,
+    grounding: Option<(
+        &'a crate::turn_grounding::GroundingRef,
+        crate::turn_grounding::GroundingState,
+    )>,
+    action_id: Option<String>,
+    item: serde_json::Value,
+) -> Vec<(&'a str, serde_json::Value)> {
     let mut fields = action_fields(a, grounding);
     // The harness's id for this tool call, carried so the OUTCOME record can be
     // joined to the action (aegis-368cu.10). OMITTED when the harness did not
@@ -254,7 +291,9 @@ fn record(
     if let Some(id) = action_id {
         fields.push(("action_id", id.into()));
     }
-    crate::metrics::emit("action", &fields);
+    // ALWAYS pushed, including as Null — see the note above.
+    fields.push(("item", item));
+    fields
 }
 
 #[cfg(test)]

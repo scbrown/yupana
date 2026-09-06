@@ -47,7 +47,14 @@ pub fn run_post_bash() -> anyhow::Result<()> {
     // A read failure is not worth surfacing: the command has already run, and
     // this hook must never be able to affect it.
     std::io::stdin().lock().read_to_string(&mut buf).ok();
-    crate::metrics::emit("action_outcome", &outcome_fields(&buf));
+    // Scope the plate read to THIS session before building the record. An
+    // outcome inherits its item the same way the action does — through
+    // `metrics::emit`'s UNSCOPED fallback — so leaving it unclaimed here
+    // reproduces aegis-1mp1ls on the outcome row as well as the action row.
+    let session = crate::hook::HookInput::parse(&buf).and_then(|i| i.session_id);
+    let item =
+        crate::plate::current(session.as_deref()).map_or(serde_json::Value::Null, Into::into);
+    crate::metrics::emit("action_outcome", &outcome_fields(&buf, item));
     Ok(())
 }
 
@@ -55,8 +62,14 @@ pub fn run_post_bash() -> anyhow::Result<()> {
 ///
 /// Pure, so the contract is testable without a spool or the process
 /// environment — the same reason [`super::pre_bash::invocation_fields`] is pure.
+/// The work item is PASSED IN for that reason: resolving the plate here would
+/// make the one field that must be session-scoped the one field no test can
+/// reach.
 #[must_use]
-pub fn outcome_fields(payload: &str) -> Vec<(&'static str, serde_json::Value)> {
+pub fn outcome_fields(
+    payload: &str,
+    item: serde_json::Value,
+) -> Vec<(&'static str, serde_json::Value)> {
     let input = crate::hook::HookInput::parse(payload);
     let mut fields: Vec<(&'static str, serde_json::Value)> = Vec::new();
 
@@ -67,6 +80,14 @@ pub fn outcome_fields(payload: &str) -> Vec<(&'static str, serde_json::Value)> {
     // and neither may look like a clean run.
     fields.push(("parsed", input.is_some().into()));
     fields.push(("payload_bytes", payload.len().into()));
+    // ALWAYS claimed, on EVERY exit from this function including the
+    // unparseable one below. A caller that abstains by pushing nothing has its
+    // abstention overridden by the unscoped fallback in `metrics::emit`
+    // (aegis-368cu.7), so an early return that skips this push is the same bug
+    // in a rarer branch — and the unparseable branch is exactly where a
+    // fabricated attribution is least defensible, since we could not even read
+    // whose session it was.
+    fields.push(("item", item));
 
     let Some(input) = input else {
         return fields;
