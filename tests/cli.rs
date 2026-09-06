@@ -1799,6 +1799,10 @@ fn repo_for_promote() -> tempfile::TempDir {
 /// the damaging path was indistinguishable from the safe one. A refusal, not a
 /// warning: the operators who hit this were being careful, and the flag's own help
 /// text told them omitting it was the cautious choice.
+/// Gated on `quipu`: the refusal lives in the feature-gated promote impl, and the
+/// no-feature stub exits 2 with its own message. Without this gate the test failed
+/// on the `golden-path` CI arm — an arm I had not built locally.
+#[cfg(feature = "quipu")]
 #[test]
 fn a_bare_promote_refuses_the_unretractable_append_path() {
     let dir = repo_for_promote();
@@ -1818,6 +1822,10 @@ fn a_bare_promote_refuses_the_unretractable_append_path() {
 /// unretractable write becomes a thing you say, not a thing you omit. Asserting
 /// only that it is not the append refusal: the endpoint is a closed port, so the
 /// write itself fails, which is what keeps this test off the network.
+/// Gated on `quipu`: the refusal lives in the feature-gated promote impl, and the
+/// no-feature stub exits 2 with its own message. Without this gate the test failed
+/// on the `golden-path` CI arm — an arm I had not built locally.
+#[cfg(feature = "quipu")]
 #[test]
 fn append_opts_back_in_and_is_no_longer_the_refusal() {
     let dir = repo_for_promote();
@@ -1858,6 +1866,10 @@ fn append_conflicts_with_the_snapshot_modes() {
 /// same append arm, so it was a SECOND undocumented producer of unretractable
 /// facts — not just hand-run `promote`. It must hit the same refusal rather than
 /// be silently upgraded to a destructive snapshot replace.
+/// Gated on `quipu`: the refusal lives in the feature-gated promote impl, and the
+/// no-feature stub exits 2 with its own message. Without this gate the test failed
+/// on the `golden-path` CI arm — an arm I had not built locally.
+#[cfg(feature = "quipu")]
 #[test]
 fn export_to_a_graph_refuses_the_append_path_too() {
     let dir = repo_for_promote();
