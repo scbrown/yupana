@@ -331,3 +331,59 @@ fn a_one_file_change_writes_strictly_fewer_triples_than_the_whole_projection() {
     );
     assert!(p.triples() > 0, "and not zero, which would retract a.rs");
 }
+
+// ---------------------------------------------------------------------------
+// THE REPORT (wu, reviewing #47). `unfiled_subjects` was computed, assigned, and
+// asserted on by a test calling it "reported, not silent" — while NOTHING
+// printed it, and the module header claimed a caller could REFUSE these facts,
+// which no caller could do. The facts were never at risk (they are written under
+// the provenance key); what was missing is the thing that catches a NEW kind of
+// unowned fact joining that bucket.
+//
+// These arms are on the CLASSIFICATION the reporter uses, not on stdout: what
+// matters is that a non-commit subject is distinguishable from commit
+// provenance, because that is the distinction the report is built on.
+// ---------------------------------------------------------------------------
+
+#[test]
+#[allow(non_snake_case)]
+fn a_NON_COMMIT_unowned_subject_is_distinguishable_from_commit_provenance() {
+    let prov = format!(
+        "<{ONTO}commit/abc123> a bobbin:Commit ; rdfs:label \"abc123\" .\n\
+         <{ONTO}mystery/thing> a bobbin:Unknown ; rdfs:label \"mystery\" .\n"
+    );
+    let turtle = format!("{}{prov}", projection());
+    let p = plan("yupana", &turtle, &["src/a.rs".to_string()]).expect("plan");
+
+    let (known, unexpected): (Vec<_>, Vec<_>) = p
+        .unfiled_subjects
+        .iter()
+        .partition(|(s, _)| s.contains("/commit/"));
+    assert_eq!(
+        known.len(),
+        1,
+        "the commit subject is the known shape: {p:?}"
+    );
+    assert_eq!(
+        unexpected.len(),
+        1,
+        "a non-commit unowned subject must be separable so it can be NAMED: {p:?}"
+    );
+    assert!(unexpected[0].0.contains("mystery"));
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn commit_provenance_ALONE_produces_nothing_unexpected_to_report() {
+    // The other direction: the ordinary case must not print a NOTE, or the
+    // report becomes noise people learn to skip and stops working.
+    let prov = format!("<{ONTO}commit/abc123> a bobbin:Commit ; rdfs:label \"abc123\" .\n");
+    let turtle = format!("{}{prov}", projection());
+    let p = plan("yupana", &turtle, &["src/a.rs".to_string()]).expect("plan");
+    let unexpected = p
+        .unfiled_subjects
+        .keys()
+        .filter(|s| !s.contains("/commit/"))
+        .count();
+    assert_eq!(unexpected, 0, "no NOTE for the ordinary case: {p:?}");
+}

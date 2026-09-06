@@ -45,13 +45,25 @@
 //!   the file whose snapshot would legitimately retract it if the reference
 //!   disappeared.
 //!
-//! ## Unowned facts are REFUSED, never dropped
+//! ## Unowned facts are CARRIED under a provenance key, and reported
 //!
-//! Some promoted facts belong to no file — commit provenance nodes, for one. They
-//! cannot be written under a per-file key, and silently omitting them from a
-//! subset write would retract them by absence on the next full resync, or leave
-//! them stale forever. [`Partition::unowned`] carries them so the caller can
-//! refuse rather than discover it later.
+//! Some promoted facts belong to no file — commit provenance nodes are the case
+//! that exists today. They cannot go under a per-file key, and silently omitting
+//! them would retract them by absence on the next full resync, or leave them
+//! stale forever. So they are WRITTEN, under [`provenance_key`], on every subset
+//! promote.
+//!
+//! THIS HEADING USED TO SAY THEY WERE "REFUSED, never dropped ... so the caller
+//! can refuse", and no caller could: nothing consumed `unfiled_subjects` and
+//! nothing printed it (wu, reviewing #47). The facts were never at risk — they
+//! are written — but the doc described a safety property the code does not have,
+//! which is the more dangerous error of the two, because it tells a reader not to
+//! look.
+//!
+//! What actually protects against a NEW kind of unowned fact quietly joining the
+//! provenance bucket is the REPORT: the CLI prints unowned subjects whenever they
+//! are anything other than the known commit-provenance shape. A count nobody
+//! prints is not a safeguard, it is a variable.
 
 use std::collections::BTreeMap;
 
@@ -243,9 +255,12 @@ pub struct SubsetPlan {
     /// Subjects whose facts belong to no file, with a triple count — the
     /// content of the [`provenance_key`] write.
     ///
-    /// REPORTED rather than silent: these are the facts a per-file key cannot
-    /// express, and an operator reading a subset promote's output should be able
-    /// to see that they were carried rather than assume it.
+    /// These are the facts a per-file key cannot express. They are CARRIED under
+    /// [`provenance_key`], never dropped — and the CLI prints any that are not
+    /// the known commit-provenance shape, so a new kind of unowned fact surfaces
+    /// instead of joining that bucket silently. Until #47 was reviewed this field
+    /// was computed, assigned and asserted on in a test that called it "reported,
+    /// not silent", while nothing printed it.
     pub unfiled_subjects: BTreeMap<String, usize>,
     /// Files in the projection that did NOT change and are therefore untouched.
     /// The whole point of the exercise, so it is reported rather than implied.

@@ -179,6 +179,7 @@ pub(crate) fn promote_subset(
         plan.writes.len(),
         plan.unchanged_files
     );
+    report_unfiled(&plan);
 
     if dry_run {
         // A dry run validates the SAME documents that would be written, one
@@ -245,6 +246,56 @@ pub(crate) fn promote_subset(
         crate::git::resolve_commit(path, commit).unwrap_or_else(|| commit.to_string())
     );
     Ok(())
+}
+
+/// Say what went under the provenance key, and NAME anything unexpected.
+///
+/// Facts belonging to no file are carried under `provenance_key` rather than
+/// dropped. That is correct and deliberate — but until this existed, nothing
+/// printed them: `unfiled_subjects` was computed, assigned, and asserted on by a
+/// test calling it "reported, not silent", while no caller ever reported it (wu,
+/// reviewing #47). The module header even claimed the caller could REFUSE them,
+/// which no caller could do.
+///
+/// The facts were never at risk. What was missing is the thing that catches a NEW
+/// kind of unowned fact: today the only one is commit provenance, and if some
+/// other subject starts landing in that bucket it should be visible in the run
+/// that carried it, not discovered later by someone auditing the graph.
+///
+/// So: the known commit-provenance shape is summarised as a count, and anything
+/// else is NAMED. A report that prints the expected case in full is a report
+/// people learn to skip.
+fn report_unfiled(plan: &crate::promote_subset::SubsetPlan) {
+    if plan.unfiled_subjects.is_empty() {
+        return;
+    }
+    let (known, unexpected): (Vec<_>, Vec<_>) = plan
+        .unfiled_subjects
+        .iter()
+        .partition(|(subject, _)| subject.contains("/commit/"));
+    let known_triples: usize = known.iter().map(|(_, n)| **n).sum();
+    if known_triples > 0 {
+        println!(
+            "  provenance: {known_triples} triple(s) across {} commit subject(s) \
+             carried under the provenance key.",
+            known.len()
+        );
+    }
+    if !unexpected.is_empty() {
+        let total: usize = unexpected.iter().map(|(_, n)| **n).sum();
+        println!(
+            "  NOTE: {total} triple(s) across {} subject(s) belong to no file and are \
+             NOT commit provenance. They are carried under the provenance key, not \
+             dropped — but they are a new shape and worth a look:",
+            unexpected.len()
+        );
+        for (subject, n) in unexpected.iter().take(10) {
+            println!("    {subject} ({n} triple(s))");
+        }
+        if unexpected.len() > 10 {
+            println!("    ... and {} more", unexpected.len() - 10);
+        }
+    }
 }
 
 #[cfg(test)]
