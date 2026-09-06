@@ -133,6 +133,42 @@ pub(super) fn from_daemon(
     )))
 }
 
+/// Project governed policy: the RESIDENT DAEMON FIRST, then the live path.
+///
+/// THE ONE PLACE THAT DECISION IS MADE. It used to be written inline, in
+/// `rule_planes` only — and that is not a tidiness observation, it is the root
+/// cause of aegis-kjz0hg: three other hook sites called `refresh_or_cached`
+/// directly and therefore could never be served by the daemon, no matter how
+/// healthy it was. Nobody chose that; there was simply no shared thing to call.
+///
+/// Measured 2026-09-06 through a capture proxy: with a usable daemon the
+/// pre-edit path (which routed through here) issued ZERO quipu requests, while
+/// `pre-bash` on a `git push` still issued one — `landing_guard`, going direct.
+/// One query is not a floor, but it is a synchronous quipu round trip in front
+/// of an agent's `git push`, which is where a 10-30s stall is least affordable.
+///
+/// The second thing the direct sites lost is quieter and worse: `from_daemon`
+/// REFUSES a resident projection past the TTL, with a reason naming the
+/// refresher's own failure, so a stale catalogue cannot keep enforcing
+/// unfalsifiably. A direct `refresh_or_cached` has no equivalent for the
+/// resident copy, so those sites had no staleness contract at all.
+///
+/// A down or unusable daemon falls through to exactly the previous behaviour.
+pub(crate) fn projected(
+    config: &YupanaConfig,
+    registry: &mut ProjectionRegistry,
+) -> Result<ProjectionSource, String> {
+    let now = crate::projection_cache::now_secs();
+    match from_daemon(config, registry, now) {
+        Some(result) => result,
+        None => registry.refresh_or_cached(
+            crate::projection_cache::cache_path().as_deref(),
+            config.quipu.projection_cache_ttl_secs,
+            now,
+        ),
+    }
+}
+
 /// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56).
 ///
 /// The measured reason this exists: `POST /policy/check` took 2.4-7.2s and ran

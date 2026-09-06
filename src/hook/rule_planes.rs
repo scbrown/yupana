@@ -201,18 +201,11 @@ pub(super) fn governed_check(
     // declares that plus the cache's age. Only a projection failure with no
     // servable cache degrades to allow.
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
-    let cache_path = crate::projection_cache::cache_path();
-    let now = crate::projection_cache::now_secs();
-    // aegis-x894x2: the resident daemon first when one is expected. `None` means
-    // no usable daemon answer and the live path below is unchanged.
-    let projected = match crate::hook::daemon_projection::from_daemon(config, &mut registry, now) {
-        Some(result) => result,
-        None => registry.refresh_or_cached(
-            cache_path.as_deref(),
-            config.quipu.projection_cache_ttl_secs,
-            now,
-        ),
-    };
+    // aegis-x894x2: the resident daemon first when one is expected, falling
+    // through to the live path. Extracted to `daemon_projection::projected` so
+    // the other hook sites share this decision instead of each re-deciding it —
+    // three of them had silently not (aegis-kjz0hg).
+    let projected = crate::hook::daemon_projection::projected(config, &mut registry);
     let source = match projected {
         Ok(source) => source,
         Err(reason) => {
