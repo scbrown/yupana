@@ -28,7 +28,7 @@ pub(super) fn deliberate_use_name(cmd: &Commands) -> Option<&'static str> {
         Commands::Changed { .. } => "changed",
         Commands::Census { .. } => "census",
         Commands::Export { .. } => "export",
-        Commands::Promote { .. } => "promote",
+        Commands::Promote(_) => "promote",
         #[cfg(feature = "quipu")]
         Commands::Verifier { .. } => "verifier",
         #[cfg(feature = "quipu")]

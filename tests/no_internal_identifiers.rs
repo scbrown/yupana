@@ -277,6 +277,14 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "src/promote_branch_test.rs",
         "src/promote_provenance.rs",
         "src/promote_provenance_test.rs",
+        // The subset partitioner keys ownership off the ONTOLOGY predicates the
+        // emitter actually writes (`filePath`, `definedIn`, `inDocument`). A
+        // stand-in namespace here would partition a projection that does not
+        // exist, and every partition would come back unowned — the one outcome
+        // the module treats as "refuse and fall back", so it would fail loudly
+        // in a test and silently in production.
+        "src/promote_subset.rs",
+        "src/promote_subset_test.rs",
         "src/promote_test.rs",
         "src/verdict.rs",
         // The end-to-end promotion tests assert on the BYTES that reached a
