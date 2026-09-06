@@ -50,11 +50,33 @@ pub struct PromoteArgs {
     /// Answers "would this promotion conform?" without touching the graph.
     #[arg(long)]
     pub dry_run: bool,
-    /// Replace the complete per-repository code snapshot atomically. This
-    /// is explicit because it authorizes absence (including an empty tree)
-    /// to retract facts from the prior snapshot.
+    /// Replace the complete per-repository code snapshot atomically, under
+    /// the producer key `snapshot:code:{repo}`.
+    ///
+    /// ⚠ THIS FLAG'S RATIONALE USED TO READ AS A SAFETY OPT-IN — "explicit
+    /// because it authorizes absence to retract facts" — and that framing has
+    /// the risk exactly backwards for a code projection. Withholding it does
+    /// not protect the graph; it writes facts under a free-form source that
+    /// `plan_source_retraction` can never match, so NOTHING can ever retract
+    /// them: not a later promote, not `--subset`, not a re-key. Measured on
+    /// the aegis store (aegis-rz75m6): modules whose files were deleted from
+    /// the repo 36 days earlier were still live and fully typed, because the
+    /// promote that wrote them took the append path.
+    ///
+    /// The cautious-looking choice was the damaging one, which is why bare
+    /// appends now REFUSE and need `--append` (see that flag).
     #[arg(long)]
     pub replace_snapshot: bool,
+    /// Append the projection WITHOUT replacing the snapshot, under a
+    /// free-form source rather than a producer key.
+    ///
+    /// ⚠ FACTS WRITTEN THIS WAY CAN NEVER BE RETRACTED BY ANYTHING. A code
+    /// projection is a snapshot of a tree by nature, so appending one leaves
+    /// entities that outlive their files permanently. This exists only so the
+    /// old behaviour remains reachable and NAMED; if you are reaching for it
+    /// to make a refusal go away, you want `--replace-snapshot`.
+    #[arg(long, conflicts_with_all = ["replace_snapshot", "subset"])]
+    pub append: bool,
     /// Repository name to attribute promoted entities to. Defaults to the
     /// `origin` remote's repo name; with no origin, promotion refuses rather
     /// than deriving identity from the directory name (a worktree's dir name
@@ -161,6 +183,7 @@ impl Cli {
         repo: Option<&str>,
         dry_run: bool,
         replace_snapshot: bool,
+        append: bool,
         subset: Option<&Subset<'_>>,
     ) -> anyhow::Result<()> {
         // `--to` IS THE AUTHORIZATION, and it is the only one (aegis-o2h97).
@@ -313,6 +336,41 @@ impl Cli {
                 sub.list_keys,
             );
         }
+        // ⛔ REFUSE THE BARE APPEND PATH (aegis-rz75m6, sattler 2026-09-07).
+        //
+        // Below, `replace_snapshot` writes under the producer key
+        // `snapshot:code:{repo}`, which `plan_source_retraction` matches. The
+        // fallthrough arm writes under the free-form `source` string, which it
+        // CANNOT match — so those facts are unretractable by every producer,
+        // forever. Both arms exited 0 and printed the same "promoted N triples",
+        // so nothing distinguished a normal promote from a permanent one.
+        //
+        // Measured consequence on the aegis store: modules for files deleted
+        // from the repo 36 days earlier were still live and fully typed, and
+        // ~1 in 3 sampled modules were owned by a free-form source. The
+        // scheduled lane was never at fault — goldblum's code-promote.sh has
+        // always passed --replace-snapshot. Every orphan came from a HAND-RUN
+        // promote, i.e. from operators being careful and omitting a flag whose
+        // own help text told them omission was the safe choice.
+        //
+        // A footgun default is a bug, so this REFUSES rather than warns: a
+        // warning is read past, and the people who hit this were already being
+        // careful. `--append` keeps the old behaviour reachable and NAMED.
+        if !dry_run && !replace_snapshot && !append {
+            eprintln!(
+                "yupana promote: REFUSING to append without --replace-snapshot.\n\n\
+                 A code projection is a snapshot of a tree. Appending one writes facts under\n\
+                 the source `{source}`, which is not a producer key — so quipu's\n\
+                 plan_source_retraction can NEVER match them and nothing will ever retract\n\
+                 them. Entities outlive their files permanently (aegis-rz75m6: modules for\n\
+                 files deleted 36 days earlier, still live).\n\n\
+                 You almost certainly want:\n\
+                     yupana promote --replace-snapshot --to <url> {path}\n\n\
+                 If you genuinely intend an unretractable append, say so with --append.",
+                path = path.display()
+            );
+            std::process::exit(2);
+        }
         let outcome = match (dry_run, &endpoint) {
             (true, ep) => crate::promote::dry_run(ep.as_deref(), &turtle, &source)?,
             (false, Some(ep)) if replace_snapshot => {
@@ -358,6 +416,7 @@ impl Cli {
         _repo: Option<&str>,
         _dry_run: bool,
         _replace_snapshot: bool,
+        _append: bool,
         _subset: Option<&Subset<'_>>,
     ) -> anyhow::Result<()> {
         self.planned(
