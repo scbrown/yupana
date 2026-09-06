@@ -443,6 +443,7 @@ impl Cli {
                     a.repo.as_deref(),
                     a.dry_run,
                     a.replace_snapshot,
+                    a.append,
                     // `--subset` and its scope travel as ONE value, so "list the
                     // keys of a promote that is not a subset" and "a base with no
                     // subset" are unrepresentable here rather than merely refused

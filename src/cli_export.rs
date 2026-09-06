@@ -28,7 +28,16 @@ impl crate::cli::Cli {
         match to {
             Some(_) => {
                 self.load_config(path)?.write_guard("promotion")?;
-                self.promote(path, "HEAD", to, repo, false, false, None)
+                // `append: false` — so this hits the SAME bare-append refusal as
+                // `promote` (aegis-rz75m6). This call site is how `export --to`
+                // has ALSO been writing unretractable facts: it is promotion by
+                // another spelling, and it passed replace_snapshot=false, so
+                // every `yupana export --to <quipu>` landed under a free-form
+                // source no retraction can ever match. Refusing here rather than
+                // quietly upgrading it to a snapshot replace: promotion now
+                // requires the caller to choose, and silently making an export
+                // destructive would be the larger surprise.
+                self.promote(path, "HEAD", to, repo, false, false, false, None)
             }
             None => export(path, repo),
         }

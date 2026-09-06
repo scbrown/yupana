@@ -1120,7 +1120,12 @@ fn promote_refuses_dir_name_identity_and_accepts_origin() {
         .success();
     Command::cargo_bin("yupana")
         .unwrap()
-        .args(["promote", "--to", &format!("http://{addr}")])
+        .args([
+            "promote",
+            "--replace-snapshot",
+            "--to",
+            &format!("http://{addr}"),
+        ])
         .current_dir(dir.path())
         .assert()
         .failure()
@@ -1569,7 +1574,11 @@ fn branch_model_qualifies_promoted_facts_and_refuses_named_graph() {
     let (addr, rx) = capturing_knot();
     Command::cargo_bin("yupana")
         .unwrap()
-        .args(["promote", "--config"])
+        // --replace-snapshot because a bare promote now REFUSES (aegis-rz75m6).
+        // These assert on the TURTLE (branch qualifier / provenance / identity),
+        // which is built before the write-path branch, so the payload under test
+        // is unchanged — only the arm that ships it.
+        .args(["promote", "--replace-snapshot", "--config"])
         .arg(&cfg)
         .args(["--to", &format!("http://{addr}")])
         .env("HOME", dir.path())
@@ -1631,7 +1640,11 @@ fn promotion_carries_the_commit_touched_entities_provenance() {
     let (addr, rx) = capturing_knot();
     Command::cargo_bin("yupana")
         .unwrap()
-        .args(["promote", "--config"])
+        // --replace-snapshot because a bare promote now REFUSES (aegis-rz75m6).
+        // These assert on the TURTLE (branch qualifier / provenance / identity),
+        // which is built before the write-path branch, so the payload under test
+        // is unchanged — only the arm that ships it.
+        .args(["promote", "--replace-snapshot", "--config"])
         .arg(&cfg)
         .args(["--to", &format!("http://{addr}")])
         .env("HOME", dir.path())
@@ -1738,4 +1751,133 @@ fn export_announces_a_directory_name_identity_guess() {
         named[0], named[1],
         "explicit --repo must be path-independent"
     );
+}
+
+/// A git repo with one Rust file and an origin, so `promote` can derive identity.
+fn repo_for_promote() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/a.rs"), "pub fn a() -> u32 { 1 }\n").unwrap();
+    for args in [
+        vec!["init", "-q"],
+        vec!["add", "-A"],
+        vec![
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "seed",
+        ],
+        vec![
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:scbrown/tmptest.git",
+        ],
+    ] {
+        std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+    }
+    dir
+}
+
+/// aegis-rz75m6: a bare `promote --to` took the plain-append arm, writing facts
+/// under the free-form source `yupana promote {repo}@{sha} (cli)` instead of the
+/// producer key `snapshot:code:{repo}`. quipu's `plan_source_retraction` matches
+/// on source, so NOTHING could ever retract them — measured on the aegis store as
+/// modules for files deleted from the repo 36 days earlier, still live and fully
+/// typed, and ~1 in 3 sampled modules owned by such a source.
+///
+/// It exited 0 and printed the same "promoted N triples" as a correct promote, so
+/// the damaging path was indistinguishable from the safe one. A refusal, not a
+/// warning: the operators who hit this were being careful, and the flag's own help
+/// text told them omitting it was the cautious choice.
+/// Gated on `quipu`: the refusal lives in the feature-gated promote impl, and the
+/// no-feature stub exits 2 with its own message. Without this gate the test failed
+/// on the `golden-path` CI arm — an arm I had not built locally.
+#[cfg(feature = "quipu")]
+#[test]
+fn a_bare_promote_refuses_the_unretractable_append_path() {
+    let dir = repo_for_promote();
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args(["promote", "--to", "http://127.0.0.1:1", "--repo", "tmptest"])
+        .current_dir(dir.path())
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("REFUSING to append"))
+        // It must name the fix, not merely the problem.
+        .stderr(predicate::str::contains("--replace-snapshot"))
+        .stderr(predicate::str::contains("--append"));
+}
+
+/// The escape hatch stays reachable and NAMED — the point is that an
+/// unretractable write becomes a thing you say, not a thing you omit. Asserting
+/// only that it is not the append refusal: the endpoint is a closed port, so the
+/// write itself fails, which is what keeps this test off the network.
+/// Gated on `quipu`: the refusal lives in the feature-gated promote impl, and the
+/// no-feature stub exits 2 with its own message. Without this gate the test failed
+/// on the `golden-path` CI arm — an arm I had not built locally.
+#[cfg(feature = "quipu")]
+#[test]
+fn append_opts_back_in_and_is_no_longer_the_refusal() {
+    let dir = repo_for_promote();
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args([
+            "promote",
+            "--append",
+            "--to",
+            "http://127.0.0.1:1",
+            "--repo",
+            "tmptest",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .stderr(predicate::str::contains("REFUSING to append").not());
+}
+
+/// `--append` is mutually exclusive with both snapshot-writing modes: it is the
+/// negation of what they do, and a caller who passes both has not decided.
+#[test]
+fn append_conflicts_with_the_snapshot_modes() {
+    for other in [vec!["--replace-snapshot"], vec!["--subset", "--all"]] {
+        let dir = repo_for_promote();
+        let mut args = vec!["promote", "--append", "--to", "http://127.0.0.1:1"];
+        args.extend(other);
+        Command::cargo_bin("yupana")
+            .unwrap()
+            .args(&args)
+            .current_dir(dir.path())
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("cannot be used with"));
+    }
+}
+
+/// `export --to <quipu>` IS promotion by another spelling and routed through the
+/// same append arm, so it was a SECOND undocumented producer of unretractable
+/// facts — not just hand-run `promote`. It must hit the same refusal rather than
+/// be silently upgraded to a destructive snapshot replace.
+/// Gated on `quipu`: the refusal lives in the feature-gated promote impl, and the
+/// no-feature stub exits 2 with its own message. Without this gate the test failed
+/// on the `golden-path` CI arm — an arm I had not built locally.
+#[cfg(feature = "quipu")]
+#[test]
+fn export_to_a_graph_refuses_the_append_path_too() {
+    let dir = repo_for_promote();
+    Command::cargo_bin("yupana")
+        .unwrap()
+        .args(["export", "--to", "http://127.0.0.1:1", "--repo", "tmptest"])
+        .current_dir(dir.path())
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("REFUSING to append"));
 }
