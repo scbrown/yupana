@@ -43,6 +43,30 @@ pub const HOOK: &str = "yupana-hook";
 pub const DAEMON: &str = "yupana-daemon";
 /// Promotion — writes, not the read path.
 pub const PROMOTE: &str = "yupana-promote";
+/// The namespace prefix for a one-shot CLI invocation. The label sent is
+/// `yupana-cli:<verb>` — see `cli_use::quipu_caller_kind`, which owns the verbs.
+///
+/// SEPARATE FROM [`HOOK`] BECAUSE CONFLATING THEM MAKES THE ONE QUESTION AN
+/// OPERATOR ASKS UNANSWERABLE. Measured 2026-09-06 (aegis-tjyhh4): quipu showed
+/// 2.16 s/s held under `yupana-hook` while `yupana-daemon` sat at 0/0 and
+/// `use_daemon = true`, which reads as "a hook path is bypassing the daemon".
+/// Measured per path, every hook path was at ZERO — plain `pre-bash` 0 requests,
+/// `pre-edit` with a usable daemon 0, `post-edit` 0. The traffic was CLI:
+/// `yupana status` issues 19-21 `/query` calls and `yupana refresh-projection`
+/// (a twice-hourly cron) 6, and every one of them reported itself as a hook,
+/// because [`HOOK`] is the process default and only the daemon called [`set`].
+///
+/// The label set already told the hook herd from the daemon that replaced it.
+/// What it could not do was tell either from the callers that never moved, so
+/// the cutover's own after-measure pointed at the wrong path.
+pub const CLI_PREFIX: &str = "yupana-cli:";
+/// The resident MCP server.
+///
+/// Not folded into [`CLI`] for the same reason [`CLI`] is not folded into
+/// [`HOOK`]: `serve` is a long-lived process answering tool calls, so its load
+/// has a different shape and a different owner from a one-shot command, and a
+/// bucket that mixes them cannot be read.
+pub const MCP: &str = "yupana-mcp";
 
 static LABEL: OnceLock<&'static str> = OnceLock::new();
 
@@ -92,9 +116,29 @@ mod tests {
     /// The labels are distinct, or the after-measure cannot be read at all.
     #[test]
     fn the_caller_kinds_are_distinct() {
-        assert_ne!(HOOK, DAEMON);
-        assert_ne!(HOOK, PROMOTE);
-        assert_ne!(DAEMON, PROMOTE);
+        // Every pair, not a sample: two kinds sharing a string is exactly the
+        // collision that made the aegis-tjyhh4 floor unattributable, and it
+        // would be introduced by a copy-paste that a spot check would miss.
+        let kinds = [HOOK, DAEMON, PROMOTE, MCP];
+        for (i, a) in kinds.iter().enumerate() {
+            for b in &kinds[i + 1..] {
+                assert_ne!(a, b, "two caller kinds share a label");
+            }
+        }
+    }
+
+    /// The set is CAPPED server-side (quipu folds the overflow into `other`), so
+    /// growth here is deliberate. This is not a count in prose — the assertion
+    /// reads the array — but it does mean adding a kind is a decision someone
+    /// takes on purpose rather than a line that slips in.
+    #[test]
+    fn every_kind_names_yupana_so_the_store_side_view_groups_them() {
+        for k in [HOOK, DAEMON, PROMOTE, MCP] {
+            assert!(
+                k.starts_with("yupana-"),
+                "{k} is not attributable to yupana"
+            );
+        }
     }
 
     /// Stable, aggregatable caller KINDS — never per-agent names, which would

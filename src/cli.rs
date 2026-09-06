@@ -321,6 +321,7 @@ impl Cli {
         if let Some(cmd) = deliberate_use_name(&self.command) {
             crate::metrics::emit("command", &[("cmd", cmd.into())]);
         }
+        cli_use::declare_quipu_caller(&self.command); // before dispatch (aegis-tjyhh4)
         match &self.command {
             Commands::Analyze { path, at } => self.analyze(path, at.as_deref()),
             Commands::Refs { symbol, path, at } => {

@@ -27,7 +27,10 @@ mod credential_output;
 /// Asking the resident daemon for the projected policy before going live
 /// (aegis-x894x2). Gated with the projection it serves.
 #[cfg(feature = "quipu")]
-mod daemon_projection;
+// Crate-visible, not private: `brief_sources` reaches it from the
+// `hook session-start` path, and the whole point of aegis-kjz0hg is that this
+// decision has ONE home rather than a copy per call site.
+pub(crate) mod daemon_projection;
 mod delegate_line;
 #[cfg(feature = "quipu")]
 mod disk_guard;
