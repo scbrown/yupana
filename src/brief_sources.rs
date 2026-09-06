@@ -454,13 +454,11 @@ pub fn gather(config: &YupanaConfig, root: &Path) -> Option<Brief> {
     let endpoint = config.quipu.endpoint.clone();
 
     let mut registry = crate::project::ProjectionRegistry::new(&endpoint);
-    let cache_path = crate::projection_cache::cache_path();
-    let now = crate::projection_cache::now_secs();
-    let cache_age = match registry.refresh_or_cached(
-        cache_path.as_deref(),
-        config.quipu.projection_cache_ttl_secs,
-        now,
-    ) {
+    // The daemon first (aegis-kjz0hg). Reached from `hook session-start`, so it
+    // is a hook path like the other three and belongs on the same decision —
+    // once per session rather than per edit, but a session start is exactly when
+    // several agents come up together.
+    let cache_age = match crate::hook::daemon_projection::projected(config, &mut registry) {
         Ok(crate::project::ProjectionSource::Live) => None,
         Ok(crate::project::ProjectionSource::FreshCache { age_secs }) => Some(age_secs),
         Ok(crate::project::ProjectionSource::Cache { age_secs, .. }) => Some(age_secs),

@@ -76,11 +76,10 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     let (git_ref, ref_assumed) = resolve_ref(&landing, &root);
 
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
-    let authority = match registry.refresh_or_cached(
-        crate::projection_cache::cache_path().as_deref(),
-        config.quipu.projection_cache_ttl_secs,
-        crate::projection_cache::now_secs(),
-    ) {
+    // THE DAEMON FIRST (aegis-kjz0hg). This was the last hook path measured
+    // issuing a live quipu query — one per `git push`/`merge`, synchronously in
+    // front of the command, on the path where a stall is least affordable.
+    let authority = match super::daemon_projection::projected(&config, &mut registry) {
         // A projection succeeded — but "succeeded" includes being served from a
         // cache written before this plane existed, which carries no catalogue
         // and must not read as "nothing is governed".

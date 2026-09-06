@@ -81,11 +81,11 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     }
 
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
-    let source = match registry.refresh_or_cached(
-        crate::projection_cache::cache_path().as_deref(),
-        config.quipu.projection_cache_ttl_secs,
-        crate::projection_cache::now_secs(),
-    ) {
+    // The daemon first (aegis-kjz0hg). This one runs on EVERY bash command, so
+    // it measured 0 requests only because a warm disk cache absorbed it — which
+    // is not the same as being served by the daemon, and stops being true the
+    // moment that cache expires and every agent's hook queries at once.
+    let source = match super::daemon_projection::projected(&config, &mut registry) {
         Ok(source) => source,
         Err(e) => {
             return notify(&format!(

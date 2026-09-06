@@ -78,11 +78,10 @@ pub(super) fn notice(rel: &str, root: &Path, config: &YupanaConfig) -> Option<St
     let item = crate::plate::current(None)?;
 
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
-    let cache_age = match registry.refresh_or_cached(
-        crate::projection_cache::cache_path().as_deref(),
-        config.quipu.projection_cache_ttl_secs,
-        crate::projection_cache::now_secs(),
-    ) {
+    // The daemon first (aegis-kjz0hg), like every other hook site. This one runs
+    // per EDIT, so it is the highest-frequency of the three that were bypassing
+    // it — it measured 0 requests only because the disk cache was warm.
+    let cache_age = match super::daemon_projection::projected(config, &mut registry) {
         Ok(crate::project::ProjectionSource::Live) => None,
         Ok(crate::project::ProjectionSource::FreshCache { age_secs }) => Some(age_secs),
         Ok(crate::project::ProjectionSource::Cache { age_secs, .. }) => Some(age_secs),
