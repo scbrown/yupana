@@ -285,6 +285,28 @@ the **name-based** tree-sitter result and labels the response `treesitter`; it
 never accepts the column and quietly answers at line precision. Without the
 `lsp` build feature, `FILE:LINE:COL` remains a loud refusal.
 
+Library consumers can retain `extract::lsp::Session` to reuse one initialized
+server per workspace and language. Its `locations` method accepts definitions,
+references and type definitions; `hover`, `document_symbols` and
+`workspace_symbols` preserve the standard LSP result payloads. Each returned
+`Precise<T>` includes `tier: lsp`. Unsupported languages return no session,
+while missing servers or protocol failures return errors for the caller's
+explicit tree-sitter fallback. No fallback is labeled LSP.
+
+Retained sessions read saved contents on demand and send `didChange` before
+querying an edited file. Dropping the session terminates and reaps its server.
+They perform no work per keystroke. The one-shot CLI still starts a cold server;
+the warm-server performance target applies to retained sessions, not cold
+startup. A bounded `ContentModified` retry handles indexing without resetting
+the request deadline, and unrelated server notifications cannot extend it.
+
+The LSP CI arm installs rust-analyzer and a pinned TypeScript language server.
+Real-server tests cover definitions, references, type definitions, hover,
+document/workspace symbols and saved-file updates. They report 20-query warm
+p95 measurements for definitions and references in both languages and require
+less than one second. Local tests report a skip when a server is absent;
+protocol fakes validate transport behavior, not language-server performance.
+
 A position that resolves to nothing explains which kind of nothing it is,
 rather than borrowing the vocabulary of "no such symbol":
 

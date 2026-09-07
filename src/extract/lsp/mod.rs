@@ -7,7 +7,7 @@
 //! `treesitter`-tagged fallback. One client owns one warm server process and can
 //! answer repeated queries without respawning it.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -15,6 +15,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
 use serde_json::{json, Value};
+
+mod session;
+pub use session::{Precise, Session};
 
 /// A one-based source position supplied by CLI/MCP callers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,7 +31,7 @@ pub struct Position {
 }
 
 /// One precise LSP location, normalized to root-relative, one-based fields.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Location {
     /// Root-relative source file.
     pub file: String,
@@ -49,6 +52,8 @@ pub enum Query {
     Definition,
     /// `textDocument/references` (excluding declarations).
     References,
+    /// `textDocument/typeDefinition`.
+    TypeDefinition,
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +110,7 @@ struct Client {
     replies: Receiver<anyhow::Result<Value>>,
     next_id: u64,
     server: Server,
-    opened: HashSet<PathBuf>,
+    opened: HashMap<PathBuf, (String, u64)>,
 }
 
 impl Client {
@@ -150,7 +155,7 @@ impl Client {
             replies,
             next_id: 1,
             server,
-            opened: HashSet::new(),
+            opened: HashMap::new(),
         };
         let root_uri = file_uri(&client.root);
         client.request_with_timeout(
@@ -167,16 +172,24 @@ impl Client {
         Ok(client)
     }
 
-    fn query(
-        &mut self,
-        file: &Path,
-        position: &Position,
-        query: Query,
-    ) -> anyhow::Result<Vec<Location>> {
+    fn open(&mut self, file: &Path) -> anyhow::Result<bool> {
         let uri = file_uri(file);
         let canonical_file = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
-        if self.opened.insert(canonical_file) {
-            let text = std::fs::read_to_string(file)?;
+        let text = std::fs::read_to_string(file)?;
+        let version = if let Some((previous, version)) = self.opened.get(&canonical_file) {
+            if previous == &text {
+                return Ok(false);
+            }
+            let version = version + 1;
+            self.notify(
+                "textDocument/didChange",
+                &json!({
+                    "textDocument": {"uri": uri, "version": version},
+                    "contentChanges": [{"text": text}]
+                }),
+            )?;
+            version
+        } else {
             self.notify(
                 "textDocument/didOpen",
                 &json!({"textDocument": {
@@ -186,10 +199,24 @@ impl Client {
                     "text": text
                 }}),
             )?;
-        }
+            1
+        };
+        self.opened.insert(canonical_file, (text, version));
+        Ok(true)
+    }
+
+    fn query(
+        &mut self,
+        file: &Path,
+        position: &Position,
+        query: Query,
+    ) -> anyhow::Result<Vec<Location>> {
+        let changed = self.open(file)?;
+        let uri = file_uri(file);
         let method = match query {
             Query::Definition => "textDocument/definition",
             Query::References => "textDocument/references",
+            Query::TypeDefinition => "textDocument/typeDefinition",
         };
         let mut params = json!({
             "textDocument": {"uri": uri},
@@ -208,7 +235,7 @@ impl Client {
         for attempt in 0..30 {
             let response = self.request(method, &params)?;
             let found = locations(response.get("result").unwrap_or(&Value::Null), &self.root);
-            if !found.is_empty() || attempt == 29 {
+            if !found.is_empty() || !changed || attempt == 29 {
                 return Ok(found);
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -226,11 +253,14 @@ impl Client {
         params: &Value,
         timeout: Duration,
     ) -> anyhow::Result<Value> {
-        let id = self.next_id;
+        let mut id = self.next_id;
         self.next_id += 1;
         self.send(&json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}))?;
+        let deadline = std::time::Instant::now() + timeout;
         loop {
-            let message = self.replies.recv_timeout(timeout).map_err(|error| {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            anyhow::ensure!(!remaining.is_zero(), "language server {method} timed out");
+            let message = self.replies.recv_timeout(remaining).map_err(|error| {
                 anyhow::anyhow!("language server stopped answering {method}: {error}")
             })??;
             // Servers may ask for configuration/capability data while a request
@@ -249,8 +279,23 @@ impl Client {
             }
             if message.get("id").and_then(Value::as_u64) == Some(id) {
                 if let Some(error) = message.get("error") {
+                    // A server may invalidate an in-flight request as its
+                    // workspace finishes indexing. Retry only this protocol
+                    // condition, within the ORIGINAL request deadline.
+                    if error.get("code").and_then(Value::as_i64) == Some(-32801)
+                        && std::time::Instant::now() < deadline
+                    {
+                        std::thread::sleep(Duration::from_millis(20));
+                        id = self.next_id;
+                        self.next_id += 1;
+                        self.send(
+                            &json!({"jsonrpc":"2.0", "id":id, "method":method, "params":params}),
+                        )?;
+                        continue;
+                    }
                     anyhow::bail!("language server {method} error: {error}");
                 }
+                anyhow::ensure!(message.get("result").is_some(), "LSP response lacks result");
                 return Ok(message);
             }
         }
@@ -345,3 +390,9 @@ fn uri_path(uri: &str) -> Option<PathBuf> {
 #[cfg(test)]
 #[path = "lsp_test.rs"]
 mod tests;
+
+#[cfg(test)]
+mod session_test;
+
+#[cfg(test)]
+mod protocol_test;
