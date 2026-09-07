@@ -8,7 +8,6 @@ use std::path::Path;
 
 use colored::Colorize;
 
-use crate::dataflow::{Dataflow, FlowDir};
 use crate::graph::{CodeGraph, Dir};
 use crate::reconcile::reconcile;
 use crate::render::{print_reached, reached_json};
@@ -228,81 +227,6 @@ fn print_bucket(label: &str, files: &[String], quiet: bool) {
     println!("  {}: {}", label.bold(), files.join(", "));
 }
 
-/// `yupana dataflow` — intra-procedural data dependence within a function.
-pub(crate) fn dataflow(
-    json: bool,
-    quiet: bool,
-    function: &str,
-    path: &Path,
-    var: Option<&str>,
-    forward: bool,
-    hops: u32,
-) -> anyhow::Result<()> {
-    let flow = Dataflow::build(path)?;
-    if !flow.has_function(function) {
-        return not_found(json, quiet, function, "dataflow");
-    }
-    let dir = if forward {
-        FlowDir::FlowsInto
-    } else {
-        FlowDir::DependsOn
-    };
-
-    match var {
-        Some(var) => {
-            let steps = flow.flow(function, var, dir, hops);
-            if json {
-                let out = serde_json::json!({
-                    "function": function,
-                    "var": var,
-                    "direction": dir.as_str(),
-                    "count": steps.len(),
-                    "flow": steps.iter().map(|s| serde_json::json!({ "name": s.name, "distance": s.distance })).collect::<Vec<_>>(),
-                    "tier": "treesitter",   // FR-3: dataflow is tree-sitter-derived.
-                });
-                println!("{}", serde_json::to_string_pretty(&out)?);
-            } else if steps.is_empty() {
-                if !quiet {
-                    println!("{var} has no {} edges in {function}", dir.as_str());
-                }
-            } else {
-                println!("{} of {var} in {function}:", dir.as_str());
-                for step in &steps {
-                    println!("  {} (hop {})", step.name.cyan(), step.distance);
-                }
-            }
-        }
-        None => {
-            let edges = flow.edges(function);
-            if json {
-                let out = serde_json::json!({
-                    "function": function,
-                    "count": edges.len(),
-                    "edges": edges.iter().map(|e| serde_json::json!({ "dependent": e.dependent, "depends_on": e.depends_on, "line": e.line })).collect::<Vec<_>>(),
-                    "tier": "treesitter",   // FR-3: dataflow is tree-sitter-derived.
-                });
-                println!("{}", serde_json::to_string_pretty(&out)?);
-            } else if edges.is_empty() {
-                if !quiet {
-                    println!("no data-dependence edges in {function}");
-                }
-            } else {
-                println!("data dependence in {function}:");
-                for edge in edges {
-                    println!(
-                        "  {}:{} {} depends on {}",
-                        function,
-                        edge.line,
-                        edge.dependent.cyan(),
-                        edge.depends_on.cyan()
-                    );
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 /// `yupana export` — emit the referential structure as Turtle.
 /// `yupana census` — same-file symbol-name collisions, the sizing input for the
 /// scope-qualified IRI migration.
@@ -417,7 +341,7 @@ pub(crate) fn census(json: bool, quiet: bool, path: &Path) -> anyhow::Result<()>
 }
 
 /// Shared "not found" reporting for a missing symbol/function.
-fn not_found(json: bool, quiet: bool, name: &str, what: &str) -> anyhow::Result<()> {
+pub(crate) fn not_found(json: bool, quiet: bool, name: &str, what: &str) -> anyhow::Result<()> {
     if json {
         // The not-found result is still a served fact and still carries its tier
         // (FR-3) — this is the empty-case hole the top-level tag closes. All three

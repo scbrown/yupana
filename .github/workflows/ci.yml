@@ -43,6 +43,10 @@ jobs:
             flags: "--features mcp"
           - name: langs-extra
             flags: "--features langs-extra"
+          - name: cpg
+            flags: "--features cpg"
+          - name: mcp+cpg
+            flags: "--features mcp,cpg"
           - name: lsp
             flags: "--features lsp"
           - name: mcp+lsp
@@ -88,6 +92,10 @@ jobs:
             flags: "--features mcp"
           - name: langs-extra
             flags: "--features langs-extra"
+          - name: cpg
+            flags: "--features cpg"
+          - name: mcp+cpg
+            flags: "--features mcp,cpg"
           - name: lsp
             flags: "--features lsp"
           - name: mcp+lsp

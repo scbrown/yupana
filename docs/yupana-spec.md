@@ -751,8 +751,10 @@ dependency becomes compelling (§16, open question 1).
   definition/reference resolution for Rust plus TypeScript/JavaScript. It landed
   atomically with `Tier::served()` and dedicated CI arms; runtime server/build
   absence degrades to explicitly tagged tree-sitter facts.
-- `cpg` — **planned, not yet a Cargo feature** (aegis-qe5z). Its former empty
-  feature was removed because it advertised a tier without an implementation.
+- `cpg` — Rust CFG postdominators and bounded inter-procedural value-flow
+  traversals, explicitly selected through `dataflow --interprocedural` or MCP.
+  Facts are tier-tagged; unsupported constructs and query budgets are reported.
+  See the CLI reference for the supported Rust subset and limitations.
 
 **Lints.** Adopt Quipu's in-manifest `[lints.rust]` / `[lints.clippy]` block
 verbatim (`unsafe_code = "deny"`, `unused_must_use = "deny"`, `missing_docs =
@@ -1178,7 +1180,7 @@ criterion; every phase must keep the `quipu` feature compiling both on and off
 - [x] Reconcile structural reachable set with Bobbin co-change (FR-11): `src/reconcile.rs`, `yupana impact --cochange` (CLI) and the `cochange` param on `yupana_impact` (MCP), partitioning into corroborated / structural-only / co-change-only.
 - [x] Edit-reactive harness hook (FR-30, prototype): `yupana hook post-edit` emits a synchronous cross-file blast-radius advisory as Claude Code `PostToolUse` context (builds transiently until the Phase-3 resident daemon lands).
 - [x] Referential-structure export (FR-34, code side): `yupana export --format turtle` emits `CodeModule`/`CodeSymbol` + `definedIn`/`calls`/`imports` as Turtle in the `bobbin:` ontology (the substrate under Phase-4 promotion; doc→code references and `--to quipu` fold in later).
-- [ ] *Deferred to the `cpg` feature (post-exit):* deeper CPG — control dependence + inter-procedural taint (FR-7, remainder of FR-8).
+- [x] `cpg`: Rust CFG control dependence and bounded inter-procedural value flow (FR-7, remainder of FR-8); supported subset and limitations in the CLI reference.
 - **Exit (met):** structural blast radius, reconciled with history, served to agents and Bobbin. Co-change mining stays in Bobbin; Yupana reconciles a supplied co-change set (the routing rule).
 
 ### Phase 3 — Multi-tenancy *(the hard phase)*
@@ -1431,9 +1433,9 @@ than degrading to the qualifier.)
 ## Appendix D: Implementation Status
 
 A snapshot of what is actually built, reconciled against the source tree
-2026-09-03. The body of this spec (§§1–11) is the *design*; this appendix is
-the *state* — so its numbers are **recomputed** from `find`/`wc` and
-`cargo test -- --list`, never carried forward from the previous revision.
+2026-09-07. The body of this spec (§§1–11) is the *design*; this appendix is
+the *state*. Source files, lines and test attributes are recomputed from the
+current tree, never carried forward from the previous revision.
 
 **Two of those numbers are now pinned by tests**, because this appendix had
 rotted by roughly 4× on the file count and 29× on the test count before anyone
@@ -1458,7 +1460,7 @@ drops landed outside the phase numbering entirely — the game-state harness
 (FR-35..FR-39) and the golden-path guard (FR-40..FR-42) — each behind its own
 Cargo feature and its own addendum.
 
-**Source layout (`src/`, 206 `.rs` files, ~53,226 lines):** the 400-line soft
+**Source layout (`src/`, 229 `.rs` files, ~59,148 lines):** the 400-line soft
 cap is a warn-not-fail target and 30 non-test files currently exceed it, led by
 `promote.rs` (625), `export.rs` (605) and `hook/rule_planes.rs` (555). Those
 three are the only entries in `scripts/file-size-baseline.txt`: the ratchet
@@ -1472,6 +1474,7 @@ exempt from the check (`*_test.rs`, `*tests.rs`, `tests/`).
 | `graph/` | `CodeGraph` + `reachable()` (FR-12), `symbol_at` position lookup, tenant base/overlay/view | done |
 | `daemon/` | the resident engine + REST API (FR-27): `/status` `/callers` `/callees` `/impact` `/references` `/symbols` `/dataflow` `/measure` `/edit` `/health`, plus `/ingest` `/guard` `/whatif` and `/path/check` behind their features | done |
 | `watch/` | `notify` watcher + debounce + tiered scheduling (FR-17), per-file code-fact freshness | done |
+| `extract/cpg.rs` + `extract/cpg/` | Rust CFG control dependence and bounded direct-call value flow | done (`cpg` feature; documented subset) |
 | `dataflow.rs` | intra-procedural data dependence | done |
 | `reconcile.rs` | structural-vs-co-change partition (FR-11) | done |
 | `export.rs` / `docref.rs` | referential structure → Turtle (FR-34) incl. `Section → references → CodeSymbol` (FR-33) | done |
@@ -1508,13 +1511,11 @@ the `game-state` feature), `yupana_path_check` (the golden-path conformance
 guard, FR-41/FR-42; needs the `golden-path` feature). Over stdio +
 streamable-HTTP. **This count is pinned by name** in `tests/docs_drift.rs`.
 
-**Cargo features:** `default = []`; `mcp`, `langs-extra`, `quipu`,
-`game-state`, `golden-path` — all off by default. **Every one of them except
-`langs-extra` is in the CI matrix**, and as both a solo and an `mcp`-combined
-arm: nine arms on clippy and nine on test (`default`, `mcp`, `langs-extra`,
-`quipu`, `mcp+quipu`, `game-state`, `mcp+game-state`, `golden-path`,
-`mcp+golden-path`). That is the dark-feature rule from §14.10 made mechanical:
-a feature joins the matrix in the same change that wires it.
+**Cargo features:** `default = []`; `mcp`, `langs-extra`, `lsp`, `cpg`,
+`quipu`, `game-state`, `golden-path` — all off by default. Every feature has a
+CI arm; LSP, CPG, Quipu, game-state and golden-path also have MCP-combined arms.
+See `.github/workflows/ci.yml` for the exact matrix. A feature joins the matrix
+in the same change that wires its engine.
 
 `langs-extra` gates REAL extractors — TypeScript, TSX, Python, Go, Java and C++
 all produce modules, symbols and call edges (measured 2026-08-04 against a
@@ -1526,28 +1527,25 @@ previously read "deps are declared but extractors are Rust-only so far" — that
 was true early in Phase 1, went stale, and is the likeliest reason a release was
 hand-built without the flag.
 
-`cpg` remains planned and is **not a feature yet**. `lsp` returned as a feature
-only with its real JSON-RPC client, `Tier::served()` arm, and CI matrix. This
-preserves the lesson from the former empty `cpg = []` / `lsp = []` flags: a
-feature that can be enabled without an implementation advertises a lie.
+`cpg` and `lsp` now gate real engines, with tier advertisement and independent
+CI arms. The former empty flags were removed before these implementations landed.
 
-**Tests: 988** (`cargo test --all-features -- --list`), of which 2 are
-`#[ignore]`d and both declare why in the attribute: `shape_agreement`'s Layer 2
-verdict-agreement test needs a live `QUIPU_URL`, and `promote_test`'s chunk
-soak needs `YUPANA_CHUNK_SOAK_PAYLOAD` and runs in minutes. `cargo test` on
-default features runs 474. The
-Rust-free replay-converter suite (`tests/spool_to_dogwood.py`, 8 tests) runs
-under the `replay-converter-tests` pre-commit hook, so `just check` and CI's
-pre-commit job both cover it. Quality gate green: `cargo fmt`, `clippy -D
-warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
+**Tests: 1,092** source test attributes across `src/` and `tests/`, measured
+2026-09-07 by counting `#[test]` and `#[tokio::test]`. This is a source count;
+compiled counts vary with Cargo features and macro expansion. Appendix D's drift
+guard checks these measurements within its documented tolerance. Python replay,
+session-guard, and session-depth suites run through `just test`; the replay suite
+also runs in the pre-commit gate. Required quality gates are `just check`,
+feature tests/lint, and the documentation build.
 
 **Not yet built:**
 
-- **Remaining LSP precision surfaces** (FR-2; `lsp` feature) — GH #1. Precise
-  definition/reference positions are implemented; types, hover,
-  document/workspace symbols, and `verify`'s `type-violation` remain.
-- **CPG control-dependence + inter-procedural taint** (FR-7, remainder of
-  FR-8; planned `cpg` feature) — GH #6.
+- **LSP-backed `verify` type checking.** The LSP client now exposes definitions,
+  references, type definitions, hover and document/workspace symbols. Wiring
+  those into `verify`'s `type-violation` verdict remains separate.
+- **Broader CPG language/semantic coverage.** Rust control dependence and bounded
+  direct-call value flow are implemented; alias analysis, dispatch, implicit
+  flows and additional languages remain outside the supported subset.
 - **FR-32, the optional LSP *server* surface** — exposing Yupana *as* a
   language server to human editors. Distinct from FR-2 above: that one
   *consumes* language servers for precision, this one *is* one.
@@ -1567,10 +1565,9 @@ warnings` (all nine arms), markdownlint, mdBook, file-size ratchet.
 | §9.7 commit→touched-entities provenance edge | ✅ Implemented (in yupana) | `src/promote_provenance.rs::commit_turtle` emits the `bobbin:GitCommit` node and one `bobbin:modifies` statement per touched `CodeModule`, appended to the projection at promotion time — §9.7's *placement* requirement, previously met only by an out-of-tree hourly job. `git::commit_touched_paths` uses `log -1 --name-only -m --first-parent` so an ordinary commit, a **merge** (a bare `diff-tree` on a merge prints nothing) and the **root** commit all answer correctly. Edges are filtered against the projection, so one can never point at an entity the same payload does not declare. `aegis:implements` deliberately NOT emitted (the work-item vocabulary belongs to the tracker-aware lane); module granularity; valid-time carried as `bobbin:date` because `/knot` has no `valid_from` parameter. GH #5. |
 | §9.4 branch modeling (named-graph vs qualifier) | 🟡 Qualifier implemented; named-graph refuses | `src/promote_branch.rs` attaches `bobbin:onBranch "<branch>"` to every entity a promotion declares (`git::branch_for` resolves it, or ABSTAINS — no qualifier rather than a guess), gated by `shapes/code-edges.ttl::OnBranchShape`. Default `branch_model` moved to `"qualifier"`, the implemented model. `"named_graph"` REFUSES the promotion naming quipu#36, rather than silently writing under the fallback's semantics. The qualifier answers branch MEMBERSHIP, not per-branch structure — promoted IRIs are branch-independent by design, so both branches' edges land on one subject; that gap is what quipu#36 closes. GH #4. |
 
-Pre-existing Phase 1/2 spec-gaps also remain open (out of the graph-export
-scope): the remaining FR-2 LSP surfaces (GH #1) and FR-7/FR-8 CPG (GH #6).
-FR-4 column-granularity definition/reference positions are implemented behind
-the `lsp` feature, with name-based tree-sitter fallback when no build resolves.
+The LSP client surfaces and Rust CPG queries are implemented independently of
+this graph-export table. Their supported subsets and limitations are recorded in
+the CLI reference. CPG query facts do not automatically enter the Turtle export.
 
 ## Appendix E: Design Decision Log
 

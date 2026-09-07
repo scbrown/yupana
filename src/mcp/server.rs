@@ -36,12 +36,8 @@ use crate::graph::{CodeGraph, Dir, Reached};
 use crate::reconcile::reconcile;
 use crate::types::Tier;
 
-/// The provenance tier of everything the call graph and dataflow serve. The
-/// graph is built entirely from tree-sitter extraction (`CodeGraph::build`), so
-/// every reachability/dataflow fact is `treesitter` today — one source of truth
-/// for that string rather than a literal repeated per handler, and the place to
-/// propagate a real per-node tier from when the LSP/CPG tiers start resolving
-/// edges (FR-3).
+/// Provenance for the default tree-sitter graph and local dataflow responses.
+/// Opt-in CPG reports carry their own tier and do not use this helper.
 fn graph_tier() -> String {
     Tier::TreeSitter.as_str().to_string()
 }
@@ -337,7 +333,7 @@ impl YupanaMcpServer {
     }
 
     #[tool(
-        description = "Intra-procedural data dependence within a function. With `var`, trace what it depends on (or, with forward=true, what it flows into); without `var`, list all dependence edges. Best for: 'where does this value come from?'."
+        description = "Data dependence within a function; interprocedural=true opts into Rust CPG control dependence and call-site-matched flow (requires cpg build). With `var`, trace what it depends on (or, with forward=true, what it flows into); without `var`, list all dependence edges. Best for: 'where does this value come from?'."
     )]
     async fn yupana_dataflow(
         &self,

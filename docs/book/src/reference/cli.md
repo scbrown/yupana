@@ -12,7 +12,7 @@ COMMANDS:
     callers     Direct callers and callees of a symbol
     communities Densely-connected symbol clusters (deterministic Louvain, FR-9)
     impact      Blast radius; --cochange reconciles against history (FR-11)
-    dataflow    Intra-procedural data dependence within a function
+    dataflow    Local data dependence, or opt-in Rust CPG flow across calls
     export      Emit the referential structure as Turtle (bobbin: ontology)
     hook        Harness hook adapter (post-edit advisory / pre-edit guard)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
@@ -412,3 +412,56 @@ a generated narrowing pattern **offered for human approval**, and the
 exemplar's embedding as a similarity anchor with a suggested threshold that
 quipu's backtest replaces. Nothing emitted is a policy; quipu's
 definition-time placement check remains the refusal authority.
+
+## Rust CPG dataflow (`cpg` feature)
+
+Build with `just build --features cpg`. The ordinary `dataflow` command keeps its
+intra-procedural, `treesitter` result in every build. Opt in explicitly:
+
+```bash
+yupana dataflow main ./src --interprocedural --var input --forward --hops 32 --json
+yupana dataflow main ./src --interprocedural --json
+```
+
+The CPG mode emits JSON (also without `--json`). Without `--var`, it returns
+control-dependence edges for the selected function. Each edge carries
+`relation: "bobbin:controlDependsOn"`, `tier: "cpg"`, statement IDs, and the
+statement/condition lines. A CFG postdominator calculation handles branches,
+merges, early returns, and unlabeled `while`/`loop`, `break`, and `continue`.
+It does not infer control dependence from lexical nesting alone. An unsupported
+control construct or a region unable to reach an exit omits that function's
+control facts with a diagnostic. Calls are modeled with normal return behavior;
+unwinding and diverging callees are not modeled.
+
+With `--var`, the same reply adds explicit value-flow reachability across
+lexically resolved bare calls and unique `crate::...` calls between Rust free
+functions. Argument-to-parameter and return-to-result edges connect the functions.
+Call-site matching prevents the return of one invocation from contaminating a
+second invocation. `--forward` follows source to sink; the default follows
+dependencies backwards. Each reached value has a `cpg` tier, qualified function,
+source line, distance, and a witness `path`. Use `$return` to start from a
+function's return value. No implicit flow from a branch condition is added to
+the explicit value-flow graph; control edges are reported separately.
+
+A simple function name must resolve uniquely. Ambiguous selectors report the
+exact file/scope/byte IDs to use. Bindings are declaration-scoped, so shadowed
+locals and same-named functions remain separate. A variable name selects all
+matching bindings inside the selected function; use its exact value ID to
+select one. IDs refer to the current source snapshot and can change after edits.
+
+This is a bounded source approximation, **not a safety verdict**. Local assignments
+are flow-insensitive; path feasibility, heap aliases, sanitizer semantics,
+exceptions, macros, closures, async, traits/method dispatch and imported aliases
+are not resolved. Unsupported constructs, syntax errors and unresolved calls are
+reported in `diagnostics`; unknown calls do not invent argument-to-return edges.
+A missing path cannot prove absence of a real flow. `truncated` reports exhausted
+hop/state budgets (maximum 256 hops and 50,000 traversal states), including
+recursive paths. Control extraction also bounds CFG size (2,048 blocks and
+10,000 AST descendants per function), reporting omissions in `diagnostics`.
+`truncated: false` does not remove the model's limitations.
+
+The analysis is on-demand over Rust source, honoring source selection and ignore
+rules. It does not require a build or launch an external CPG engine. These CPG
+facts are served through the query response; the ordinary referential Turtle
+export and resident daemon `/dataflow` remain their existing tree-sitter surfaces.
+A build without `cpg` refuses `--interprocedural` with an explicit error.
