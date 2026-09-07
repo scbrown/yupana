@@ -41,7 +41,7 @@ fn properties() -> Vec<Value> {
 }
 
 fn body(rows: Vec<Value>) -> Value {
-    json!({"results":{"bindings":rows}})
+    json!({"results":{"bindings":Value::Array(rows)}})
 }
 
 #[test]

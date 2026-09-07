@@ -1,7 +1,7 @@
 //! Read the text catalogue without joining optional fields across the store.
 //!
-//! Membership still uses the full TextRule subclass path. Exact subject reads
-//! then reconstruct the same required/optional row product as TEXT_POLICY_QUERY;
+//! Membership still uses the full `TextRule` subclass path. Exact subject reads
+//! then reconstruct the same required/optional row product as `TEXT_POLICY_QUERY`;
 //! the existing decoder keeps every distinct optional value and rejects conflicts.
 
 use std::collections::HashSet;
