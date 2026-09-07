@@ -122,7 +122,10 @@ fn status_json_advertises_only_implemented_tiers() {
         cfg!(feature = "lsp"),
         "lsp must be advertised exactly when its engine is compiled"
     );
-    assert!(!tiers.contains(&serde_json::json!("cpg")));
+    assert_eq!(
+        tiers.contains(&serde_json::json!("cpg")),
+        cfg!(feature = "cpg")
+    );
     assert_eq!(
         tiers.contains(&serde_json::json!("engine-state")),
         cfg!(feature = "game-state"),

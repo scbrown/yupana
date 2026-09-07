@@ -309,6 +309,9 @@ pub struct CommunitiesResponse {
 /// Request for `yupana_dataflow` — intra-procedural data dependence.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct DataflowRequest {
+    /// Opt into Rust CPG control dependence and call-site-matched value flow.
+    #[serde(default)]
+    pub interprocedural: Option<bool>,
     /// The function to analyze.
     #[schemars(description = "Function name to analyze")]
     pub function: String,

@@ -22,6 +22,10 @@ use tree_sitter::{Node, Parser};
 #[cfg(feature = "lsp")]
 pub mod lsp;
 
+/// Rust-native control dependence and interprocedural value flow.
+#[cfg(feature = "cpg")]
+pub mod cpg;
+
 use crate::errors::{Error, Result};
 use crate::types::{Symbol, SymbolKind, Tier};
 
@@ -125,11 +129,8 @@ fn grammar_spec(language: &str) -> Option<GrammarSpec> {
 /// indistinguishable from "that repo has no code in those languages" (aegis-ah0q1:
 /// the deployed binary was Rust-only for an undated period and nothing said so).
 ///
-/// Same principle as [`Tier::served`](crate::types::Tier::served) and the reason
-/// the empty `cpg`/`lsp` features were removed (aegis-qe5z): a build must not
-/// advertise a capability it does not have. The inverse is just as costly — a
-/// build must not stay SILENT about a capability it is missing, because the
-/// consumer cannot tell an empty answer from an unsupported one.
+/// Like [`Tier::served`](crate::types::Tier::served), this reports capabilities
+/// from compiled implementations, so empty and unsupported remain distinguishable.
 ///
 /// Gated identically to [`grammar_spec`]; `advertised_languages_all_resolve`
 /// asserts the two cannot drift.

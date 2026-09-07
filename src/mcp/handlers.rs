@@ -134,6 +134,28 @@ pub(super) fn dataflow(
         .path
         .as_ref()
         .map_or_else(|| server.root.clone(), |p| server.root.join(p));
+    if req.interprocedural.unwrap_or(false) {
+        #[cfg(feature = "cpg")]
+        {
+            let dir = if req.forward.unwrap_or(false) {
+                FlowDir::FlowsInto
+            } else {
+                FlowDir::DependsOn
+            };
+            let model = crate::extract::cpg::Cpg::build(&base).map_err(internal)?;
+            return json_result(&model.query(
+                &req.function,
+                req.var.as_deref(),
+                dir,
+                req.hops.unwrap_or(5),
+            ));
+        }
+        #[cfg(not(feature = "cpg"))]
+        return Err(McpError::invalid_params(
+            "interprocedural dataflow requires the cpg feature",
+            None,
+        ));
+    }
     let flow = Dataflow::build(&base).map_err(internal)?;
     let found = flow.has_function(&req.function);
 

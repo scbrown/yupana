@@ -36,6 +36,7 @@ pub mod change;
 pub mod ci_shift;
 pub mod cli;
 mod cli_cmds;
+mod cli_dataflow;
 pub mod community;
 pub mod config;
 pub mod constraint;

@@ -108,25 +108,8 @@ impl Tier {
     /// The tiers this build can ACTUALLY serve — the single source of truth for
     /// `yupana status` / `yupana_status` (aegis-qe5z).
     ///
-    /// It reports a tier only when that tier has a registered extractor. Today
-    /// that is tree-sitter ALONE: the LSP tier (FR-2) and the CPG tier (FR-7) are
-    /// unimplemented, so they are NOT advertised. `status` used to push `lsp`/`cpg`
-    /// on `cfg!(feature = "lsp"/"cpg")`, but those were EMPTY Cargo features that
-    /// gated no code — so `--features lsp` produced a binary that advertised a
-    /// precision tier while every fact it served was still `TreeSitter`. That is
-    /// the exact "present an approximation as precise" failure FR-3 and AGENTS.md
-    /// forbid, one level up at the feature flag (sibling of aegis-8yrn).
-    ///
-    /// When a tier gains a real implementation, add it HERE, gated on that
-    /// implementation (a `Vec` push behind the module that provides it) — never on
-    /// a bare feature flag, which can be enabled without the code existing.
-    ///
-    /// `engine-state` (FR-35) obeys that rule rather than bending it: the
-    /// `game-state` feature gates [`crate::state`], which is the ingestion
-    /// engine itself, so the flag and the implementation are the same thing
-    /// here — unlike the removed `lsp`/`cpg` flags, which gated nothing. A build
-    /// without `game-state` has no `/ingest` to state a fact through and so does
-    /// not advertise the tier.
+    /// Each optional tier is gated with its engine: LSP sessions, Rust CPG,
+    /// and game-state ingestion. Empty feature flags must never advertise a tier.
     #[must_use]
     pub fn served() -> Vec<String> {
         // `mut` is used only on the `game-state` arm; without the allow, the
@@ -135,6 +118,8 @@ impl Tier {
         let mut tiers = vec![Tier::TreeSitter.as_str().to_string()];
         #[cfg(feature = "lsp")]
         tiers.push(Tier::Lsp.as_str().to_string());
+        #[cfg(feature = "cpg")]
+        tiers.push(Tier::Cpg.as_str().to_string());
         #[cfg(feature = "game-state")]
         tiers.push(Tier::EngineState.as_str().to_string());
         tiers
@@ -267,16 +252,16 @@ mod tests {
 
     #[test]
     fn served_tiers_are_only_implemented_ones() {
-        // Status must advertise a tier only when it is real. The
-        // extractor assigns TreeSitter, so that is always claimed — never
-        // `lsp`/`cpg`, which have no implementation. A push of an unimplemented
-        // tier here (or a re-introduced empty feature) fails this.
+        // Optional tiers are advertised exactly with their implemented engines.
         assert!(Tier::served().contains(&"treesitter".to_string()));
         assert_eq!(
             Tier::served().contains(&"lsp".to_string()),
             cfg!(feature = "lsp")
         );
-        assert!(!Tier::served().contains(&"cpg".to_string()));
+        assert_eq!(
+            Tier::served().contains(&"cpg".to_string()),
+            cfg!(feature = "cpg")
+        );
     }
 
     /// The `engine-state` tier is advertised EXACTLY when the engine that can

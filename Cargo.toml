@@ -135,9 +135,8 @@ langs-extra = [
     "dep:tree-sitter-java",
     "dep:tree-sitter-cpp",
 ]
-# NB: `cpg` (FR-7) is still not a feature: its former empty flag advertised a
-# tier with no engine. `lsp` returned only alongside its real JSON-RPC client,
-# `Tier::served()` arm, tests, and CI matrix. Keep those four pieces atomic.
+# Rust CFG control dependence and bounded interprocedural value flow.
+cpg = []
 # Phase 4: promote committed facts into Quipu, SHACL-validated.
 quipu = ["dep:oxrdf", "dep:oxttl", "dep:oxrdfio", "dep:rudof_lib", "dep:ureq", "dep:ring"]
 # FR-35..FR-39: the game-state harness — generic (non-code) fact ingestion, the

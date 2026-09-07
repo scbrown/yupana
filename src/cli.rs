@@ -194,13 +194,16 @@ enum Commands {
         #[arg(long)]
         to: Option<String>,
     },
-    /// Intra-procedural data dependence within a function.
+    /// Data dependence; optionally trace across direct Rust calls (cpg build).
     Dataflow {
         /// Function to analyze.
         function: String,
         /// Directory to build the dataflow over (defaults to current dir).
         #[arg(default_value = ".")]
         path: PathBuf,
+        /// Use the Rust CPG for control dependence and flow across calls.
+        #[arg(long)]
+        interprocedural: bool,
         /// Trace flow for a specific variable (omit to list all edges).
         #[arg(long)]
         var: Option<String>,
@@ -386,14 +389,20 @@ impl Cli {
                 var,
                 forward,
                 hops,
-            } => cli_cmds::dataflow(
+                interprocedural,
+            } => crate::cli_dataflow::dataflow(
                 self.json,
                 self.quiet,
                 function,
                 path,
                 var.as_deref(),
-                *forward,
+                if *forward {
+                    crate::dataflow::FlowDir::FlowsInto
+                } else {
+                    crate::dataflow::FlowDir::DependsOn
+                },
                 *hops,
+                *interprocedural,
             ),
             Commands::Changed { base, to } => self.changed(base.as_deref(), to.as_deref()),
             Commands::Verify { file, buffer } => {

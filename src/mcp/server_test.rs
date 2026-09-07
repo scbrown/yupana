@@ -219,6 +219,7 @@ async fn dataflow_carries_a_top_level_tier() {
     let payload = served(
         server(&dir)
             .yupana_dataflow(Parameters(DataflowRequest {
+                interprocedural: None,
                 function: "a".into(),
                 path: None,
                 var: None,
@@ -311,6 +312,7 @@ async fn every_fact_serving_response_carries_a_tier() {
             "yupana_dataflow",
             served(
                 s.yupana_dataflow(Parameters(DataflowRequest {
+                    interprocedural: None,
                     function: "a".into(),
                     path: None,
                     var: None,
@@ -332,16 +334,7 @@ async fn every_fact_serving_response_carries_a_tier() {
 
 #[tokio::test]
 async fn status_advertises_only_implemented_tiers() {
-    // yupana_status must claim a tier only when it is real. The extractor
-    // assigns TreeSitter, so that is always advertised — never lsp/cpg, which have
-    // no implementation and are no longer even Cargo features.
-    //
-    // `engine-state` (FR-35) is the one tier that varies, and it varies WITH ITS
-    // ENGINE, not with a bare flag: `game-state` gates `crate::state`, which is
-    // the ingestion path itself. Asserted in both directions so neither
-    // "advertised without the engine" nor "engine built but not advertised" can
-    // pass — the first is the empty-feature lie this test was written for, the
-    // second sends a consumer looking for a tier the build really serves.
+    // Each optional tier varies with its real engine, in both directions.
     let dir = fixture();
     let payload = served(server(&dir).yupana_status().await);
     let tiers = payload["tiers"].as_array().unwrap().clone();
@@ -351,7 +344,10 @@ async fn status_advertises_only_implemented_tiers() {
         cfg!(feature = "lsp"),
         "lsp must be advertised exactly when its engine is compiled"
     );
-    assert!(!tiers.contains(&serde_json::json!("cpg")));
+    assert_eq!(
+        tiers.contains(&serde_json::json!("cpg")),
+        cfg!(feature = "cpg")
+    );
     assert_eq!(
         tiers.contains(&serde_json::json!("engine-state")),
         cfg!(feature = "game-state"),
@@ -535,4 +531,35 @@ async fn references_refuses_half_a_position_rather_than_downgrading_to_a_name() 
         }))
         .await;
     assert!(err.is_err(), "half a position must be refused, not guessed");
+}
+
+#[tokio::test]
+async fn cpg_dataflow_opt_in_and_feature_refusal() {
+    let dir = fixture();
+    std::fs::write(dir.path().join("main.rs"),
+        "fn relay(p:i32)->i32 { p } fn sink(s:i32) {} fn origin(a:i32) { let b=relay(a); sink(b); }").unwrap();
+    let result = server(&dir)
+        .yupana_dataflow(Parameters(DataflowRequest {
+            function: "origin".into(),
+            path: None,
+            var: Some("a".into()),
+            forward: Some(true),
+            hops: Some(32),
+            interprocedural: Some(true),
+        }))
+        .await;
+    if cfg!(feature = "cpg") {
+        let payload = served(result);
+        assert_eq!(payload["tier"], "cpg");
+        assert!(payload["flow"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["name"] == "s" && s["tier"] == "cpg"));
+    } else {
+        assert!(
+            result.is_err(),
+            "a non-CPG build must refuse instead of answering from tree-sitter"
+        );
+    }
 }

@@ -221,6 +221,8 @@ yupana impact <symbol> src --hops 5
 
 # Data dependence within a function
 yupana dataflow <function> src --var <variable>
+# With a cpg-enabled build: bounded Rust flow across direct calls
+yupana dataflow <function> src --interprocedural --var <variable> --forward --hops 32 --json
 
 # Export the referential structure (code + docs) as governed RDF Turtle
 yupana export src --repo myrepo --format turtle

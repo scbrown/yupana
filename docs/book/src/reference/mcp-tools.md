@@ -30,7 +30,7 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 | `yupana_callees` | Direct callees of a symbol (what it calls) |
 | `yupana_communities` | Densely-connected symbol clusters (deterministic Louvain, FR-9) |
 | `yupana_impact` | Blast radius — transitive callers, N hops; reconciles against a `cochange` set (FR-11) |
-| `yupana_dataflow` | Intra-procedural data dependence within a function |
+| `yupana_dataflow` | Local data dependence; `interprocedural: true` opts into Rust CPG |
 | `yupana_verify` | Verdict on a **proposed** edit buffer, before you write it (FR-23/FR-24) |
 | `yupana_promote` | Promote a subtree's facts to Quipu — SHACL-validate, then write (needs the `quipu` feature) |
 | `yupana_ingest` | Load generic (non-code) facts into the hot board graph (FR-35; needs the `game-state` feature) |
@@ -84,3 +84,13 @@ not "this compiles".
 
 Every response carries a `tier` tag; structure-reading requests will accept a
 `tenant` parameter as multi-tenancy lands (Phase 3).
+
+### CPG dataflow opt-in
+
+`yupana_dataflow` accepts `interprocedural: true` in a build with `mcp,cpg`.
+The `function`, `var`, `forward`, `hops`, and `path` selectors keep their roles;
+the result becomes the CPG report described in [CLI reference](cli.md#rust-cpg-dataflow-cpg-feature),
+including source-qualified witness paths, control edges, diagnostics, and search
+truncation. Both the report and its facts carry `tier: "cpg"`. Omit the flag for
+the existing intra-procedural response. Without `cpg`, requesting the flag returns
+an error rather than silently substituting a tree-sitter answer.
