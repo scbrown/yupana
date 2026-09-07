@@ -268,6 +268,10 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         "src/project_trajectory.rs",
         "policies/delegate-line.ttl",
         "src/project_queries.rs",
+        // Bounded text reads and their equivalence fixtures use the same
+        // vocabulary as the original whole-catalogue query.
+        "src/project/text_fetch.rs",
+        "src/project/text_fetch_test.rs",
         // §9.4's branch qualifier and §9.7's commit provenance both write into
         // the promoted graph, so their fixtures and assertions are the same data
         // contract `src/export.rs` and `src/promote_test.rs` already carry: a

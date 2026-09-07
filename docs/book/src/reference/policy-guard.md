@@ -152,6 +152,20 @@ own silent failure:
   guard not running. Collapsing them is what made a soak count unguarded edits
   as clean ones.
 
+Text-rule refresh separates catalogue membership from property retrieval. It
+discovers every `TextRule` subclass through the explicit subclass path, then
+reads each subject's properties directly. It reconstructs the original query's
+required and optional bindings before decoding, including every distinct label,
+rationale and exemption. This avoids expensive whole-store optional joins as
+the graph grows. Repository landing lookup starts from `landingPolicy` before
+checking the repository type; its selected fields and filters are unchanged.
+
+These reads do not extend the HTTP deadline or the cache TTL. A failed or
+explicitly truncated text-catalogue read fails the refresh and preserves the
+prior cache. Like the other independently fetched policy planes, discovery and
+subject reads do not share a transactional snapshot; a concurrent graph edit
+can be reflected across successive refreshes.
+
 ### Replay exposure faithfully
 
 A `guard` metrics record produced by the governed plane includes `exposure` and

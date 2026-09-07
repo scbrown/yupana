@@ -5,6 +5,7 @@ use crate::rules::Rule;
 use crate::textrules::TextRule;
 use crate::types::Freshness;
 mod cache_install;
+mod text_fetch;
 
 pub use crate::project_decode::{decode_policies, decode_text_rules};
 pub use crate::project_exposure::{fetch_repo_exposure, RepoExposure};
@@ -41,7 +42,7 @@ pub struct ProjectedPolicy {
 
 /// Fetch and decode the governed text-rule catalogue over HTTP.
 pub fn fetch_text_rules(endpoint: &str) -> Result<Vec<TextRule>> {
-    decode_text_rules(&query(endpoint, TEXT_POLICY_QUERY)?)
+    text_fetch::fetch(endpoint)
 }
 
 /// The ceiling on ANY single projection HTTP call. This path runs inside the

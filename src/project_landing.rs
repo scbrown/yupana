@@ -160,8 +160,8 @@ PREFIX aegis: <http://aegis.gastown.local/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state WHERE {
-  ?repo a aegis:GitRepo ;
-        aegis:landingPolicy ?rule .
+  ?repo aegis:landingPolicy ?rule .
+  ?repo a aegis:GitRepo .
   OPTIONAL { ?repo rdfs:label ?label }
   OPTIONAL { ?repo skos:altLabel ?alt }
   OPTIONAL { ?repo aegis:owned_by ?owner }
