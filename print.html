@@ -958,7 +958,7 @@ COMMANDS:
     callers     Direct callers and callees of a symbol
     communities Densely-connected symbol clusters (deterministic Louvain, FR-9)
     impact      Blast radius; --cochange reconciles against history (FR-11)
-    dataflow    Intra-procedural data dependence within a function
+    dataflow    Local data dependence, or opt-in Rust CPG flow across calls
     export      Emit the referential structure as Turtle (bobbin: ontology)
     hook        Harness hook adapter (post-edit advisory / pre-edit guard)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
@@ -1273,6 +1273,50 @@ a generated narrowing pattern <strong>offered for human approval</strong>, and t
 exemplar's embedding as a similarity anchor with a suggested threshold that
 quipu's backtest replaces. Nothing emitted is a policy; quipu's
 definition-time placement check remains the refusal authority.</p>
+<h2 id="rust-cpg-dataflow-cpg-feature"><a class="header" href="#rust-cpg-dataflow-cpg-feature">Rust CPG dataflow (<code>cpg</code> feature)</a></h2>
+<p>Build with <code>just build --features cpg</code>. The ordinary <code>dataflow</code> command keeps its
+intra-procedural, <code>treesitter</code> result in every build. Opt in explicitly:</p>
+<pre><code class="language-bash">yupana dataflow main ./src --interprocedural --var input --forward --hops 32 --json
+yupana dataflow main ./src --interprocedural --json
+</code></pre>
+<p>The CPG mode emits JSON (also without <code>--json</code>). Without <code>--var</code>, it returns
+control-dependence edges for the selected function. Each edge carries
+<code>relation: "bobbin:controlDependsOn"</code>, <code>tier: "cpg"</code>, statement IDs, and the
+statement/condition lines. A CFG postdominator calculation handles branches,
+merges, early returns, and unlabeled <code>while</code>/<code>loop</code>, <code>break</code>, and <code>continue</code>.
+It does not infer control dependence from lexical nesting alone. An unsupported
+control construct or a region unable to reach an exit omits that function's
+control facts with a diagnostic. Calls are modeled with normal return behavior;
+unwinding and diverging callees are not modeled.</p>
+<p>With <code>--var</code>, the same reply adds explicit value-flow reachability across
+lexically resolved bare calls and unique <code>crate::...</code> calls between Rust free
+functions. Argument-to-parameter and return-to-result edges connect the functions.
+Call-site matching prevents the return of one invocation from contaminating a
+second invocation. <code>--forward</code> follows source to sink; the default follows
+dependencies backwards. Each reached value has a <code>cpg</code> tier, qualified function,
+source line, distance, and a witness <code>path</code>. Use <code>$return</code> to start from a
+function's return value. No implicit flow from a branch condition is added to
+the explicit value-flow graph; control edges are reported separately.</p>
+<p>A simple function name must resolve uniquely. Ambiguous selectors report the
+exact file/scope/byte IDs to use. Bindings are declaration-scoped, so shadowed
+locals and same-named functions remain separate. A variable name selects all
+matching bindings inside the selected function; use its exact value ID to
+select one. IDs refer to the current source snapshot and can change after edits.</p>
+<p>This is a bounded source approximation, <strong>not a safety verdict</strong>. Local assignments
+are flow-insensitive; path feasibility, heap aliases, sanitizer semantics,
+exceptions, macros, closures, async, traits/method dispatch and imported aliases
+are not resolved. Unsupported constructs, syntax errors and unresolved calls are
+reported in <code>diagnostics</code>; unknown calls do not invent argument-to-return edges.
+A missing path cannot prove absence of a real flow. <code>truncated</code> reports exhausted
+hop/state budgets (maximum 256 hops and 50,000 traversal states), including
+recursive paths. Control extraction also bounds CFG size (2,048 blocks and
+10,000 AST descendants per function), reporting omissions in <code>diagnostics</code>.
+<code>truncated: false</code> does not remove the model's limitations.</p>
+<p>The analysis is on-demand over Rust source, honoring source selection and ignore
+rules. It does not require a build or launch an external CPG engine. These CPG
+facts are served through the query response; the ordinary referential Turtle
+export and resident daemon <code>/dataflow</code> remain their existing tree-sitter surfaces.
+A build without <code>cpg</code> refuses <code>--interprocedural</code> with an explicit error.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h1>
 <p>Yupana reads the <code>[yupana]</code> table of <code>.bobbin/config.toml</code>. All keys are optional;
 unspecified keys fall back to the defaults shown below.</p>
@@ -1514,7 +1558,7 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 <tr><td><code>yupana_callees</code></td><td>Direct callees of a symbol (what it calls)</td></tr>
 <tr><td><code>yupana_communities</code></td><td>Densely-connected symbol clusters (deterministic Louvain, FR-9)</td></tr>
 <tr><td><code>yupana_impact</code></td><td>Blast radius — transitive callers, N hops; reconciles against a <code>cochange</code> set (FR-11)</td></tr>
-<tr><td><code>yupana_dataflow</code></td><td>Intra-procedural data dependence within a function</td></tr>
+<tr><td><code>yupana_dataflow</code></td><td>Local data dependence; <code>interprocedural: true</code> opts into Rust CPG</td></tr>
 <tr><td><code>yupana_verify</code></td><td>Verdict on a <strong>proposed</strong> edit buffer, before you write it (FR-23/FR-24)</td></tr>
 <tr><td><code>yupana_promote</code></td><td>Promote a subtree's facts to Quipu — SHACL-validate, then write (needs the <code>quipu</code> feature)</td></tr>
 <tr><td><code>yupana_ingest</code></td><td>Load generic (non-code) facts into the hot board graph (FR-35; needs the <code>game-state</code> feature)</td></tr>
@@ -1557,6 +1601,14 @@ rather than guessed at. <code>ok: true</code> means "nothing this tier can see i
 not "this compiles".</p>
 <p>Every response carries a <code>tier</code> tag; structure-reading requests will accept a
 <code>tenant</code> parameter as multi-tenancy lands (Phase 3).</p>
+<h3 id="cpg-dataflow-opt-in"><a class="header" href="#cpg-dataflow-opt-in">CPG dataflow opt-in</a></h3>
+<p><code>yupana_dataflow</code> accepts <code>interprocedural: true</code> in a build with <code>mcp,cpg</code>.
+The <code>function</code>, <code>var</code>, <code>forward</code>, <code>hops</code>, and <code>path</code> selectors keep their roles;
+the result becomes the CPG report described in <a href="reference/cli.html#rust-cpg-dataflow-cpg-feature">CLI reference</a>,
+including source-qualified witness paths, control edges, diagnostics, and search
+truncation. Both the report and its facts carry <code>tier: "cpg"</code>. Omit the flag for
+the existing intra-procedural response. Without <code>cpg</code>, requesting the flag returns
+an error rather than silently substituting a tree-sitter answer.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="resident-daemon"><a class="header" href="#resident-daemon">Resident Daemon</a></h1>
 <p><code>yupana daemon</code> is the Phase-3 resident engine (FR-31): it builds the base graph
 <strong>once</strong>, holds it in memory, and answers queries over a local HTTP API

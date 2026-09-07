@@ -204,7 +204,7 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 <tr><td><code>yupana_callees</code></td><td>Direct callees of a symbol (what it calls)</td></tr>
 <tr><td><code>yupana_communities</code></td><td>Densely-connected symbol clusters (deterministic Louvain, FR-9)</td></tr>
 <tr><td><code>yupana_impact</code></td><td>Blast radius — transitive callers, N hops; reconciles against a <code>cochange</code> set (FR-11)</td></tr>
-<tr><td><code>yupana_dataflow</code></td><td>Intra-procedural data dependence within a function</td></tr>
+<tr><td><code>yupana_dataflow</code></td><td>Local data dependence; <code>interprocedural: true</code> opts into Rust CPG</td></tr>
 <tr><td><code>yupana_verify</code></td><td>Verdict on a <strong>proposed</strong> edit buffer, before you write it (FR-23/FR-24)</td></tr>
 <tr><td><code>yupana_promote</code></td><td>Promote a subtree's facts to Quipu — SHACL-validate, then write (needs the <code>quipu</code> feature)</td></tr>
 <tr><td><code>yupana_ingest</code></td><td>Load generic (non-code) facts into the hot board graph (FR-35; needs the <code>game-state</code> feature)</td></tr>
@@ -247,6 +247,14 @@ rather than guessed at. <code>ok: true</code> means "nothing this tier can see i
 not "this compiles".</p>
 <p>Every response carries a <code>tier</code> tag; structure-reading requests will accept a
 <code>tenant</code> parameter as multi-tenancy lands (Phase 3).</p>
+<h3 id="cpg-dataflow-opt-in"><a class="header" href="#cpg-dataflow-opt-in">CPG dataflow opt-in</a></h3>
+<p><code>yupana_dataflow</code> accepts <code>interprocedural: true</code> in a build with <code>mcp,cpg</code>.
+The <code>function</code>, <code>var</code>, <code>forward</code>, <code>hops</code>, and <code>path</code> selectors keep their roles;
+the result becomes the CPG report described in <a href="cli.html#rust-cpg-dataflow-cpg-feature">CLI reference</a>,
+including source-qualified witness paths, control edges, diagnostics, and search
+truncation. Both the report and its facts carry <code>tier: "cpg"</code>. Omit the flag for
+the existing intra-procedural response. Without <code>cpg</code>, requesting the flag returns
+an error rather than silently substituting a tree-sitter answer.</p>
 
                     </main>
 
