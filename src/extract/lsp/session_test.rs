@@ -16,6 +16,11 @@ fn installed(program: &str) -> bool {
         .status()
         .is_ok_and(|s| s.success());
     if !available {
+        assert_ne!(
+            std::env::var("YUPANA_REQUIRE_LSP_SERVERS").as_deref(),
+            Ok("1"),
+            "required real language server is unavailable: {program}"
+        );
         eprintln!("SKIP real LSP test: {program} is unavailable");
     }
     available

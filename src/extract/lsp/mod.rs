@@ -220,6 +220,7 @@ impl Client {
             Query::References => "textDocument/references",
             Query::TypeDefinition => "textDocument/typeDefinition",
         };
+        let cold = changed || !self.warmed_methods.contains(method);
         let mut params = json!({
             "textDocument": {"uri": uri},
             "position": {
@@ -237,7 +238,7 @@ impl Client {
         for attempt in 0..30 {
             let response = self.request(method, &params)?;
             let found = locations(response.get("result").unwrap_or(&Value::Null), &self.root);
-            if !found.is_empty() || !changed || attempt == 29 {
+            if !found.is_empty() || !cold || attempt == 29 {
                 return Ok(found);
             }
             std::thread::sleep(Duration::from_millis(100));

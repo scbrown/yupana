@@ -28,7 +28,7 @@ while True:
     else:
         requests += 1
         if requests == 1: reply['error'] = {'code':-32801, 'message':'content modified'}
-        elif requests == 2:
+        elif requests == 2 or (sys.argv[2] == 'cold-method' and requests == 4):
             reply['result'] = [{'uri':'file://' + sys.argv[1] + '/x.rs', 'range':{'start':{'line':0,'character':3},'end':{'line':0,'character':4}}}]
         else: reply['result'] = []
     send(reply)
@@ -69,10 +69,37 @@ fn content_modified_retries_but_a_warm_empty_answer_returns_immediately() {
     assert!(client.warmed_methods.contains("textDocument/definition"));
     let start = std::time::Instant::now();
     assert!(client
-        .query(&file, &position, Query::References)
+        .query(&file, &position, Query::Definition)
         .unwrap()
         .is_empty());
     assert!(start.elapsed() < Duration::from_secs(1));
+}
+
+#[test]
+fn a_new_capability_still_retries_cold_empty_results_on_an_open_document() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("x.rs");
+    std::fs::write(&file, "fn x() {}\n").unwrap();
+    let mut client = client(dir.path(), "cold-method");
+    let position = Position {
+        file: "x.rs".into(),
+        line: 1,
+        column: 4,
+    };
+    assert_eq!(
+        client
+            .query(&file, &position, Query::Definition)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .query(&file, &position, Query::References)
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]

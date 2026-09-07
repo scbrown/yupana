@@ -153,10 +153,14 @@ jobs:
           npm install --global typescript-language-server@5.3.0 typescript@5.9.3
 
       - run: cargo test ${{ matrix.flags }}
+        env:
+          YUPANA_REQUIRE_LSP_SERVERS: ${{ matrix.name == 'lsp' && '1' || '0' }}
 
       - name: Report real language-server warm latency
         if: matrix.name == 'lsp'
         run: cargo test --features lsp real_ -- --nocapture
+        env:
+          YUPANA_REQUIRE_LSP_SERVERS: "1"
 
   # Feature arms join the matrix as their engines land, so a feature can never
   # "ship dark" (Bobbin's hard-won lesson). --features quipu joined in Phase 4
