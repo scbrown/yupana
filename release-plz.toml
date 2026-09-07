@@ -1,6 +1,38 @@
 [workspace]
 changelog_config = "cliff.toml"
 publish = false
+
+# ⛔ WITHOUT THIS, THE LANE DEADLOCKS AT THE CURRENT VERSION AND SAYS SO IN GREEN.
+#
+# release-plz resolves "the last released version" by downloading the crate from
+# crates.io. `yupana` HAS NEVER BEEN PUBLISHED there ("crate `yupana` does not
+# exist" — measured 2026-09-06; only the pre-rename `hank` 0.4.0 from the archived
+# repo). With no registry baseline it concludes the package is unreleased and that
+# the manifest version IS the next version. Measured, run 34066854500:
+#
+#     INFO yupana: next version is 0.6.5        <- no bump
+#     INFO the repository is already up-to-date
+#     release_pr_output: {"prs":[]}
+#     INFO yupana 0.6.5: Already published - Tag v0.6.5 already exists
+#
+# over 11 `feat` and 12 `fix` subjects and 73 changed files under src/. Every push
+# to main ran this and reported SUCCESS, so the repo sat 81 commits ahead of v0.6.5
+# with nothing red anywhere (aegis-dn0hi5). `publish = false` above stops us
+# PUBLISHING; it does not stop that lookup — a sentence quipu's own release-plz.toml
+# already carries, for a different reason: there the bare name collides with an
+# unrelated crate, here the name is simply absent. Same setting, same cure.
+#
+# `git_only` makes the tags the baseline, which is what a binary tool distributed
+# by GitHub release actually wants. It must not be combined with `publish = true`;
+# publish is false above.
+#
+# ⚠️ DELIBERATELY NOT FIXED by setting `publish = false` in Cargo.toml, which would
+# also stop the lookup. That flag makes `cargo publish` refuse permanently, and the
+# crates lane in .github/workflows/release.yml is held in DRY-RUN behind the repo
+# variable CRATES_PUBLISH_ENABLED precisely because the first publish CLAIMS THE
+# NAME on crates.io and that is Stiwi's call, on the Desk CRATES card. Settling an
+# open decision as a side effect of a release-lane repair is not a fix.
+git_only = true
 git_release_enable = true
 git_tag_enable = true
 # release-plz's DEFAULT tag template is `{{ package }}-v{{ version }}`, i.e. it
