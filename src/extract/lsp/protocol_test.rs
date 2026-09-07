@@ -66,6 +66,7 @@ fn content_modified_retries_but_a_warm_empty_answer_returns_immediately() {
             .len(),
         1
     );
+    assert!(client.warmed_methods.contains("textDocument/definition"));
     let start = std::time::Instant::now();
     assert!(client
         .query(&file, &position, Query::References)
@@ -92,4 +93,5 @@ fn malformed_success_is_not_an_empty_precise_answer() {
     let dir = tempfile::tempdir().unwrap();
     let mut client = client(dir.path(), "malformed");
     assert!(client.request("probe", &json!({})).is_err());
+    assert!(!client.warmed_methods.contains("probe"));
 }

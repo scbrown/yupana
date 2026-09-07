@@ -34,7 +34,12 @@ fn exercise(root: &Path, file: &str, text: &str, server: &str) {
     let references = session.locations(&declaration, Query::References).unwrap();
     assert!(references.value.iter().any(|v| v.start_line == 3));
     let variable = position(file, text, 3, "result.value");
+    let cold_type = std::time::Instant::now();
     let types = session.locations(&variable, Query::TypeDefinition).unwrap();
+    eprintln!(
+        "REAL LSP {server} first type-definition: {:?}",
+        cold_type.elapsed()
+    );
     assert!(types.value.iter().any(|v| v.start_line == 1), "{types:?}");
     let hover = session.hover(&call).unwrap();
     assert_eq!(hover.tier, crate::types::Tier::Lsp);

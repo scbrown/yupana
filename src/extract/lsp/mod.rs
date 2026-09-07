@@ -7,7 +7,7 @@
 //! `treesitter`-tagged fallback. One client owns one warm server process and can
 //! answer repeated queries without respawning it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -111,6 +111,7 @@ struct Client {
     next_id: u64,
     server: Server,
     opened: HashMap<PathBuf, (String, u64)>,
+    warmed_methods: HashSet<String>,
 }
 
 impl Client {
@@ -156,6 +157,7 @@ impl Client {
             next_id: 1,
             server,
             opened: HashMap::new(),
+            warmed_methods: HashSet::new(),
         };
         let root_uri = file_uri(&client.root);
         client.request_with_timeout(
@@ -244,7 +246,18 @@ impl Client {
     }
 
     fn request(&mut self, method: &str, params: &Value) -> anyhow::Result<Value> {
-        self.request_with_timeout(method, params, Duration::from_secs(5))
+        // Initialization is protocol-ready, not capability-ready: servers may
+        // lazily build semantic indexes on the first type/hover request even
+        // after syntax-based definitions succeeded. Keep this cold budget
+        // separate from subsequent requests and the measured warm p95 target.
+        let seconds = if self.warmed_methods.contains(method) {
+            5
+        } else {
+            30
+        };
+        let response = self.request_with_timeout(method, params, Duration::from_secs(seconds))?;
+        self.warmed_methods.insert(method.to_owned());
+        Ok(response)
     }
 
     fn request_with_timeout(

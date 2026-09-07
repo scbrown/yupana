@@ -297,7 +297,10 @@ Retained sessions read saved contents on demand and send `didChange` before
 querying an edited file. Dropping the session terminates and reaps its server.
 They perform no work per keystroke. The one-shot CLI still starts a cold server;
 the warm-server performance target applies to retained sessions, not cold
-startup. A bounded `ContentModified` retry handles indexing without resetting
+startup. Each capability's first request has a 30-second cold deadline because
+servers may initialize semantic indexes lazily; later requests have a five-second
+ceiling, while the measured warm p95 target remains below one second.
+A bounded `ContentModified` retry handles indexing without resetting
 the request deadline, and unrelated server notifications cannot extend it.
 
 The LSP CI arm installs rust-analyzer and a pinned TypeScript language server.
