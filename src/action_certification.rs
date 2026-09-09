@@ -215,33 +215,42 @@ pub fn sign(input: ActionInput, key: &Ed25519KeyPair) -> Result<SignedActionReco
 }
 
 pub fn append(path: &Path, record: &SignedActionRecord) -> Result<()> {
-    if let Ok(existing) = std::fs::read_to_string(path) {
-        for line in existing.lines() {
-            let Ok(prior) = serde_json::from_str::<SignedActionRecord>(line) else {
-                continue;
-            };
-            if prior.record_id == record.record_id {
-                if prior.signed_payload_hash == record.signed_payload_hash {
-                    return Ok(());
-                }
-                return Err(Error::Promote(format!(
-                    "record_id {} already exists with a different signed payload",
-                    record.record_id
-                )));
-            }
-        }
-    }
+    use std::io::{Read, Write};
+
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
         .create(true)
+        .read(true)
         .append(true)
         .open(path)?;
-    serde_json::to_writer(&mut file, record)
+    // The gate and host adapter share this spool. Lock BEFORE the identity
+    // check, so concurrent retries cannot both append the same record. The
+    // descriptor owns the lock and releases it on every return path.
+    file.lock()?;
+    let mut existing = String::new();
+    file.read_to_string(&mut existing)?;
+    for line in existing.lines() {
+        let Ok(prior) = serde_json::from_str::<SignedActionRecord>(line) else {
+            continue;
+        };
+        if prior.record_id == record.record_id {
+            if prior.signed_payload_hash == record.signed_payload_hash {
+                return Ok(());
+            }
+            return Err(Error::Promote(format!(
+                "record_id {} already exists with a different signed payload",
+                record.record_id
+            )));
+        }
+    }
+    // Serialize before writing: to_writer(File) emits many small writes which
+    // interleave between processes even on an append-only descriptor.
+    let mut bytes = serde_json::to_vec(record)
         .map_err(|e| Error::Promote(format!("serialize action record: {e}")))?;
-    writeln!(file)?;
+    bytes.push(b'\n');
+    file.write_all(&bytes)?;
     Ok(())
 }
 
@@ -321,5 +330,49 @@ mod tests {
         let error = append(&path, &changed).unwrap_err().to_string();
         assert!(error.contains("different signed payload"));
         assert_eq!(std::fs::read_to_string(path).unwrap().lines().count(), 1);
+    }
+    #[test]
+    fn concurrent_writers_preserve_records_and_deduplicate_retries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("actions.jsonl");
+        let kp = key();
+        let records: Vec<_> = (0..16)
+            .map(|n| {
+                let mut action = input(true);
+                action.record_id = format!("concurrent-{n}");
+                action.scope_provenance = serde_json::json!({"command": "x".repeat(8192)});
+                sign(action, &kp).unwrap()
+            })
+            .collect();
+        let mut shared_input = input(true);
+        shared_input.record_id = "shared".into();
+        let shared = sign(shared_input, &kp).unwrap();
+        let barrier = std::sync::Barrier::new(16);
+        std::thread::scope(|scope| {
+            for record in &records {
+                let path = &path;
+                let barrier = &barrier;
+                let shared = &shared;
+                scope.spawn(move || {
+                    barrier.wait();
+                    for _ in 0..3 {
+                        append(path, record).unwrap();
+                        // Every writer also races to append the same identity.
+                        append(path, shared).unwrap();
+                    }
+                });
+            }
+        });
+        let text = std::fs::read_to_string(path).unwrap();
+        assert!(text.ends_with('\n'));
+        let rows: Vec<SignedActionRecord> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(rows.len(), records.len() + 1);
+        for record in records {
+            assert!(rows.contains(&record));
+        }
+        assert_eq!(rows.iter().filter(|r| r.record_id == "shared").count(), 1);
     }
 }
