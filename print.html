@@ -761,6 +761,19 @@ additive, default-graph-preserving quad-store extension —
 Yupana can fall back to a branch qualifier. See the
 <a href="concepts/../design/specification.html">Specification</a> §9 for the ontology extension and
 the quad-store RFC sketch.</p>
+<h3 id="commit-provenance-and-time"><a class="header" href="#commit-provenance-and-time">Commit provenance and time</a></h3>
+<p>Committed CLI promotion emits <code>GitCommit</code> → <code>modifies</code> edges only for touched
+modules present in the projection. It sends the authored git <code>%aI</code> timestamp as
+<code>valid_from</code> for append, snapshot and subset writes. Quipu returns a normalized
+UTC key, which Yupana prints as <code>valid-from: &lt;key&gt;</code>; use that returned key for
+<code>valid_at</code> queries, since a local offset can cross a UTC day boundary.</p>
+<p>Transaction time remains server assigned, and <code>actor="yupana"</code> identifies the
+writer. The commit carries separate <code>author</code>, <code>date</code> (authored time) and
+<code>committer</code> facts. If the server does not confirm <code>valid_from</code>, promotion fails
+with an explicit warning that the write may already have landed. Upgrade the
+server and inspect that write before retrying.</p>
+<p>Yupana emits raw provenance only. Work-item linking belongs to the tracker-aware
+ingest lane, and aggregation belongs to <a href="https://github.com/scbrown/quipu/issues/37">Quipu #37</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-game-state-harness"><a class="header" href="#the-game-state-harness">The Game-State Harness</a></h1>
 <p>FR-35..FR-39, behind the <code>game-state</code> Cargo feature. This is a real widening of
 Yupana's mandate: from a <em>code</em> graph analyzer to a <strong>general in-memory fact graph
