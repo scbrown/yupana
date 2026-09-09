@@ -972,7 +972,7 @@ Quipu; Yupana holds only what is in flight plus a read-only projection of the ba
 
 Yupana's promotion emits more than entity facts — at commit time it can write the
 **provenance edge `commit → touched entities`** (valid-time = commit time,
-`source` = SHA, `actor` = committer). That provenance is the substrate for a
+`source` includes the resolved SHA, `actor` = the writing process). That provenance is the substrate for a
 Quipu-side capability distinct from Bobbin's statistical co-change:
 **governed, provenance-based work-item co-occurrence** (ticket/epic ↔ code).
 
@@ -998,10 +998,10 @@ is only to promote the provenance edge in Phase 4.
 
 **Status (GH #5): the edge is produced inside Yupana at promotion time.**
 `src/promote_provenance.rs` emits, per promoted commit, a `bobbin:GitCommit`
-node (`hash` / `repo` / `author` / `date` as a typed `xsd:dateTime` / `rdfs:label`)
+node (`hash` / `repo` / `author` / `committer` / typed `date` / `rdfs:label`)
 and one `bobbin:modifies` statement per touched `CodeModule`, gated by
 `GitCommitShape` + `ModifiesShape` in `shapes/code-edges.ttl`, synced from
-Quipu's registry. Three deliberate limits:
+Quipu's registry. Two deliberate limits:
 
 - **`aegis:implements` is NOT emitted.** The commit → work-item link needs a
   declared project-prefix vocabulary Yupana does not hold, and the tracker-aware
@@ -1011,28 +1011,24 @@ Quipu's registry. Three deliberate limits:
 - **Module granularity.** "Touched" means the commit changed the file, which is
   exactly true. Symbol-level touch would need a per-symbol diff and would
   over-claim if guessed from a file-level one.
-- **Valid-time rides as a fact, not as a transaction field.** Verified against
-  Quipu `main`: `tool_knot` takes `turtle` / `timestamp` / `actor` / `source` /
-  `shapes` / `replace_snapshot` / `snapshot` / `graph` and has **no `valid_from`
-  parameter**, so the valid-time axis is not settable over `/knot`. The commit's
-  authored time therefore rides as `bobbin:date`. Putting it in `timestamp`
-  would falsify transaction time ("when learned"), which is the axis that IS
-  correct today.
+Committed CLI promotion sends the author's strict ISO-8601 git timestamp (`%aI`)
+verbatim as `/knot` `valid_from`, on append, snapshot and subset writes. Quipu
+normalizes it to second-precision UTC and returns the stored key; Yupana retains
+that response and prints `valid-from: <key>` for `valid_at` queries. An offset
+can cross a UTC day boundary, so never substitute the submitted spelling. A
+server that omits the confirmation cannot yield a successful committed promotion;
+the error states that a write may already have landed.
 
-**Divergence with the pre-existing out-of-tree ingest lane, and the fix.**
-Measured, not assumed. camayoc's `scripts/ingest_git_provenance.py` mints under
-`BASE = http://aegis.gastown.local/code/`; Yupana mints under
-`http://aegis.gastown.local/ontology/code/…`, the base its own entities live at.
-Those are different IRIs for the same referents, so this is **not** a
-double-write — the two lanes produce disjoint populations that never collide and
-never join. Quipu's own `src/namespace.rs` records the measurement (2026-08-23):
-subjects under `CODE_BASE` number **0**, subjects under the ontology base
-**10,425**, and it warns that building against `CODE_BASE` forks the code graph.
-The resolution is a one-line `BASE` repoint on the camayoc side, which that note
-already asks for; afterwards both lanes mint identical commit and module IRIs and
-`/knot` supersedes per `(s, p, o)`, so they converge rather than duplicate.
-Yupana's `rdfs:label` spelling matches the ingest's (`<repo>@<sha[:12]>`) so that
-convergence does not leave two labels on one node.
+`timestamp` stays server assigned (transaction time, "when learned"). `actor`
+remains `yupana` (writer attribution). `bobbin:author` and `bobbin:date` describe
+the author; `bobbin:committer` records the actual committer, who may be different.
+This explicitly replaces the original actor-equals-committer proposal. APIs that
+promote an uncommitted projection retain their existing time behavior.
+
+Commit IRIs share the exporter's base with module IRIs. The tracker-aware ingest
+lane has been repointed to that base; unusual-path escaping can still differ,
+so universal cross-producer IRI equivalence is not claimed. The label spelling
+remains `<repo>@<sha[:12]>`.
 
 ### 9.8 Bounded transitive paths over the promoted graph (Quipu-side follow-up)
 

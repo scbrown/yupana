@@ -244,146 +244,9 @@ fn normalize_token(raw: Option<String>) -> Option<String> {
     raw.filter(|t| !t.is_empty())
 }
 
-/// Post validated Turtle to Quipu's `/knot`. Returns the number of triples the
-/// transaction reports as present for these facts — the count that makes
-/// idempotence checkable (a re-promotion returns the same count, not a larger one).
-///
-/// `endpoint` is the Quipu base URL (e.g. from `--to` / config); this appends
-/// `/knot`. NEVER defaulted to a hardcoded host — a promotion that silently picks a
-/// graph is how facts land in the wrong one.
-pub fn write_knot(endpoint: &str, turtle: &str, source: &str) -> Result<KnotResult> {
-    write_knot_request(endpoint, turtle, source, None)
-}
-
-/// Atomically replace one stable producer snapshot through `/knot`.
-pub fn write_knot_snapshot(
-    endpoint: &str,
-    turtle: &str,
-    source: &str,
-    snapshot: &str,
-) -> Result<KnotResult> {
-    write_knot_request(endpoint, turtle, source, Some(snapshot))
-}
-
-fn write_knot_request(
-    endpoint: &str,
-    turtle: &str,
-    source: &str,
-    snapshot: Option<&str>,
-) -> Result<KnotResult> {
-    let url = format!("{}/knot", endpoint.trim_end_matches('/'));
-    let auth = quipu_auth_token();
-    // Provenance on every write (promotion tail item 4): quipu records actor +
-    // source per transaction; an anonymous writer is unauditable, and yupana was
-    // the only anonymous one left.
-    let mut body = serde_json::json!({
-        "turtle": turtle,
-        "actor": "yupana",
-        "source": source
-    });
-    if let Some(key) = snapshot {
-        body["replace_snapshot"] = serde_json::Value::Bool(true);
-        body["snapshot"] = serde_json::Value::String(key.to_string());
-    }
-    let body = body.to_string();
-
-    // Quipu is known to flap (transient 503 "no available server", recovering in
-    // seconds). Ride through TRANSIENT failures — 5xx and transport errors — with
-    // a short backoff; a 4xx is a real answer and fails immediately. The
-    // all-or-nothing guarantee is unaffected: every attempt is the same full
-    // idempotent write, and exhausting retries still fails loud, never partial.
-    const ATTEMPTS: u32 = 3;
-    let mut resp = None;
-    let mut last_err = String::new();
-    for attempt in 1..=ATTEMPTS {
-        let mut req = crate::quipu_label::json_post(&url, crate::quipu_label::PROMOTE);
-        if let Some(token) = &auth {
-            req = req.set("Authorization", &format!("Bearer {token}"));
-        }
-        match req.send_string(&body) {
-            Ok(r) => {
-                resp = Some(r);
-                break;
-            }
-            Err(ureq::Error::Status(code, _)) if code < 500 => {
-                return Err(Error::Promote(format!("POST {url} failed: status {code}")));
-            }
-            Err(e) => {
-                last_err = e.to_string();
-                if attempt < ATTEMPTS {
-                    std::thread::sleep(std::time::Duration::from_secs(2 * u64::from(attempt)));
-                }
-            }
-        }
-    }
-    let resp = resp.ok_or_else(|| {
-        Error::Promote(format!(
-            "POST {url} failed after {ATTEMPTS} attempts (transient errors retried): {last_err}"
-        ))
-    })?;
-
-    let text = resp
-        .into_string()
-        .map_err(|e| Error::Promote(format!("could not read /knot response: {e}")))?;
-    // Quipu can REFUSE the write server-side: its persistent shape registry,
-    // when loaded, validates independently of yupana's in-process gate, and a
-    // shape the server holds that yupana's copy lacks surfaces HERE as HTTP 200
-    // with conforms:false (seen live: a stored symbolKind maxCount(1) refused
-    // a projection yupana's shapes accepted). That is a real refusal and must
-    // read as one — not as a JSON parse error on a missing `count` field.
-    if let Ok(refusal) = serde_json::from_str::<KnotRefusal>(&text) {
-        if !refusal.conforms {
-            let issues = refusal
-                .issues
-                .iter()
-                .map(|i| format!("{} {} on {}", i.component, i.message, i.focus_node))
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(Error::Promote(format!(
-                "quipu refused the write (server-side SHACL, {} violation(s)): {issues}. \
-                 yupana's own shapes ACCEPTED this projection — the two shape sets have \
-                 drifted; reconcile shapes/code-edges.ttl with quipu's stored registry.",
-                refusal.violations
-            )));
-        }
-    }
-    let parsed: KnotResult = serde_json::from_str(&text)
-        .map_err(|e| Error::Promote(format!("unexpected /knot response {text:?}: {e}")))?;
-    Ok(parsed)
-}
-
-/// Quipu's `/knot` refusal shape (HTTP 200, `conforms:false`).
-#[derive(Debug, serde::Deserialize)]
-struct KnotRefusal {
-    conforms: bool,
-    #[serde(default)]
-    violations: u64,
-    #[serde(default)]
-    issues: Vec<KnotIssue>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct KnotIssue {
-    #[serde(default)]
-    component: String,
-    #[serde(default)]
-    message: String,
-    #[serde(default)]
-    focus_node: String,
-}
-
-/// Quipu `/knot` response. `conforms` here is Quipu's OWN field and is NOT the
-/// validation gate — Quipu's persistent shape registry may be empty, in which case
-/// it reports `conforms:true` for anything. yupana's gate is [`validate`] above,
-/// which ran before this. `count` is the load-bearing field for idempotence.
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct KnotResult {
-    /// Triples present for these facts after the write — the idempotence signal.
-    pub count: u64,
-    /// Quipu's monotonic transaction id, when returned.
-    #[serde(default)]
-    pub tx_id: Option<u64>,
-}
+#[path = "promote_wire.rs"]
+mod promote_wire;
+pub use promote_wire::{write_knot, write_knot_snapshot, KnotResult};
 
 /// The aggregated result of a (possibly chunked) promotion write.
 #[derive(Debug, Clone)]
@@ -395,6 +258,8 @@ pub struct WriteSummary {
     pub tx_ids: Vec<u64>,
     /// How many `/knot` posts the write took (1 = the classic single-post path).
     pub chunks: usize,
+    /// Distinct normalized valid-time query keys confirmed by Quipu.
+    pub valid_from: Vec<String>,
 }
 
 /// The outcome of the pre-write half of a promotion.
@@ -461,6 +326,16 @@ pub fn dry_run(endpoint: Option<&str>, turtle: &str, source: &str) -> Result<Pro
 /// in one `/knot` post when it fits, in idempotent chunks when it would 413.
 /// On non-conformance it writes NOTHING and returns the violations.
 pub fn promote(endpoint: &str, turtle: &str, source: &str) -> Result<Promotion> {
+    promote_at(endpoint, turtle, source, None)
+}
+
+/// Promote with independent valid-time; transaction time remains server assigned.
+pub fn promote_at(
+    endpoint: &str,
+    turtle: &str,
+    source: &str,
+    valid_from: Option<&str>,
+) -> Result<Promotion> {
     let chunks = match prepare(turtle, source)? {
         Prepared::Ready(chunks) => chunks,
         Prepared::Refused(refusal) => return Ok(refusal),
@@ -470,21 +345,27 @@ pub fn promote(endpoint: &str, turtle: &str, source: &str) -> Result<Promotion> 
         count: 0,
         tx_ids: Vec::new(),
         chunks: total,
+        valid_from: Vec::new(),
     };
     for (i, chunk) in chunks.iter().enumerate() {
-        let knot = write_knot(endpoint, chunk, source).map_err(|e| {
+        let knot = promote_wire::write_knot_request(endpoint, chunk, source, None, valid_from).map_err(|e| {
             // A server-side refusal names a focus node in a payload only yupana
             // held, so this failure needs the projection retained too.
             let dump = dump_payload(turtle, source);
             Error::Promote(with_payload(
                 format!(
-                    "chunk {}/{total} failed after {} chunk(s) landed — re-running is safe (deterministic IRIs supersede): {e}",
+                    "chunk {}/{total} result unconfirmed after {} earlier chunk(s) acknowledged; inspect before retrying: {e}",
                     i + 1,
                     i
                 ),
                 dump.as_deref(),
             ))
         })?;
+        if let Some(time) = knot.valid_from {
+            if !summary.valid_from.contains(&time) {
+                summary.valid_from.push(time);
+            }
+        }
         summary.count += knot.count;
         if let Some(t) = knot.tx_id {
             summary.tx_ids.push(t);
@@ -498,22 +379,38 @@ pub fn promote(endpoint: &str, turtle: &str, source: &str) -> Result<Promotion> 
 /// Snapshot writes deliberately use one request rather than the additive
 /// chunk path: Quipu accepts bounded 64 MiB bodies, and replacement must never
 /// expose a half-old/half-new graph or retract the first chunk when posting the
-/// second. A transport failure leaves the prior snapshot current.
+/// second. A lost response may follow a committed write; verify before retrying.
 pub fn promote_snapshot(
     endpoint: &str,
     turtle: &str,
     source: &str,
     snapshot: &str,
 ) -> Result<Promotion> {
+    promote_snapshot_at(endpoint, turtle, source, snapshot, None)
+}
+
+/// Replace a snapshot with independent valid-time; retractions retain transaction time.
+pub fn promote_snapshot_at(
+    endpoint: &str,
+    turtle: &str,
+    source: &str,
+    snapshot: &str,
+    valid_from: Option<&str>,
+) -> Result<Promotion> {
     match prepare(turtle, source)? {
         Prepared::Refused(refusal) => Ok(refusal),
         Prepared::Ready(_) => {
-            let knot = write_knot_snapshot(endpoint, turtle, source, snapshot).map_err(|e| {
+            let knot = promote_wire::write_knot_request(
+                endpoint,
+                turtle,
+                source,
+                Some(snapshot),
+                valid_from,
+            )
+            .map_err(|e| {
                 let dump = dump_payload(turtle, source);
                 Error::Promote(with_payload(
-                    format!(
-                        "atomic snapshot replacement failed; prior snapshot remains current: {e}"
-                    ),
+                    format!("atomic snapshot result unconfirmed; a write may have landed: {e}"),
                     dump.as_deref(),
                 ))
             })?;
@@ -521,6 +418,7 @@ pub fn promote_snapshot(
                 count: knot.count,
                 tx_ids: knot.tx_id.into_iter().collect(),
                 chunks: 1,
+                valid_from: knot.valid_from.into_iter().collect(),
             }))
         }
     }
@@ -566,6 +464,9 @@ impl Promotion {
                     String::new()
                 };
                 writeln!(w, "  promoted: {} triples present{txs}{chunked}", k.count)?;
+                for time in &k.valid_from {
+                    writeln!(w, "  valid-from: {time}")?;
+                }
                 Ok(true)
             }
             Promotion::Refused {

@@ -128,6 +128,7 @@ pub(crate) fn promote_subset(
     changed: Option<&[String]>,
     turtle: &str,
     source: &str,
+    valid_from: &str,
     endpoint: Option<&str>,
     dry_run: bool,
     list_keys: bool,
@@ -205,7 +206,7 @@ pub(crate) fn promote_subset(
     let mut wrote = 0usize;
     let mut triples = 0usize;
     for w in &plan.writes {
-        match crate::promote::promote_snapshot(ep, &w.turtle, source, &w.key) {
+        match crate::promote::promote_snapshot_at(ep, &w.turtle, source, &w.key, Some(valid_from)) {
             Ok(outcome) => {
                 let mut sink = std::io::sink();
                 if !outcome.report(&mut sink)? {
@@ -220,6 +221,11 @@ pub(crate) fn promote_subset(
                         w.key
                     );
                     std::process::exit(2);
+                }
+                if let crate::promote::Promotion::Wrote(summary) = &outcome {
+                    for time in &summary.valid_from {
+                        println!("  valid-from: {time}");
+                    }
                 }
                 wrote += 1;
                 triples += w.triples;
