@@ -357,6 +357,12 @@ fn record(
             // to be able to count those without re-deriving anything.
             "ref_stated_by_command": !request.ref_assumed,
             "command": landing.evidence,
+            // Preserve the actual policy diagnosis under the signature; the
+            // generic certification mismatch alone cannot explain a refusal.
+            "decision_codes": match decision {
+                Decision::Refuse { codes, .. } => codes.clone(),
+                _ => Vec::new(),
+            },
         }),
         checks,
     };
