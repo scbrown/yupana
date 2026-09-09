@@ -30,6 +30,8 @@ pub struct LandingRequest {
     pub agent: Option<String>,
     /// The work item cited for this landing.
     pub bead: Option<String>,
+    /// Whether a fresh session plate was positively read; unknown fails open.
+    pub work_item_readable: bool,
 }
 
 /// The verdict.
@@ -156,7 +158,7 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
                 });
             }
 
-            if req.bead.as_deref().filter(|b| !b.is_empty()).is_none() {
+            if req.work_item_readable && req.bead.as_deref().filter(|b| !b.is_empty()).is_none() {
                 codes.push("work_item_missing".into());
                 faults.push(
                     "the landing cites no work item, and every governed landing must be \
@@ -231,6 +233,7 @@ mod tests {
             ref_assumed: false,
             agent: agent.map(str::to_string),
             bead: bead.map(str::to_string),
+            work_item_readable: true,
         }
     }
 
@@ -386,5 +389,20 @@ mod tests {
             panic!("expected refusal")
         };
         assert!(reason.contains("resolved, not"), "{reason}");
+    }
+    #[test]
+    fn unknown_plate_fails_open_without_bypassing_ownership() {
+        let authority = repo(LandingRule::SingleWriter, Some("malcolm"));
+        let mut request = req(Some("malcolm"), None, "main");
+        request.work_item_readable = false;
+        assert!(matches!(
+            decide(&authority, &request),
+            Decision::Allow { .. }
+        ));
+        request.agent = Some("other".into());
+        let Decision::Refuse { codes, .. } = decide(&authority, &request) else {
+            panic!("ownership must still refuse")
+        };
+        assert_eq!(codes, ["agent_is_not_repo_owner"]);
     }
 }
