@@ -95,17 +95,15 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
         Err(e) => LandingAuthority::Unknown(e),
     };
 
+    let plate = crate::plate::observation(input.session_id.as_deref());
     let request = LandingRequest {
         verb: landing.verb.as_str(),
         repo,
         git_ref,
         ref_assumed,
         agent: acting_agent(),
-        // Session-scoped (aegis-1mp1ls). This one rides a SIGNED certification
-        // record as `item`, so an unscoped read does not merely mislabel a
-        // trace row — it puts a dead session's work item under a signature, and
-        // the signature is what makes the record admissible later.
-        bead: crate::plate::current(input.session_id.as_deref()),
+        work_item_readable: plate.is_some(),
+        bead: plate.flatten(),
     };
     let decision = decide(&authority, &request);
 
@@ -117,6 +115,9 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     }
 
     match decision {
+        Decision::Allow { .. } if !request.work_item_readable => {
+            Outcome::Notify("yupana: work-item plate UNKNOWN; fail-open on attribution only".into())
+        }
         Decision::Allow { .. } | Decision::NotApplicable { .. } => Outcome::Allow,
         Decision::Refuse { reason, .. } => {
             // The mode is the ceiling. Under advise the refusal is reported in
@@ -357,6 +358,7 @@ fn record(
             // to be able to count those without re-deriving anything.
             "ref_stated_by_command": !request.ref_assumed,
             "command": landing.evidence,
+            "work_item_readable": request.work_item_readable,
             // Preserve the actual policy diagnosis under the signature; the
             // generic certification mismatch alone cannot explain a refusal.
             "decision_codes": match decision {
