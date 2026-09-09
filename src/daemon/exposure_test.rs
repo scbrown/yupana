@@ -33,6 +33,13 @@ fn an_unreachable_quipu_is_answered_but_NEVER_cached() {
     );
 
     assert!(
+        first.unreachable,
+        "and it SAYS it never got an answer — otherwise this row is identical to \
+         a repo quipu genuinely does not know, both fail open, and a soak cannot \
+         count the fail-open it exists to catch (aegis-8tumi4)"
+    );
+
+    assert!(
         cache.is_empty(),
         "a failure to ASK must never be stored as a verdict — this is the whole \
          reason ExposureAnswer distinguishes Answered from Unreachable"
@@ -114,6 +121,7 @@ fn the_reply_reconstructs_the_decision_value() {
             verdict: verdict.to_string(),
             reason: Some("because".into()),
             from_cache: true,
+            unreachable: false,
             age_secs: 5,
             rules_hash: "abc".into(),
         };
