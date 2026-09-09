@@ -215,3 +215,20 @@ additive, default-graph-preserving quad-store extension —
 Yupana can fall back to a branch qualifier. See the
 [Specification](../design/specification.md) §9 for the ontology extension and
 the quad-store RFC sketch.
+
+### Commit provenance and time
+
+Committed CLI promotion emits `GitCommit` → `modifies` edges only for touched
+modules present in the projection. It sends the authored git `%aI` timestamp as
+`valid_from` for append, snapshot and subset writes. Quipu returns a normalized
+UTC key, which Yupana prints as `valid-from: <key>`; use that returned key for
+`valid_at` queries, since a local offset can cross a UTC day boundary.
+
+Transaction time remains server assigned, and `actor="yupana"` identifies the
+writer. The commit carries separate `author`, `date` (authored time) and
+`committer` facts. If the server does not confirm `valid_from`, promotion fails
+with an explicit warning that the write may already have landed. Upgrade the
+server and inspect that write before retrying.
+
+Yupana emits raw provenance only. Work-item linking belongs to the tracker-aware
+ingest lane, and aggregation belongs to [Quipu #37](https://github.com/scbrown/quipu/issues/37).

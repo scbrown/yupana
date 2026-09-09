@@ -1497,9 +1497,12 @@ fn capturing_knot() -> (std::net::SocketAddr, std::sync::mpsc::Receiver<String>)
                 break;
             }
         }
-        let _ = sock.write_all(
-            b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 13\r\n\r\n\
-              {\"count\": 42}",
+        let response = r#"{"count":42,"valid_from":"2026-03-03T23:15:00Z"}"#;
+        let _ = write!(
+            sock,
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
+            response.len(),
+            response
         );
         let _ = tx.send(text);
     });
