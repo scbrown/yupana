@@ -169,7 +169,8 @@ pub(crate) fn projected(
     }
 }
 
-/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56).
+/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56),
+/// keeping WHETHER WE GOT AN ANSWER as well as what it was.
 ///
 /// The measured reason this exists: `POST /policy/check` took 2.4-7.2s and ran
 /// once per governed edit, uncached, from every agent — the CONSTANT half of the
@@ -181,11 +182,6 @@ pub(crate) fn projected(
 /// rules to warnings, so folding a transport failure into it would silently
 /// weaken enforcement every time one process was not running — a policy change
 /// wearing the costume of a connection error.
-pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project::RepoExposure {
-    exposure_answer_for(config, repo).0
-}
-
-/// [`exposure_for`], keeping WHETHER WE GOT AN ANSWER as well as what it was.
 ///
 /// The decision is identical either way — a governed rule never blocks on a
 /// guess — so this exists solely for the RECORD. `RepoExposure::Unknown` is two

@@ -200,7 +200,7 @@ fn a_DOWN_daemon_resolves_exposure_LIVE_rather_than_answering_unknown() {
     let mut config = config_for(1, &format!("http://127.0.0.1:{quipu_port}"), true);
     config.serve.mcp_http_port = 1; // refused immediately
 
-    let exposure = super::exposure_for(&config, "somerepo");
+    let exposure = super::exposure_answer_for(&config, "somerepo").0;
     assert_eq!(
         exposure,
         crate::project::RepoExposure::Public,
@@ -216,7 +216,7 @@ fn use_daemon_false_resolves_exposure_live() {
     let quipu_port = stub_quipu("unsatisfied");
     let config = config_for(1, &format!("http://127.0.0.1:{quipu_port}"), false);
     assert_eq!(
-        super::exposure_for(&config, "somerepo"),
+        super::exposure_answer_for(&config, "somerepo").0,
         crate::project::RepoExposure::Internal
     );
 }
