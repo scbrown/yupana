@@ -212,7 +212,7 @@ embedding and co-change signals and serves explained context over MCP.</li>
 </blockquote>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
 <p>Yupana is a Rust project built with <a href="https://github.com/casey/just"><code>just</code></a>.</p>
-<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<h2 id="source-build-prerequisites"><a class="header" href="#source-build-prerequisites">Source-build prerequisites</a></h2>
 <ul>
 <li>Rust (stable) — the project targets edition 2021.</li>
 <li>A C compiler (<code>cc</code>/<code>gcc</code>) — tree-sitter grammars compile a small C parser.</li>
@@ -225,13 +225,22 @@ just build            # or: cargo build --release
 </code></pre>
 <p>The binary is produced at <code>target/debug/yupana</code> (or <code>target/release/yupana</code>).</p>
 <h2 id="install-locally"><a class="header" href="#install-locally">Install locally</a></h2>
-<pre><code class="language-bash">just install
+<pre><code class="language-bash">just install-release 0.8.0
+
+# Developer build from this checkout (includes uncommitted source):
+just install
 </code></pre>
-<p>The install recipe builds the complete feature set into <code>~/.local/bin/yupana</code>
-and installs <code>~/.local/bin/hank</code> as a relative symlink to that same executable.
-Both names therefore report the same version and expose <code>exemplar</code>, <code>verifier</code>,
-and <code>verdicts</code>; they can never silently select different feature builds. Set
-<code>YUPANA_INSTALL_ROOT</code> to use another prefix.</p>
+<p><code>install-release</code> downloads the published Linux x86_64 archive and verifies its
+<code>.sha256</code>, version, and <code>exemplar</code>, <code>verifier</code>, and <code>verdicts</code> capabilities. It
+installs the exact archive binary without compiling the checkout. This path
+requires curl, Python 3, <code>flock</code>, and Linux file utilities, but not Rust.</p>
+<p><code>install</code> builds the current checkout, including uncommitted changes. Its banner
+identifies the source commit and dirty state. Dirty shared checkouts with linked
+worktrees are refused; use your own worktree for source development.</p>
+<p>Both paths publish atomically under an install lock to <code>~/.local/bin/yupana</code>
+and install <code>~/.local/bin/hank</code> as a relative symlink to that executable. Set
+<code>YUPANA_INSTALL_ROOT</code> to use another prefix. To roll back a release, run
+<code>just install-release</code> with the previous version.</p>
 <h2 id="install-the-git-hooks"><a class="header" href="#install-the-git-hooks">Install the git hooks</a></h2>
 <pre><code class="language-bash">just setup            # installs pre-commit hooks
 </code></pre>
