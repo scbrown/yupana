@@ -1,5 +1,8 @@
 //! Exposure must travel with the session-attributed guard decision, not a timestamp join.
 #![cfg(feature = "quipu")]
+// Test names shout the invariant they turn on — the emphasis this repo already
+// uses in `daemon::exposure_test`. Scoped to tests.
+#![allow(non_snake_case)]
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -88,6 +91,21 @@ impl Drop for ExposureServer {
 }
 
 fn probe(outcome: &'static str, expected: &str, mode: &str, matching: bool, origin: bool) {
+    probe_with(outcome, expected, mode, matching, origin, None);
+}
+
+/// `endpoint_override` points the guard at a REFUSED port, so "we never got an
+/// answer" is a real event rather than a mock of one. `expected_source` is the
+/// fact aegis-8tumi4 exists for: `unknown` alone cannot tell a repo quipu does
+/// not know from a quipu we never reached, and both fail open.
+fn probe_with(
+    outcome: &'static str,
+    expected: &str,
+    mode: &str,
+    matching: bool,
+    origin: bool,
+    endpoint_override: Option<&str>,
+) {
     let mut server = ExposureServer::new(outcome);
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
@@ -114,12 +132,13 @@ fn probe(outcome: &'static str, expected: &str, mode: &str, matching: bool, orig
     }
     // cwd deliberately differs from the edited file's repository.
     std::fs::create_dir_all(root.join(".bobbin")).unwrap();
+    let endpoint = endpoint_override.unwrap_or(&server.endpoint).to_string();
     std::fs::write(root.join(".bobbin/config.toml"), format!(
-        "[yupana.policy]\nmode = '{mode}'\n[yupana.quipu]\nenabled = true\nendpoint = '{}'\nprojection_cache_ttl_secs = 3600\n", server.endpoint
+        "[yupana.policy]\nmode = '{mode}'\n[yupana.quipu]\nenabled = true\nendpoint = '{endpoint}'\nprojection_cache_ttl_secs = 3600\n"
     )).unwrap();
     let cache = serde_json::json!({
         "version":2, "written_at":yupana::projection_cache::now_secs(),
-        "endpoint":server.endpoint,"policies":[],
+        "endpoint":endpoint,"policies":[],
         "text_rules":[{"name":"test-boundary","pattern":"FORBIDDEN_TEST_TOKEN","tier":"block"}]
     });
     std::fs::write(root.join("projection.json"), cache.to_string()).unwrap();
@@ -173,6 +192,20 @@ fn probe(outcome: &'static str, expected: &str, mode: &str, matching: bool, orig
         let governed = records.iter().find(|r| r["kind"] == "governed").unwrap();
         assert_eq!(guard["rule"], "test-boundary");
         assert_eq!(guard["exposure"], expected);
+        let want_source = if !origin {
+            // Decided WITHOUT asking anything: not a lookup, so neither a
+            // success nor a fail-open. It must be countable as neither.
+            "local"
+        } else if endpoint_override.is_some() {
+            "unreachable"
+        } else {
+            "answered"
+        };
+        assert_eq!(
+            guard["exposure_source"], want_source,
+            "the record must say HOW the exposure was obtained, not only what it was"
+        );
+        assert_eq!(guard["exposure_source"], governed["exposure_source"]);
         assert_eq!(
             guard["repo"],
             if origin { "artifact" } else { "unresolved" }
@@ -183,15 +216,16 @@ fn probe(outcome: &'static str, expected: &str, mode: &str, matching: bool, orig
         assert_eq!(guard["result"], if blocks { "deny" } else { "notify" });
         assert_eq!(
             requests.len(),
-            usize::from(origin),
+            usize::from(origin && endpoint_override.is_none()),
             "no second exposure lookup"
         );
-        if origin {
+        if origin && endpoint_override.is_none() {
             assert!(requests[0].starts_with("POST /policy/check "));
             assert!(requests[0].contains("repo_artifact"));
         }
     } else {
         assert!(guard.get("exposure").is_none());
+        assert!(guard.get("exposure_source").is_none());
         assert!(guard.get("repo").is_none());
         assert!(requests.is_empty());
     }
@@ -214,4 +248,25 @@ fn exposure_and_provenance_share_the_decision_record() {
 fn unresolved_repo_is_unknown_and_unmatched_edits_omit_exposure() {
     probe("satisfied", "unknown", "enforce", true, false);
     probe("satisfied", "n/a", "advise", false, true);
+}
+
+/// THE FAIL-OPEN, MADE VISIBLE. A quipu we never reached and a repo quipu does
+/// not know both decide `unknown` and both let the edit through — by design, a
+/// governed rule never blocks on a guess. What must NOT happen is the two
+/// leaving the same record, because then a soak counting false positives cannot
+/// see the false negatives at all (aegis-8tumi4: 6 of 14 network-needing
+/// lookups timed out, 43%, every one indistinguishable from a correct pass).
+///
+/// 127.0.0.1:1 is refused immediately, so "quipu is down" is fast and real
+/// rather than mocked — the same shape `daemon::exposure_test` uses.
+#[test]
+fn an_UNREACHABLE_quipu_is_recorded_as_unreachable_not_as_a_plain_unknown() {
+    probe_with(
+        "satisfied",
+        "unknown",
+        "enforce",
+        true,
+        true,
+        Some("http://127.0.0.1:1"),
+    );
 }

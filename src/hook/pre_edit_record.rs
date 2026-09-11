@@ -158,8 +158,9 @@ pub(super) fn guard_recorded(
 
     // Carry the deciding plane's values, without a second lookup or a join to
     // another spool line. Session, rule and exposure can now be replayed together.
-    if let Some((exposure, repo)) = &decision.governed_context {
+    if let Some((exposure, exposure_source, repo)) = &decision.governed_context {
         fields.push(("exposure", (*exposure).into()));
+        fields.push(("exposure_source", (*exposure_source).into()));
         fields.push(("repo", repo.clone().into()));
     }
 

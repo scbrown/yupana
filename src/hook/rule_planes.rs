@@ -311,6 +311,8 @@ pub(super) fn governed_check(
     // judge against. The repo NAME and the exposure verdict are the two facts
     // that decide it, and neither is a path.
     let mut exposure_label = "n/a";
+    // HOW that exposure was obtained — see `exposure_answer_for` (aegis-8tumi4).
+    let mut exposure_source = "n/a";
     let mut target_repo: Option<String> = None;
     if !text_violations.is_empty() {
         // Exposure is resolved ONCE per edit, from the graph, via the governed
@@ -320,7 +322,12 @@ pub(super) fn governed_check(
             .as_deref()
             .and_then(crate::git::origin_repo_name);
         let exposure = match (&target_root, &repo) {
-            (Some(_), Some(repo)) => crate::hook::daemon_projection::exposure_for(config, repo),
+            (Some(_), Some(repo)) => {
+                let (exposure, source) =
+                    crate::hook::daemon_projection::exposure_answer_for(config, repo);
+                exposure_source = source;
+                exposure
+            }
             (Some(tr), None) => RepoExposure::Unknown(format!(
                 "the tree containing this file ({}) has no `origin` remote, so \
                  its exposure cannot be resolved",
@@ -337,6 +344,10 @@ pub(super) fn governed_check(
             RepoExposure::Internal => "internal",
             RepoExposure::Unknown(_) => "unknown",
         };
+        // The other arms decided WITHOUT asking: answers, not failures.
+        if exposure_source == "n/a" {
+            exposure_source = "local";
+        }
         target_repo = repo;
         let (text_messages, text_blocks) = text_plane(&text_violations, &exposure);
         messages.extend(text_messages);
@@ -412,6 +423,7 @@ pub(super) fn governed_check(
             ("structural", (structural_violations.len() as u64).into()),
             ("blocking", any_blocking.into()),
             ("exposure", exposure_label.into()),
+            ("exposure_source", exposure_source.into()),
             ("repo", repo_label.clone().into()),
             // WHICH catalogue said so. A soak that groups governed firings
             // without this cannot tell a verdict from the current policy set
@@ -487,7 +499,7 @@ pub(super) fn governed_check(
     // against a registry that could not be refreshed is stale, and saying so is
     // the whole point of carrying the field.
     let mut decision = Decision::evaluated(outcome, evaluations, registry.freshness());
-    decision.governed_context = Some((exposure_label, repo_label));
+    decision.governed_context = Some((exposure_label, exposure_source, repo_label));
     Some(decision)
 }
 

@@ -169,7 +169,8 @@ pub(crate) fn projected(
     }
 }
 
-/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56).
+/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56),
+/// keeping WHETHER WE GOT AN ANSWER as well as what it was.
 ///
 /// The measured reason this exists: `POST /policy/check` took 2.4-7.2s and ran
 /// once per governed edit, uncached, from every agent — the CONSTANT half of the
@@ -181,7 +182,24 @@ pub(crate) fn projected(
 /// rules to warnings, so folding a transport failure into it would silently
 /// weaken enforcement every time one process was not running — a policy change
 /// wearing the costume of a connection error.
-pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project::RepoExposure {
+///
+/// The decision is identical either way — a governed rule never blocks on a
+/// guess — so this exists solely for the RECORD. `RepoExposure::Unknown` is two
+/// facts wearing one token: "quipu says it does not know this repo", which is a
+/// real and stable answer, and "we never reached quipu", which is a failed
+/// measurement. Both fail open, and until they are told apart in the spool a
+/// fail-open leaves a row indistinguishable from a correct pass on an unexposed
+/// target — so the advise-mode soak cannot count the false negatives it exists
+/// to count (aegis-8tumi4, measured: 6 of 14 network-needing lookups timed out).
+///
+/// This mirrors `policy_source` on the same record, which already draws exactly
+/// this distinction for the OTHER lookup the guard makes, and for the same
+/// stated reason: two verdicts are not equally good evidence just because they
+/// carry the same word.
+pub(super) fn exposure_answer_for(
+    config: &YupanaConfig,
+    repo: &str,
+) -> (crate::project::RepoExposure, &'static str) {
     if config.serve.use_daemon {
         match crate::daemon::client_policy::fetch_exposure(
             &config.serve.bind_address,
@@ -189,7 +207,14 @@ pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project:
             repo,
             daemon_exposure_timeout(),
         ) {
-            Ok(reply) => return reply.exposure(),
+            Ok(reply) => {
+                let source = if reply.unreachable {
+                    "unreachable"
+                } else {
+                    "answered"
+                };
+                return (reply.exposure(), source);
+            }
             Err(why) => eprintln!(
                 "yupana: resident daemon expected at {}:{} but exposure not usable ({why}) \
                  — resolving live instead",
@@ -197,7 +222,14 @@ pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project:
             ),
         }
     }
-    crate::project::fetch_repo_exposure(&config.quipu.endpoint, repo)
+    match crate::project_exposure::fetch_exposure_answer(&config.quipu.endpoint, repo) {
+        answer @ crate::project_exposure::ExposureAnswer::Answered(_) => {
+            (answer.exposure(), "answered")
+        }
+        answer @ crate::project_exposure::ExposureAnswer::Unreachable(_) => {
+            (answer.exposure(), "unreachable")
+        }
+    }
 }
 
 #[cfg(test)]
