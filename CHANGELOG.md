@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 - *(guard)* A check that cannot MEASURE must not report SAFE([8bae574](https://github.com/scbrown/yupana/commit/8bae574333d9a2db508f63685acc348bbb745821))
 - *(install)* Separate release artifacts from checkout builds([9b73f26](https://github.com/scbrown/yupana/commit/9b73f264def28a9adb8b0c16fd55e1ebdfc1dd8c))
+- Batch briefing candidate identity queries (#64)([c1d781f](https://github.com/scbrown/yupana/commit/c1d781fcf))
 - *(hook)* Import text_plane where it is called([48ab2af](https://github.com/scbrown/yupana/commit/48ab2af044ed42efade4e7a26790b9ff1cdc56d4))
 
 ### Testing

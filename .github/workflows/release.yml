@@ -212,6 +212,34 @@ jobs:
   # showed a green run that moved nothing. Here it left the crate UNPUBLISHED —
   # crates.io has no `yupana`, only the pre-rename `hank` at 0.4.0 from the
   # archived repository.
+  # THE CHANGELOG GATE, on the trigger that actually fires (aegis-snglaf).
+  #
+  # yupana had NO changelog verification of any kind, and v0.8.1 shipped missing
+  # TWO entries: a `fix(install)` git-cliff dropped, and a nonconventional squash
+  # subject it filtered out by design. Both were found by hand. A release whose
+  # changelog omits a behaviour change is the shape this exists to refuse.
+  #
+  # Ported from quipu, where the pull_request copy has NEVER EXECUTED: bot-authored
+  # release PRs sit `action_required` until a human approves, so the push copy is the
+  # one that protects releases. Keep both — the PR one covers human CHANGELOG edits.
+  verify-changelog:
+    name: Verify changelog
+    needs: release-plz
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history + tags: the verifier ranges over <prev>..HEAD
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify the newest section on main
+        run: ./scripts/verify-changelog.sh
+
   crates:
     name: Publish to crates.io
     # AFTER the binary. A release whose artifact failed to build should not be
@@ -242,14 +270,22 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --quiet
-          TAG="$(git tag --points-at HEAD | grep '^v[0-9]' | head -1 || true)"
-          if [ -z "$TAG" ]; then
-            echo "::error::release-plz reported a release but no v* tag points at" \
-                 "HEAD. Refusing to publish a version this run cannot name."
-            exit 1
-          fi
-          echo "want=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "tag ${TAG} -> version ${TAG#v}"
+          # ANCESTRY + TREE, not points-at (aegis-snglaf, ported from quipu PR166).
+          # points-at refused v0.8.1: release-plz tags the PR's own commit, and a
+          # merge-commit merge leaves main's HEAD one above it, so nothing points at
+          # HEAD and a valid release is refused. The resolver requires the tag to be
+          # REACHABLE from HEAD and its TREE to equal HEAD's, which is strictly
+          # stronger — a commit that landed after the tag is still refused.
+          # Exit 2 means the clone is SHALLOW and no conclusion is available; that is
+          # a checkout fault, not a tag fault, and must not read as "no tag".
+          RESOLVED="$(.github/scripts/resolve-release-tag.sh .)" || {
+            rc=$?
+            [ "$rc" = 2 ] && echo "::error::shallow checkout — needs fetch-depth: 0"
+            exit "$rc"
+          }
+          TAG="${RESOLVED%%	*}"
+          echo "want=${RESOLVED##*	}" >> "$GITHUB_OUTPUT"
+          echo "tag ${TAG} -> version ${RESOLVED##*	}"
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2

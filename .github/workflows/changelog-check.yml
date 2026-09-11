@@ -1,0 +1,32 @@
+# The changelog guard on the PR trigger — covers HUMAN pull requests that touch
+# CHANGELOG.md. It does NOT cover release-plz's own PRs: those are authored by
+# `app/github-actions`, and workflow runs on bot-authored PRs sit `action_required`
+# until somebody clicks, so this copy reports nothing for them. That is why
+# release.yml carries the same check on `push`, which is not gated that way, and why
+# both exist rather than one (aegis-snglaf).
+name: Changelog
+
+on:
+  pull_request:
+    paths:
+      - 'CHANGELOG.md'
+      - 'cliff.toml'
+      - 'scripts/verify-changelog.sh'
+      - 'scripts/check-release-window.py'
+      - 'scripts/filter-packaged-commits.py'
+
+jobs:
+  verify-changelog:
+    name: Verify changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+      - uses: dtolnay/rust-toolchain@stable
+      - run: ./scripts/verify-changelog.sh
