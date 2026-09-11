@@ -2,7 +2,7 @@
 
 Yupana is a Rust project built with [`just`](https://github.com/casey/just).
 
-## Prerequisites
+## Source-build prerequisites
 
 - Rust (stable) — the project targets edition 2021.
 - A C compiler (`cc`/`gcc`) — tree-sitter grammars compile a small C parser.
@@ -21,14 +21,25 @@ The binary is produced at `target/debug/yupana` (or `target/release/yupana`).
 ## Install locally
 
 ```bash
+just install-release 0.8.0
+
+# Developer build from this checkout (includes uncommitted source):
 just install
 ```
 
-The install recipe builds the complete feature set into `~/.local/bin/yupana`
-and installs `~/.local/bin/hank` as a relative symlink to that same executable.
-Both names therefore report the same version and expose `exemplar`, `verifier`,
-and `verdicts`; they can never silently select different feature builds. Set
-`YUPANA_INSTALL_ROOT` to use another prefix.
+`install-release` downloads the published Linux x86_64 archive and verifies its
+`.sha256`, version, and `exemplar`, `verifier`, and `verdicts` capabilities. It
+installs the exact archive binary without compiling the checkout. This path
+requires curl, Python 3, `flock`, and Linux file utilities, but not Rust.
+
+`install` builds the current checkout, including uncommitted changes. Its banner
+identifies the source commit and dirty state. Dirty shared checkouts with linked
+worktrees are refused; use your own worktree for source development.
+
+Both paths publish atomically under an install lock to `~/.local/bin/yupana`
+and install `~/.local/bin/hank` as a relative symlink to that executable. Set
+`YUPANA_INSTALL_ROOT` to use another prefix. To roll back a release, run
+`just install-release` with the previous version.
 
 ## Install the git hooks
 

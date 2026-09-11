@@ -101,6 +101,14 @@ repos:
         pass_filenames: false
         verbose: true
 
+      - id: release-install-test
+        name: checksummed release install and source provenance
+        entry: python3 tests/install_release.py
+        language: system
+        files: ^(scripts/install-(local|release)\.sh|tests/install_release\.py|justfile)$
+        pass_filenames: false
+        verbose: true
+
       - id: session-reread-tests
         name: session reread discrimination (python)
         entry: python3 scripts/session-reread-guard.py --selftest
