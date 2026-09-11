@@ -189,13 +189,26 @@ they do things neither does alone:
 ### Install
 
 ```bash
-# From source — builds every capability and installs one binary under both names
+# From a published release — verifies its checksum and installs exact archive bytes
+just install-release 0.8.0
+
+# Developer build from this checkout (includes uncommitted source):
 just install
 # ~/.local/bin/yupana
 # ~/.local/bin/hank -> yupana
 ```
 
-Local installation uses a private, temporary Cargo target under the disk cache
+Release installation downloads the versioned archive and its `.sha256` from
+GitHub. It verifies the checksum, version, and `exemplar`, `verifier`, and
+`verdicts` capabilities before atomic publication under the install lock.
+The installed binary must match the archive payload byte for byte. It requires
+Linux x86_64, curl, Python 3, `flock`, and the usual file utilities. To roll back,
+run `just install-release` with the previous release version.
+
+`just install` is a **source build**, not a release installer. It prints the
+checkout path, commit and dirty state before building, and refuses a dirty
+shared checkout with linked worktrees. Use your own worktree for development.
+Source installation uses a private, temporary Cargo target under the disk cache
 (`$XDG_CACHE_HOME/yupana/install-builds`, falling back to `~/.cache`). It builds
 all features and checks every command help surface, including nested verbs,
 against a checker compiled from the same source. The installer verifies the

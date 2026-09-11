@@ -43,6 +43,7 @@ test *args="":
     python3 tests/spool_to_dogwood.py
     just session-guard --selftest
     python3 tests/session_depth.py
+    just install-tests
 
 # Run the linter (matches CI: deny warnings, allow missing-docs)
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every
@@ -59,10 +60,19 @@ fmt:
 run *args="":
     cargo run -- {{args}}
 
-# Install the one feature-complete binary under both the current and legacy names.
+# Build the CURRENT CHECKOUT, including uncommitted source. Not a release install.
 # Override YUPANA_INSTALL_ROOT for a non-default prefix.
 install:
     scripts/install-local.sh
+
+# Install a checksummed published release, without compiling local source.
+install-release version:
+    scripts/install-release.sh {{quote(version)}}
+
+# Run installer regression tests without modifying the host installation.
+install-tests:
+    scripts/selftest-install-local.sh
+    python3 tests/install_release.py
 
 # === End-to-end (Quipu integration) ===
 
