@@ -62,6 +62,12 @@ touched, with symbols and caller locality), the central entities around it
 **successful work gets reused**, related in-flight items, the governed rules
 in force, and the scope posture. Silent when no plate or no quipu seam.
 
+Candidate work-item identities are fetched in deduplicated batches of at most
+32 entities, preserving each item's label and outcome without a network request
+per candidate. A failed batch contributes no identities and does not trigger
+individual retries. Search, context ranking, and the policy projection keep
+their existing freshness behavior; this does not cache a brief across sessions.
+
 What lands in context is the **L0** briefing: the item, its ground paths and
 the scope posture, plus a **census** of every section held back — one line
 each, naming how many items it holds and the real `quipu_ask` /
