@@ -279,7 +279,7 @@ fn serve_last_known(
                 "{why}; and no cached exposure could be served ({}: {miss})",
                 crate::exposure_cache::miss_label(&miss)
             )),
-            "unreachable",
+            crate::project_exposure::SOURCE_UNREACHABLE,
         );
     };
     match crate::exposure_cache::load_servable(
@@ -305,7 +305,7 @@ fn serve_last_known(
                 "{why}; and no cached exposure could be served ({}: {miss})",
                 crate::exposure_cache::miss_label(&miss)
             )),
-            "unreachable",
+            crate::project_exposure::SOURCE_UNREACHABLE,
         ),
     }
 }

@@ -349,7 +349,7 @@ pub(super) fn governed_check(
             exposure_source = "local";
         }
         target_repo = repo;
-        let (text_messages, text_blocks) = text_plane(&text_violations, &exposure);
+        let (text_messages, text_blocks) = text_plane(&text_violations, &exposure, exposure_source);
         messages.extend(text_messages);
         any_blocking |= text_blocks;
     }
@@ -533,14 +533,38 @@ fn target_file(input: &HookInput, root: &Path) -> Option<PathBuf> {
 pub(super) fn text_plane(
     violations: &[crate::textrules::TextViolation],
     exposure: &crate::project::RepoExposure,
+    exposure_source: &str,
 ) -> (Vec<String>, bool) {
     use crate::project::RepoExposure;
     use crate::textrules::TextTier;
 
+    // A CHECK THAT CANNOT MEASURE MUST NOT REPORT SAFE (aegis-8tumi4 item 3,
+    // ruled 2026-09-11).
+    //
+    // `Unknown` has two causes and they are opposites. Quipu ANSWERED "no such
+    // repo" — we measured, and the honest result is ignorance about a repo
+    // nobody has pinned; blocking on that is blocking on a guess, and it stays
+    // a warning. Or the lookup FAILED with nothing cached to fall back on — we
+    // did not measure at all, so "not public" is not a finding, it is the
+    // absence of one. The old code could not tell these apart, so an edit into
+    // a genuinely public repo sailed through whenever quipu was slow, which at
+    // the measured timeout rate was ~4 in 10 of the lookups that needed the
+    // network.
+    //
+    // The MIRROR of the existing rule, deliberately: the fleet already holds
+    // `a-check-that-cannot-measure-must-not-report-broken`. This is the other
+    // direction, and it is the one that costs a leak rather than a false alarm.
+    //
+    // ADVISE MODE IS UNAFFECTED AND NEEDS NO BRANCH HERE: `governed_check`
+    // gates the returned flag behind `Mode::Enforce`, so advise keeps warning —
+    // loudly, because the message below is emitted either way.
+    let unmeasured = matches!(exposure, RepoExposure::Unknown(_))
+        && exposure_source == crate::project_exposure::SOURCE_UNREACHABLE;
+
     let mut messages: Vec<String> = Vec::new();
     let mut any_blocking = false;
     for v in violations {
-        if v.tier == TextTier::Block && *exposure == RepoExposure::Public {
+        if v.tier == TextTier::Block && (*exposure == RepoExposure::Public || unmeasured) {
             any_blocking = true;
         }
         messages.push(v.message.clone());
@@ -557,6 +581,17 @@ pub(super) fn text_plane(
              would BLOCK in a public repo]"
                 .to_string(),
         ),
+        // The lookup FAILED and no last-known verdict could stand in for it.
+        RepoExposure::Unknown(reason) if unmeasured => messages.push(format!(
+            "[exposure: REFUSING — the repo's exposure could not be MEASURED \
+             ({reason}). This is not the same as a repo the graph does not \
+             know: nothing was measured, so \"not public\" is the absence of a \
+             finding rather than one, and a block-tier rule must not pass on \
+             it. Retry when quipu answers, or pin this repo's `repo_<name>` \
+             entity and remote facts in the graph.]"
+        )),
+        // Quipu ANSWERED, and the answer was that it has never heard of this
+        // repo. We measured; blocking here really would be blocking on a guess.
         RepoExposure::Unknown(reason) => messages.push(format!(
             "[exposure: warning, NOT blocking — the repo's exposure is unknown \
              ({reason}), and a governed rule never blocks on a guess. Add this \
