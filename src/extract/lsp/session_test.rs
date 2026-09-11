@@ -62,11 +62,15 @@ fn exercise(root: &Path, file: &str, text: &str, server: &str) {
         ("references", &declaration, Query::References),
     ] {
         let mut samples = Vec::new();
-        for _ in 0..20 {
+        for sample in 0..20 {
             let start = std::time::Instant::now();
             let result = session.locations(at, query).unwrap();
             samples.push(start.elapsed());
-            assert!(!result.value.is_empty());
+            assert!(
+                !result.value.is_empty(),
+                "warm {server} {name} sample={sample}: empty normalized result at {at:?}; raw response={:?}",
+                session.last_location_response()
+            );
         }
         samples.sort();
         let p95 = samples[18];

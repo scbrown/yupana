@@ -33,6 +33,11 @@ pub struct Session {
 }
 
 impl Session {
+    #[cfg(test)]
+    pub(super) fn last_location_response(&self) -> Option<&Value> {
+        self.client.last_location_response.as_ref()
+    }
+
     /// Start the language adapter selected by the file extension.
     pub fn start(root: &Path, file: &Path) -> anyhow::Result<Option<Self>> {
         super::server_for(file)
