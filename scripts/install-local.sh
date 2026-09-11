@@ -3,6 +3,28 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+if [[ ${1:-} == --help || ${1:-} == -h ]]; then
+    echo 'Usage: install-local.sh'
+    echo 'Build and install the CURRENT CHECKOUT, including uncommitted source.'
+    echo 'For a published release use: scripts/install-release.sh VERSION'
+    exit 0
+fi
+[[ $# == 0 ]] || { echo 'ERROR: unexpected argument; use --help' >&2; exit 2; }
+commit=$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || echo UNKNOWN)
+dirty=$(git -C "$repo_root" status --porcelain 2>/dev/null || echo UNKNOWN)
+state=clean
+[[ -z "$dirty" ]] || state=DIRTY
+printf 'SOURCE BUILD from CURRENT CHECKOUT: %s\nCommit: %s; state: %s\n' "$repo_root" "$commit" "$state"
+echo 'This is not a published release install; use install-release.sh VERSION for releases.'
+if [[ $commit != UNKNOWN && -n "$dirty" ]]; then
+    git_dir=$(git -C "$repo_root" rev-parse --absolute-git-dir)
+    common=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)
+    count=$(git -C "$repo_root" worktree list --porcelain | /usr/bin/grep -c '^worktree ')
+    if [[ $git_dir == "$common" && $count -gt 1 ]]; then
+        echo 'ERROR: refusing a dirty shared checkout with linked worktrees; use your own worktree.' >&2
+        exit 1
+    fi
+fi
 install_root=${YUPANA_INSTALL_ROOT:-${CARGO_INSTALL_ROOT:-$HOME/.local}}
 cargo_bin=${CARGO_BIN:-cargo}
 bin_dir="$install_root/bin"
