@@ -230,6 +230,11 @@ touched, with symbols and caller locality), the central entities around it
 (quipu pagerank), semantically similar past items with their outcomes so
 <strong>successful work gets reused</strong>, related in-flight items, the governed rules
 in force, and the scope posture. Silent when no plate or no quipu seam.</p>
+<p>Candidate work-item identities are fetched in deduplicated batches of at most
+32 entities, preserving each item's label and outcome without a network request
+per candidate. A failed batch contributes no identities and does not trigger
+individual retries. Search, context ranking, and the policy projection keep
+their existing freshness behavior; this does not cache a brief across sessions.</p>
 <p>What lands in context is the <strong>L0</strong> briefing: the item, its ground paths and
 the scope posture, plus a <strong>census</strong> of every section held back — one line
 each, naming how many items it holds and the real <code>quipu_ask</code> /
