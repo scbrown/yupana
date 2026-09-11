@@ -212,7 +212,14 @@ fn probe_with(
         );
         assert_eq!(guard["exposure"], governed["exposure"]);
         assert_eq!(guard["repo"], governed["repo"]);
-        let blocks = expected == "public" && mode == "enforce";
+        // BLOCKING IS NOW TWO CASES, NOT ONE (aegis-8tumi4 item 3, ruled 2026-09-11).
+        // A public repo blocks because we MEASURED that it is exposed. An
+        // unreachable lookup with nothing cached blocks because we measured
+        // NOTHING — "not public" is then the absence of a finding, and a check
+        // that cannot measure must not report safe. A repo quipu ANSWERED it
+        // does not know still only warns: that one is a genuine guess.
+        let unmeasured = want_source == "unreachable";
+        let blocks = (expected == "public" || unmeasured) && mode == "enforce";
         assert_eq!(guard["result"], if blocks { "deny" } else { "notify" });
         assert_eq!(
             requests.len(),
@@ -250,12 +257,17 @@ fn unresolved_repo_is_unknown_and_unmatched_edits_omit_exposure() {
     probe("satisfied", "n/a", "advise", false, true);
 }
 
-/// THE FAIL-OPEN, MADE VISIBLE. A quipu we never reached and a repo quipu does
-/// not know both decide `unknown` and both let the edit through — by design, a
-/// governed rule never blocks on a guess. What must NOT happen is the two
-/// leaving the same record, because then a soak counting false positives cannot
-/// see the false negatives at all (aegis-8tumi4: 6 of 14 network-needing
-/// lookups timed out, 43%, every one indistinguishable from a correct pass).
+/// THE FAIL-OPEN, CLOSED. This test used to assert that a quipu we never reached
+/// and a repo quipu does not know both decide `unknown` and both let the edit
+/// through, "by design". The record half of that was right and stays. The
+/// OUTCOME half was the defect: 6 of 14 network-needing lookups timed out, 43%,
+/// every one indistinguishable from a correct pass, and every one letting an
+/// identifier into a repo whose exposure was never established.
+///
+/// Since aegis-8tumi4 item 3 the two cases are separated in BOTH halves. Quipu
+/// answered "no such repo" -> we measured, ignorance about an unpinned repo is a
+/// guess, still a warning. The lookup failed with nothing cached -> we did not
+/// measure at all, and at enforce tier that now REFUSES.
 ///
 /// 127.0.0.1:1 is refused immediately, so "quipu is down" is fast and real
 /// rather than mocked — the same shape `daemon::exposure_test` uses.
