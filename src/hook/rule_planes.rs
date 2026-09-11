@@ -182,6 +182,10 @@ pub(super) fn governed_check(
     scope_plane: &mut Option<super::scope_arm::ScopePlane>,
 ) -> Option<Decision> {
     use crate::project::RepoExposure;
+    // `text_plane` now lives in its own module (yupana #66 review: extract
+    // rather than raise the size baseline). Imported inside this fn because
+    // the fn — and the module — are both `cfg(feature = "quipu")`.
+    use super::text_plane_mod::text_plane;
 
     if config.policy.mode == Mode::Off || !config.quipu.enabled || config.quipu.endpoint.is_empty()
     {
