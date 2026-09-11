@@ -7,7 +7,7 @@ use crate::project_queries::EXPOSURE_POLICY_IRI;
 
 /// How exposed is the repo an edit lands in? Three-valued BY DESIGN (the
 /// mqnl seam): collapsing "not in the graph" into either answer is the bug.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RepoExposure {
     /// The graph says this repo has a public remote: block-tier rules block.
     Public,

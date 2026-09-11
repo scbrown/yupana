@@ -46,6 +46,11 @@ pub mod docref;
 pub mod errors;
 pub mod exemplar;
 pub mod export;
+/// Durable last-known repo exposure, so a FAILED exposure lookup degrades the
+/// guard to stale-but-enforcing instead of to unguarded (aegis-8tumi4). Gated
+/// with `project_exposure`, whose verdict it stores.
+#[cfg(feature = "quipu")]
+pub mod exposure_cache;
 pub mod extract;
 pub mod git;
 /// The golden-path conformance guard (FR-40..FR-42): blessed-trajectory
