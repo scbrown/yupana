@@ -78,18 +78,18 @@ All notable changes to this project will be documented in this file.
 
 ### Hook
 
-- Record action OUTCOME, joined to the action by the harness's tool_use_id (.10)([08d6604](https://github.com/scbrown/yupana/commit/08d660424c5bff1cb642af2f697602bbda4bca29))
-- Carry the harness tool-call id on the guard record too (.10)([1e8a063](https://github.com/scbrown/yupana/commit/1e8a063ef4d2c01cb8d24d151cf60beb01a4e18e))
+- Record action OUTCOME, joined to the action by the harness's tool_use_id([08d6604](https://github.com/scbrown/yupana/commit/08d660424c5bff1cb642af2f697602bbda4bca29))
+- Carry the harness tool-call id on the guard record too([1e8a063](https://github.com/scbrown/yupana/commit/1e8a063ef4d2c01cb8d24d151cf60beb01a4e18e))
 - Session-scope the plate read on the bash/action path([3910373](https://github.com/scbrown/yupana/commit/39103733de467b99bb62f30e26851df548f55859))
 - Route every hook site through the daemon-first projection([52eb51e](https://github.com/scbrown/yupana/commit/52eb51e09c8b0123e8f577c396614d7fe7d8d2af))
 
 ### Metrics
 
-- An unscoped fallback must not override a scoped abstention (.7) (#32)([135068e](https://github.com/scbrown/yupana/commit/135068e3a146a892193f0b3303a5b31609a082f0))
+- An unscoped fallback must not override a scoped abstention (#32)([135068e](https://github.com/scbrown/yupana/commit/135068e3a146a892193f0b3303a5b31609a082f0))
 
 ### Plate
 
-- Scope the plate read to the reading session (.7, half 2) (#30)([2371423](https://github.com/scbrown/yupana/commit/237142311944930f6df2b9e6640a4e59a846b039))
+- Scope the plate read to the reading session (half 2) (#30)([2371423](https://github.com/scbrown/yupana/commit/237142311944930f6df2b9e6640a4e59a846b039))
 
 ### Promote
 
