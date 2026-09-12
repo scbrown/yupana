@@ -17,26 +17,28 @@ CONFIG = Path(os.environ.get("CLIFF_CONFIG", ROOT / "cliff.toml")).resolve()
 class ChangelogScrubTests(unittest.TestCase):
     def test_delimiters_children_and_entry_preservation(self):
         config = tomllib.loads(CONFIG.read_text())
-        # Use a configured tracker prefix, without maintaining another list.
+        # Exercise every configured tracker prefix, without maintaining another list.
         patterns = "\n".join(
             p["pattern"] for p in config["git"]["commit_preprocessors"]
         )
-        prefix = re.search(r"\(\?:([^|)]+)\|", patterns).group(1)
-        ref = f"{prefix}-abc123"
-        cases = [
-            (f"fix: bare child {ref}.2.3", "Bare child"),
-            (f"fix: public first (#42, {ref}.2)", "Public first (#42)"),
-            (f"fix: bracket public [{ref}.2, #42]", "Bracket public [#42]"),
-            (f"fix: bracket public first [#42, {ref}.2]", "Bracket public first [#42]"),
-            (f"fix: bare reference {ref}", "Bare reference"),
-            (f"fix: bracket reference [{ref}]", "Bracket reference"),
-            (f"fix: bracket child [{ref}.3]", "Bracket child"),
-            (f"fix: parenthesized child ({ref}.2)", "Parenthesized child"),
-            (f"fix: two references [{ref}] [{prefix}-def456]", "Two references"),
-            (f"fix: nested child [{ref}.2.3]", "Nested child"),
-            (f"fix: retain public reference ({ref}.2, #42)", "Retain public reference (#42)"),
-            (f"{ref}.2: leading child reference", "Leading child reference"),
-        ]
+        prefixes = re.search(r"\(\?:([^)]*)\)", patterns).group(1).split("|")
+        cases = []
+        for prefix in prefixes:
+            ref = f"{prefix}-abc123"
+            cases.extend([
+                (f"fix: bare child {ref}.2.3", "Bare child"),
+                (f"fix: public first (#42, {ref}.2)", "Public first (#42)"),
+                (f"fix: bracket public [{ref}.2, #42]", "Bracket public [#42]"),
+                (f"fix: bracket public first [#42, {ref}.2]", "Bracket public first [#42]"),
+                (f"fix: bare reference {ref}", "Bare reference"),
+                (f"fix: bracket reference [{ref}]", "Bracket reference"),
+                (f"fix: bracket child [{ref}.3]", "Bracket child"),
+                (f"fix: parenthesized child ({ref}.2)", "Parenthesized child"),
+                (f"fix: two references [{ref}] [{prefix}-def456]", "Two references"),
+                (f"fix: nested child [{ref}.2.3]", "Nested child"),
+                (f"fix: retain public reference ({ref}.2, #42)", "Retain public reference (#42)"),
+                (f"{ref}.2: leading child reference", "Leading child reference"),
+            ])
         with tempfile.TemporaryDirectory(prefix="changelog-scrub-") as directory:
             def git(*args):
                 return subprocess.check_output(
@@ -67,7 +69,8 @@ class ChangelogScrubTests(unittest.TestCase):
                 self.assertEqual(
                     matching[0].split("([", 1)[0].strip(), f"- {message}"
                 )
-        self.assertNotIn(ref, rendered)
+        for prefix in prefixes:
+            self.assertNotIn(f"{prefix}-abc123", rendered)
         self.assertNotRegex(rendered, r"(?m)^###\s+\.\d")
         self.assertIn("### Other", rendered)
 
