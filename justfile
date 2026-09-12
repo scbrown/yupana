@@ -133,3 +133,7 @@ docs cmd="build":
 # Replay context-aware text rereads, or run its discrimination tests.
 session-guard *args="--selftest":
     python3 scripts/session-reread-guard.py {{args}}
+
+# Exercise the real changelog renderer on synthetic release commits.
+test-changelog:
+    python3 scripts/test_changelog_scrub.py
