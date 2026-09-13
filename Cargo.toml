@@ -1,6 +1,6 @@
 [package]
 name = "yupana"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 description = "In-memory, multi-tenant code-analysis engine — the structural signal for the Bobbin × Quipu stack"
 authors = ["Steve Brown"]
