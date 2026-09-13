@@ -1,5 +1,87 @@
 use super::*;
 
+// Match rust-analyzer's own slow-test readiness gate: initialize only proves
+// protocol readiness, while serverStatus.quiescent proves workspace loading
+// has settled. This gate runs only in test builds, before any semantic query.
+pub(super) fn wait_for_rust_workspace(client: &mut Client) -> anyhow::Result<()> {
+    wait_for_quiescence(Duration::from_secs(30), |remaining| {
+        let message = client.replies.recv_timeout(remaining)??;
+        if message.get("method").is_some() {
+            if let Some(id) = message.get("id") {
+                client.send(&json!({"jsonrpc": "2.0", "id": id, "result": null}))?;
+            }
+        }
+        Ok(message)
+    })
+}
+
+fn wait_for_quiescence(
+    timeout: Duration,
+    mut receive: impl FnMut(Duration) -> anyhow::Result<Value>,
+) -> anyhow::Result<()> {
+    let deadline = std::time::Instant::now() + timeout;
+    let mut last_status = Value::Null;
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        anyhow::ensure!(
+            !remaining.is_zero(),
+            "rust-analyzer workspace readiness timed out; last status={last_status}"
+        );
+        let message = receive(remaining).map_err(|error| {
+            anyhow::anyhow!("rust-analyzer workspace readiness: {error}; last status={last_status}")
+        })?;
+        if message["method"] != "experimental/serverStatus" {
+            continue;
+        }
+        last_status = message["params"].clone();
+        if last_status["quiescent"] == true {
+            anyhow::ensure!(
+                last_status["health"] == "ok",
+                "rust-analyzer workspace is not healthy: {last_status}"
+            );
+            return Ok(());
+        }
+    }
+}
+
+#[test]
+fn readiness_requires_quiescent_status_not_an_unrelated_notification() {
+    let mut messages = [
+        json!({"method":"experimental/serverStatus", "params":{"health":"ok", "quiescent":false}}),
+        json!({"method":"window/logMessage", "params":{"quiescent":true}}),
+        json!({"method":"experimental/serverStatus", "params":{"health":"ok", "quiescent":true}}),
+    ]
+    .into_iter();
+    wait_for_quiescence(Duration::from_secs(1), |_| Ok(messages.next().unwrap())).unwrap();
+    assert!(messages.next().is_none());
+}
+
+#[test]
+fn readiness_rejects_an_unhealthy_workspace() {
+    let error = wait_for_quiescence(Duration::from_secs(1), |_| {
+        Ok(json!({"method":"experimental/serverStatus", "params":{
+            "health":"error", "quiescent":true, "message":"workspace failed"
+        }}))
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("workspace failed"));
+}
+
+#[test]
+fn busy_statuses_cannot_reset_readiness_deadline() {
+    let started = std::time::Instant::now();
+    let error = wait_for_quiescence(Duration::from_millis(10), |_| {
+        std::thread::sleep(Duration::from_millis(1));
+        Ok(json!({"method":"experimental/serverStatus", "params":{
+            "health":"ok", "quiescent":false, "message":"still indexing"
+        }}))
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("timed out"));
+    assert!(error.to_string().contains("still indexing"));
+    assert!(started.elapsed() < Duration::from_secs(1));
+}
+
 fn position(file: &str, text: &str, line: usize, needle: &str) -> Position {
     Position {
         file: file.into(),
@@ -85,20 +167,28 @@ fn exercise(root: &Path, file: &str, text: &str, server: &str) {
     let updated = text.replace("target", "renamed");
     std::fs::write(root.join(file), &updated).unwrap();
     let new_call = position(file, &updated, 3, "renamed()");
-    let definition = session.locations(&new_call, Query::Definition).unwrap();
-    assert_eq!(definition.value[0].start_line, 2);
-    assert!(session
-        .hover(&new_call)
-        .unwrap()
-        .value
-        .to_string()
-        .contains("renamed"));
-    assert!(session
-        .document_symbols(file)
-        .unwrap()
-        .value
-        .to_string()
-        .contains("renamed"));
+    // didChange precedes the request, but the server may still be reindexing.
+    // Poll the saved-content contract without adding latency to warm samples.
+    let started = std::time::Instant::now();
+    let timeout = Duration::from_secs(30);
+    loop {
+        let definition = session.locations(&new_call, Query::Definition).unwrap();
+        let hover = session.hover(&new_call).unwrap();
+        let symbols = session.document_symbols(file).unwrap();
+        if definition.value.first().is_some_and(|v| v.start_line == 2)
+            && hover.value.to_string().contains("renamed")
+            && symbols.value.to_string().contains("renamed")
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < timeout,
+            "saved-content {server} did not converge within {timeout:?} at {new_call:?}; \
+             last definition={definition:?}; raw response={:?}; hover={hover:?}; symbols={symbols:?}",
+            session.last_location_response()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }
 
 #[test]
