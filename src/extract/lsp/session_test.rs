@@ -85,20 +85,28 @@ fn exercise(root: &Path, file: &str, text: &str, server: &str) {
     let updated = text.replace("target", "renamed");
     std::fs::write(root.join(file), &updated).unwrap();
     let new_call = position(file, &updated, 3, "renamed()");
-    let definition = session.locations(&new_call, Query::Definition).unwrap();
-    assert_eq!(definition.value[0].start_line, 2);
-    assert!(session
-        .hover(&new_call)
-        .unwrap()
-        .value
-        .to_string()
-        .contains("renamed"));
-    assert!(session
-        .document_symbols(file)
-        .unwrap()
-        .value
-        .to_string()
-        .contains("renamed"));
+    // didChange precedes the request, but the server may still be reindexing.
+    // Poll the saved-content contract without adding latency to warm samples.
+    let started = std::time::Instant::now();
+    let timeout = Duration::from_secs(30);
+    loop {
+        let definition = session.locations(&new_call, Query::Definition).unwrap();
+        let hover = session.hover(&new_call).unwrap();
+        let symbols = session.document_symbols(file).unwrap();
+        if definition.value.first().is_some_and(|v| v.start_line == 2)
+            && hover.value.to_string().contains("renamed")
+            && symbols.value.to_string().contains("renamed")
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < timeout,
+            "saved-content {server} did not converge within {timeout:?} at {new_call:?}; \
+             last definition={definition:?}; raw response={:?}; hover={hover:?}; symbols={symbols:?}",
+            session.last_location_response()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }
 
 #[test]
