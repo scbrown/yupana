@@ -169,12 +169,20 @@ impl Client {
             &json!({
                 "processId": std::process::id(),
                 "rootUri": root_uri,
-                "capabilities": {},
+                "capabilities": if cfg!(test) && client.server.program == "rust-analyzer" {
+                    json!({"experimental": {"serverStatusNotification": true}})
+                } else {
+                    json!({})
+                },
                 "workspaceFolders": [{"uri": root_uri, "name": "yupana-query"}]
             }),
             Duration::from_secs(30),
         )?;
         client.notify("initialized", &json!({}))?;
+        #[cfg(test)]
+        if client.server.program == "rust-analyzer" {
+            session_test::wait_for_rust_workspace(&mut client)?;
+        }
         Ok(client)
     }
 
