@@ -112,6 +112,8 @@ struct Client {
     server: Server,
     opened: HashMap<PathBuf, (String, u64)>,
     warmed_methods: HashSet<String>,
+    #[cfg(test)]
+    last_location_response: Option<Value>,
 }
 
 impl Client {
@@ -158,6 +160,8 @@ impl Client {
             server,
             opened: HashMap::new(),
             warmed_methods: HashSet::new(),
+            #[cfg(test)]
+            last_location_response: None,
         };
         let root_uri = file_uri(&client.root);
         client.request_with_timeout(
@@ -238,6 +242,10 @@ impl Client {
         for attempt in 0..30 {
             let response = self.request(method, &params)?;
             let found = locations(response.get("result").unwrap_or(&Value::Null), &self.root);
+            #[cfg(test)]
+            {
+                self.last_location_response = Some(response);
+            }
             if !found.is_empty() || !cold || attempt == 29 {
                 return Ok(found);
             }
