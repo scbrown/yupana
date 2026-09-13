@@ -777,6 +777,7 @@ fn a_block_tier_hit_in_a_public_repo_blocks() {
     let (messages, blocks) = text_plane(
         &[text_violation(crate::textrules::TextTier::Block)],
         &RepoExposure::Public,
+        "answered",
     );
     assert!(blocks, "this is the exact leak the rule exists to stop");
     assert!(messages.iter().any(|m| m.contains("PUBLIC remote")));
@@ -789,6 +790,7 @@ fn a_block_tier_hit_in_an_internal_repo_downgrades_and_says_why() {
     let (messages, blocks) = text_plane(
         &[text_violation(crate::textrules::TextTier::Block)],
         &RepoExposure::Internal,
+        "answered",
     );
     assert!(!blocks, "internal-only exposure must not block");
     assert!(messages.iter().any(|m| m.contains("downgraded")));
@@ -805,6 +807,7 @@ fn an_unknown_repo_never_blocks_and_says_it_is_unknown() {
     let (messages, blocks) = text_plane(
         &[text_violation(crate::textrules::TextTier::Block)],
         &RepoExposure::Unknown("repo `yupana` is not in the graph".into()),
+        "answered",
     );
     assert!(!blocks);
     assert!(messages
@@ -815,6 +818,112 @@ fn an_unknown_repo_never_blocks_and_says_it_is_unknown() {
     assert!(messages.iter().any(|m| m.contains("repo_<name>")));
 }
 
+// --- item 3: a check that cannot MEASURE must not report SAFE ---------------
+//
+// aegis-8tumi4, ruled 2026-09-11. `Unknown` had two causes with opposite
+// correct answers and the code could not tell them apart:
+//
+//   quipu ANSWERED "no such repo"  -> we measured; ignorance about an unpinned
+//                                     repo is a guess, and we do not block on it
+//   the lookup FAILED, nothing cached -> we did not measure at all, so "not
+//                                     public" is the ABSENCE of a finding
+//
+// The second used to pass. At the measured timeout rate that was ~4 in 10 of
+// the lookups that needed the network, and a fail-open leaves a record that
+// looks exactly like a correct pass on an unexposed target.
+//
+// THESE TWO TESTS ARE A PAIR AND MUST STAY ONE. The whole defect is that the
+// two cases are indistinguishable from the outside, so a test for either alone
+// passes in a world where the distinction does not exist. This is the unit-level
+// form of the live A/B that found it: same repo, same rule, only whether the
+// lookup succeeded differs.
+
+#[cfg(feature = "quipu")]
+#[test]
+fn an_unmeasurable_exposure_REFUSES_rather_than_passing() {
+    use crate::project::RepoExposure;
+    let (messages, blocks) = text_plane(
+        &[text_violation(crate::textrules::TextTier::Block)],
+        &RepoExposure::Unknown(
+            "POST http://quipu.example/policy/check failed: timed out reading \
+             response; and no cached exposure could be served"
+                .into(),
+        ),
+        crate::project_exposure::SOURCE_UNREACHABLE,
+    );
+    assert!(
+        blocks,
+        "a block-tier hit must NOT pass when exposure could not be measured"
+    );
+    assert!(messages.iter().any(|m| m.contains("REFUSING")));
+    assert!(
+        messages.iter().any(|m| m.contains("could not be MEASURED")),
+        "the refusal must say it is about measurement, not about the verdict"
+    );
+    assert!(
+        !messages
+            .iter()
+            .any(|m| m.contains("never blocks on a guess")),
+        "that line is for the ANSWERED-unknown case and must not appear here"
+    );
+}
+
+#[cfg(feature = "quipu")]
+#[test]
+fn an_ANSWERED_unknown_still_never_blocks() {
+    // The negative control for the test above, and the promise to mqnl that
+    // this change does not quietly widen the rule: quipu replied, we measured,
+    // and an unpinned repo still only warns.
+    use crate::project::RepoExposure;
+    let (messages, blocks) = text_plane(
+        &[text_violation(crate::textrules::TextTier::Block)],
+        &RepoExposure::Unknown("repo `yupana` is not in the graph".into()),
+        "answered",
+    );
+    assert!(
+        !blocks,
+        "a MEASURED unknown is still a guess — do not block"
+    );
+    assert!(messages
+        .iter()
+        .any(|m| m.contains("never blocks on a guess")));
+    assert!(!messages.iter().any(|m| m.contains("REFUSING")));
+}
+
+#[cfg(feature = "quipu")]
+#[test]
+fn a_SERVED_last_known_verdict_is_not_treated_as_unmeasurable() {
+    // The third source value. `cache` means the lookup failed AND last-known
+    // covered for it — that IS a measurement, just an older one, and it already
+    // carries its own loud stderr line. Blocking it here would double-punish a
+    // degradation the guard handled correctly.
+    use crate::project::RepoExposure;
+    let (_, blocks) = text_plane(
+        &[text_violation(crate::textrules::TextTier::Block)],
+        &RepoExposure::Internal,
+        "cache",
+    );
+    assert!(
+        !blocks,
+        "a served last-known INTERNAL verdict must not block"
+    );
+}
+
+#[cfg(feature = "quipu")]
+#[test]
+fn a_warn_tier_hit_never_blocks_even_when_exposure_is_unmeasurable() {
+    // Per-pattern tier stays data. Item 3 raises the floor for BLOCK-tier
+    // rules only; it must not promote every warn-tier pattern into a refusal
+    // the moment quipu is slow, which would be the fleet-stopping over-read.
+    use crate::project::RepoExposure;
+    let (_, blocks) = text_plane(
+        &[text_violation(crate::textrules::TextTier::Warn)],
+        &RepoExposure::Unknown("lookup failed; nothing cached".into()),
+        crate::project_exposure::SOURCE_UNREACHABLE,
+    );
+    assert!(!blocks, "warn tier is advisory everywhere, measured or not");
+}
+
 #[cfg(feature = "quipu")]
 #[test]
 fn a_warn_tier_hit_never_blocks_even_in_a_public_repo() {
@@ -822,6 +931,7 @@ fn a_warn_tier_hit_never_blocks_even_in_a_public_repo() {
     let (_, blocks) = text_plane(
         &[text_violation(crate::textrules::TextTier::Warn)],
         &RepoExposure::Public,
+        "answered",
     );
     assert!(
         !blocks,

@@ -182,6 +182,10 @@ pub(super) fn governed_check(
     scope_plane: &mut Option<super::scope_arm::ScopePlane>,
 ) -> Option<Decision> {
     use crate::project::RepoExposure;
+    // `text_plane` now lives in its own module (yupana #66 review: extract
+    // rather than raise the size baseline). Imported inside this fn because
+    // the fn — and the module — are both `cfg(feature = "quipu")`.
+    use super::text_plane_mod::text_plane;
 
     if config.policy.mode == Mode::Off || !config.quipu.enabled || config.quipu.endpoint.is_empty()
     {
@@ -311,6 +315,8 @@ pub(super) fn governed_check(
     // judge against. The repo NAME and the exposure verdict are the two facts
     // that decide it, and neither is a path.
     let mut exposure_label = "n/a";
+    // HOW that exposure was obtained — see `exposure_answer_for` (aegis-8tumi4).
+    let mut exposure_source = "n/a";
     let mut target_repo: Option<String> = None;
     if !text_violations.is_empty() {
         // Exposure is resolved ONCE per edit, from the graph, via the governed
@@ -320,7 +326,12 @@ pub(super) fn governed_check(
             .as_deref()
             .and_then(crate::git::origin_repo_name);
         let exposure = match (&target_root, &repo) {
-            (Some(_), Some(repo)) => crate::hook::daemon_projection::exposure_for(config, repo),
+            (Some(_), Some(repo)) => {
+                let (exposure, source) =
+                    crate::hook::daemon_projection::exposure_answer_for(config, repo);
+                exposure_source = source;
+                exposure
+            }
             (Some(tr), None) => RepoExposure::Unknown(format!(
                 "the tree containing this file ({}) has no `origin` remote, so \
                  its exposure cannot be resolved",
@@ -337,8 +348,12 @@ pub(super) fn governed_check(
             RepoExposure::Internal => "internal",
             RepoExposure::Unknown(_) => "unknown",
         };
+        // The other arms decided WITHOUT asking: answers, not failures.
+        if exposure_source == "n/a" {
+            exposure_source = "local";
+        }
         target_repo = repo;
-        let (text_messages, text_blocks) = text_plane(&text_violations, &exposure);
+        let (text_messages, text_blocks) = text_plane(&text_violations, &exposure, exposure_source);
         messages.extend(text_messages);
         any_blocking |= text_blocks;
     }
@@ -412,6 +427,7 @@ pub(super) fn governed_check(
             ("structural", (structural_violations.len() as u64).into()),
             ("blocking", any_blocking.into()),
             ("exposure", exposure_label.into()),
+            ("exposure_source", exposure_source.into()),
             ("repo", repo_label.clone().into()),
             // WHICH catalogue said so. A soak that groups governed firings
             // without this cannot tell a verdict from the current policy set
@@ -487,7 +503,7 @@ pub(super) fn governed_check(
     // against a registry that could not be refreshed is stale, and saying so is
     // the whole point of carrying the field.
     let mut decision = Decision::evaluated(outcome, evaluations, registry.freshness());
-    decision.governed_context = Some((exposure_label, repo_label));
+    decision.governed_context = Some((exposure_label, exposure_source, repo_label));
     Some(decision)
 }
 
@@ -503,53 +519,4 @@ fn target_file(input: &HookInput, root: &Path) -> Option<PathBuf> {
     } else {
         root.join(path)
     })
-}
-
-/// The text plane's decision, PURE: which messages, and whether anything
-/// blocks, given the violations and the repo's exposure. Separated from
-/// [`governed_check`] so the tier x exposure matrix — the part of this whole
-/// circuit that must never be wrong in the blocking direction — is testable
-/// without a network.
-///
-/// The matrix (mqnl's seam, verbatim):
-///   block tier + Public   -> BLOCKS (this is the leak the rule exists for)
-///   block tier + Internal -> warning, downgraded and saying why
-///   block tier + Unknown  -> warning that SAYS the repo is unknown — never
-///                            block on a guess, never be silent on ignorance
-///   warn tier  + anything -> warning
-#[cfg(feature = "quipu")]
-pub(super) fn text_plane(
-    violations: &[crate::textrules::TextViolation],
-    exposure: &crate::project::RepoExposure,
-) -> (Vec<String>, bool) {
-    use crate::project::RepoExposure;
-    use crate::textrules::TextTier;
-
-    let mut messages: Vec<String> = Vec::new();
-    let mut any_blocking = false;
-    for v in violations {
-        if v.tier == TextTier::Block && *exposure == RepoExposure::Public {
-            any_blocking = true;
-        }
-        messages.push(v.message.clone());
-    }
-    match exposure {
-        RepoExposure::Public => messages.push(
-            "[exposure: this repo has a PUBLIC remote (per the graph), so \
-             block-tier rules block]"
-                .to_string(),
-        ),
-        RepoExposure::Internal => messages.push(
-            "[exposure: downgraded to a warning — the graph knows this repo and \
-             it has no public remote, so the token leaks nowhere; the same edit \
-             would BLOCK in a public repo]"
-                .to_string(),
-        ),
-        RepoExposure::Unknown(reason) => messages.push(format!(
-            "[exposure: warning, NOT blocking — the repo's exposure is unknown \
-             ({reason}), and a governed rule never blocks on a guess. Add this \
-             repo's `repo_<name>` entity and remote facts to quipu to pin it.]"
-        )),
-    }
-    (messages, any_blocking)
 }

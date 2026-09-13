@@ -29,39 +29,14 @@
 //! drift. The chain still closes, because both predicates join on the COMMIT
 //! IRI, not on each other.
 //!
-//! ── DIVERGENCE WITH THE EXISTING INGEST LANE, AND THE FIX ───────────────────
-//! Measured, not assumed. camayoc's `ingest_git_provenance.py` mints under
-//! `BASE = http://aegis.gastown.local/code/`; yupana mints under
-//! `{ONTO}code/…` = `http://aegis.gastown.local/ontology/code/…`. Those are
-//! different IRIs for the same referents, so this is NOT a double-write — the
-//! two lanes produce disjoint populations that never collide and never join.
-//! quipu's own `src/namespace.rs` records the measurement (aegis-6noan,
-//! 2026-08-23): subjects under `CODE_BASE` number **0**, subjects under the
-//! ontology base **10,425**, and it warns in as many words that building against
-//! `CODE_BASE` forks the code graph.
+//! Commit and module IRIs share the exporter's base. The tracker-aware ingest
+//! lane uses that base too; escaping unusual paths can still differ, so this
+//! does not claim universal identity across producers.
 //!
-//! So yupana mints under the base its own entities already live at — the only
-//! choice under which `modifies` reaches a CodeModule that exists. The fix on
-//! the other side is a one-line `BASE` repoint in camayoc, which quipu's note
-//! already asks for. After it, both lanes mint IDENTICAL commit and module IRIs
-//! and `/knot` supersedes per `(s, p, o)`, so they converge rather than
-//! duplicate. To make that convergence exact rather than approximate, the label
-//! below deliberately matches the ingest's spelling (`<repo>@<sha[:12]>`) — two
-//! spellings would accumulate as two labels on one node, since nothing bounds
-//! `rdfs:label` to one value.
-//!
-//! ── WHAT IS NOT CLAIMED ─────────────────────────────────────────────────────
-//! * **Module granularity.** "Touched" means the commit changed the file. That
-//!   is exactly true. Symbol-level touch would need a per-symbol diff and would
-//!   over-claim if guessed from a file-level one.
-//! * **Valid-time is carried as a FACT, not as a transaction field.** Verified
-//!   against quipu `main`: `tool_knot` accepts `turtle` / `timestamp` / `actor` /
-//!   `source` / `shapes` / `replace_snapshot` / `snapshot` / `graph` and has no
-//!   `valid_from` parameter, so the valid-time axis is not settable over `/knot`
-//!   at all. The commit's authored time therefore rides as `bobbin:date` on the
-//!   commit node. Putting it in `timestamp` instead would have been worse than
-//!   omitting it: that field is transaction time, "when learned", and
-//!   overwriting it would falsify the axis that IS correct today.
+//! Touched entities have module granularity: a file diff does not prove which
+//! symbols changed. Author identity/date and committer identity are separate
+//! facts. The CLI also sends the authored `%aI` as `/knot` valid_from, leaving
+//! transaction time server assigned and actor as the writing process.
 
 use std::path::Path;
 
@@ -83,6 +58,7 @@ use crate::export::{esc, module_iri, ONTO};
 pub fn commit_turtle(root: &Path, repo: &str, commit: &str, projection: &str) -> Option<String> {
     let sha = crate::git::resolve_commit(root, commit)?;
     let (author, date) = crate::git::commit_identity(root, &sha)?;
+    let committer = crate::git::commit_committer(root, &sha)?;
     let touched: Vec<String> = crate::git::commit_touched_paths(root, &sha)
         .iter()
         .map(|p| module_iri(repo, &p.display().to_string()))
@@ -103,6 +79,10 @@ pub fn commit_turtle(root: &Path, repo: &str, commit: &str, projection: &str) ->
         esc(repo),
         esc(&author),
         esc(&date),
+    ));
+    out.push_str(&format!(
+        "<{iri}> bobbin:committer \"{}\" .\n",
+        esc(&committer)
     ));
     // One STATEMENT per edge rather than one `;`-joined block. The chunker can
     // only split at statement boundaries, so a single block would be

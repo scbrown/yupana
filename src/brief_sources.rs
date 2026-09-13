@@ -15,6 +15,9 @@ use std::path::Path;
 use crate::brief::{Brief, GroundPath, SimilarItem};
 use crate::config::YupanaConfig;
 
+#[path = "brief_identity.rs"]
+mod identity;
+
 /// Only ids shaped like tracker ids ride into SPARQL literals.
 fn sanitized(item: &str) -> String {
     item.chars()
@@ -216,21 +219,27 @@ pub(crate) fn similar_items(
             }
         }
     }
+    let candidates: Vec<_> = entities
+        .iter()
+        .filter(|entity| {
+            entity["types"].as_array().is_some_and(|types| {
+                types.iter().any(|v| {
+                    v.as_str()
+                        .is_some_and(|s| s.ends_with("WorkItem") || s.ends_with("Bead"))
+                })
+            }) || semantic.contains_key(entity["iri"].as_str().unwrap_or_default())
+        })
+        .collect();
+    // Semantic-only candidates have no type facts. The identifier requirement
+    // still filters them; resolve all candidates in bounded batches, not N calls.
+    let identities = identity::fetch(
+        endpoint,
+        candidates.iter().filter_map(|e| e["iri"].as_str()),
+    );
     let mut similar: Vec<(u32, SimilarItem)> = Vec::new();
-    for entity in &entities {
+    for entity in candidates {
         let iri = entity["iri"].as_str().unwrap_or_default();
-        let is_work_item = entity["types"].as_array().is_some_and(|t| {
-            t.iter().any(|v| {
-                v.as_str()
-                    .is_some_and(|s| s.ends_with("WorkItem") || s.ends_with("Bead"))
-            })
-        });
-        // Semantic-only candidates carry no type facts; `identity_of` is the
-        // filter there — nothing without a tracker id gets through.
-        if !is_work_item && !semantic.contains_key(iri) {
-            continue;
-        }
-        let Some((id, outcome, label)) = identity_of(endpoint, iri) else {
+        let Some((id, outcome, label)) = identities.get(iri).cloned() else {
             continue;
         };
         if id == item {
@@ -289,28 +298,15 @@ fn probes(query_text: &str, with_terms: bool) -> Vec<String> {
     probes
 }
 
-/// An entity's tracker id, declared outcome, and label, when it has them.
-/// The id requirement doubles as the work-item filter: commits, classes and
-/// code entities carry no `aegis:identifier` and resolve to `None`.
-fn identity_of(endpoint: &str, iri: &str) -> Option<(String, Option<String>, Option<String>)> {
-    if iri.contains(['<', '>', '"', ' ']) {
-        return None;
-    }
-    let query = format!(
-        "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
-         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \
-         SELECT ?id ?outcome ?label WHERE {{ <{iri}> aegis:identifier ?id . \
-         OPTIONAL {{ <{iri}> aegis:outcome ?outcome }} \
-         OPTIONAL {{ <{iri}> rdfs:label ?label }} }}"
-    );
-    let body = crate::project::query(endpoint, &query).ok()?;
-    let id = values(&body, "id").into_iter().next()?;
-    Some((
-        id,
-        values(&body, "outcome").into_iter().next(),
-        values(&body, "label").into_iter().next(),
-    ))
-}
+/// Candidate identities share one query shape. The namespace belongs to the
+/// same deployed work-item vocabulary as the other briefing queries here.
+const IDENTITY_QUERY: &str = "\
+    PREFIX aegis: <http://aegis.gastown.local/ontology/> \
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \
+    SELECT ?entity ?id ?outcome ?label WHERE { VALUES ?entity { $CANDIDATES } \
+    ?entity aegis:identifier ?id . \
+    OPTIONAL { ?entity aegis:outcome ?outcome } \
+    OPTIONAL { ?entity rdfs:label ?label } }";
 
 /// The semantic scale is QUERY-RELATIVE, not absolute: on quipu's `/search`
 /// surface (bare query label against entity text with type/provenance

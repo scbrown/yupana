@@ -169,7 +169,8 @@ pub(crate) fn projected(
     }
 }
 
-/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56).
+/// Resolve a repo's exposure, asking the resident daemon first (aegis-q4tt56),
+/// keeping WHETHER WE GOT AN ANSWER as well as what it was.
 ///
 /// The measured reason this exists: `POST /policy/check` took 2.4-7.2s and ran
 /// once per governed edit, uncached, from every agent — the CONSTANT half of the
@@ -181,7 +182,55 @@ pub(crate) fn projected(
 /// rules to warnings, so folding a transport failure into it would silently
 /// weaken enforcement every time one process was not running — a policy change
 /// wearing the costume of a connection error.
-pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project::RepoExposure {
+///
+/// The decision is identical either way — a governed rule never blocks on a
+/// guess — so this exists solely for the RECORD. `RepoExposure::Unknown` is two
+/// facts wearing one token: "quipu says it does not know this repo", which is a
+/// real and stable answer, and "we never reached quipu", which is a failed
+/// measurement. Both fail open, and until they are told apart in the spool a
+/// fail-open leaves a row indistinguishable from a correct pass on an unexposed
+/// target — so the advise-mode soak cannot count the false negatives it exists
+/// to count (aegis-8tumi4, measured: 6 of 14 network-needing lookups timed out).
+///
+/// This mirrors `policy_source` on the same record, which already draws exactly
+/// this distinction for the OTHER lookup the guard makes, and for the same
+/// stated reason: two verdicts are not equally good evidence just because they
+/// carry the same word.
+pub(super) fn exposure_answer_for(
+    config: &YupanaConfig,
+    repo: &str,
+) -> (crate::project::RepoExposure, &'static str) {
+    let now = crate::projection_cache::now_secs();
+    match resolve_exposure_answer(config, repo) {
+        crate::project_exposure::ExposureAnswer::Answered(exposure) => {
+            // A CONFIRMED verdict refreshes last-known, so the next lookup that
+            // fails has something honest to fall back on. Fail-silent by
+            // contract: bookkeeping about enforcement must never be able to
+            // change an enforcement outcome (aegis-8tumi4 item 2).
+            if let Some(dir) = crate::exposure_cache::cache_dir() {
+                crate::exposure_cache::save(&dir, &config.quipu.endpoint, repo, &exposure, now);
+            }
+            (exposure, "answered")
+        }
+        // We never got an answer. Degrade to LAST-KNOWN, not to allow — and
+        // never store this failure as though it were a verdict.
+        crate::project_exposure::ExposureAnswer::Unreachable(why) => {
+            serve_last_known(config, repo, &why, now)
+        }
+    }
+}
+
+/// Ask the resident daemon, then quipu directly, for one repo's exposure.
+///
+/// Split out so the cache policy above reads as one decision over ONE answer,
+/// rather than being duplicated down two transport paths that fail differently.
+/// `Err` from the daemon means NO USABLE DAEMON and we resolve live; a daemon
+/// reply flagged `unreachable` means the daemon reached us but quipu did not
+/// reach IT, which is a failed lookup and must not be cached.
+fn resolve_exposure_answer(
+    config: &YupanaConfig,
+    repo: &str,
+) -> crate::project_exposure::ExposureAnswer {
     if config.serve.use_daemon {
         match crate::daemon::client_policy::fetch_exposure(
             &config.serve.bind_address,
@@ -189,7 +238,17 @@ pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project:
             repo,
             daemon_exposure_timeout(),
         ) {
-            Ok(reply) => return reply.exposure(),
+            Ok(reply) => {
+                return if reply.unreachable {
+                    crate::project_exposure::ExposureAnswer::Unreachable(
+                        reply.reason.clone().unwrap_or_else(|| {
+                            "the resident daemon could not reach quipu".to_string()
+                        }),
+                    )
+                } else {
+                    crate::project_exposure::ExposureAnswer::Answered(reply.exposure())
+                };
+            }
             Err(why) => eprintln!(
                 "yupana: resident daemon expected at {}:{} but exposure not usable ({why}) \
                  — resolving live instead",
@@ -197,7 +256,58 @@ pub(super) fn exposure_for(config: &YupanaConfig, repo: &str) -> crate::project:
             ),
         }
     }
-    crate::project::fetch_repo_exposure(&config.quipu.endpoint, repo)
+    crate::project_exposure::fetch_exposure_answer(&config.quipu.endpoint, repo)
+}
+
+/// Serve last-known exposure after a FAILED lookup, or stay `Unknown` and say
+/// why twice over.
+///
+/// The reason carried is deliberately BOTH halves — why the lookup failed and
+/// why the cache could not cover for it. One without the other sends an
+/// operator to the wrong side: "quipu timed out" alone hides that the cache was
+/// a day stale, and "no cached exposure" alone hides that quipu is down.
+fn serve_last_known(
+    config: &YupanaConfig,
+    repo: &str,
+    why: &str,
+    now: u64,
+) -> (crate::project::RepoExposure, &'static str) {
+    let Some(dir) = crate::exposure_cache::cache_dir() else {
+        let miss = crate::exposure_cache::ExposureCacheMiss::NoStateDir;
+        return (
+            crate::project::RepoExposure::Unknown(format!(
+                "{why}; and no cached exposure could be served ({}: {miss})",
+                crate::exposure_cache::miss_label(&miss)
+            )),
+            crate::project_exposure::SOURCE_UNREACHABLE,
+        );
+    };
+    match crate::exposure_cache::load_servable(
+        &dir,
+        &config.quipu.endpoint,
+        repo,
+        config.quipu.projection_cache_ttl_secs,
+        now,
+    ) {
+        Ok(cached) => {
+            // Loud on purpose. A guard that quietly enforces yesterday's answer
+            // is the next version of the bug this fixes, so the degradation
+            // announces itself and its AGE every time it happens.
+            eprintln!(
+                "yupana: exposure for `{repo}` could not be resolved ({why}) — enforcing \
+                 last-known verdict from {}s ago",
+                cached.age_secs(now)
+            );
+            (cached.exposure, "cache")
+        }
+        Err(miss) => (
+            crate::project::RepoExposure::Unknown(format!(
+                "{why}; and no cached exposure could be served ({}: {miss})",
+                crate::exposure_cache::miss_label(&miss)
+            )),
+            crate::project_exposure::SOURCE_UNREACHABLE,
+        ),
+    }
 }
 
 #[cfg(test)]

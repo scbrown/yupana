@@ -678,6 +678,7 @@ fn multi_chunk_report_names_the_chunk_count() {
         count: 9329,
         tx_ids: vec![801, 802, 803],
         chunks: 3,
+        valid_from: Vec::new(),
     });
     let mut out = Vec::new();
     wrote.report(&mut out).unwrap();

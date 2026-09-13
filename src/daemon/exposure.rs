@@ -61,6 +61,16 @@ pub struct ExposureReply {
     /// Whether this was served from the resident cache. A caller uses it for
     /// reporting only; the DECISION is identical either way.
     pub from_cache: bool,
+    /// TRUE when we never got an answer — a timeout, a 502, an unreadable body.
+    /// The DECISION is `unknown` either way (a governed rule never blocks on a
+    /// guess), which is exactly why this has to be reported separately: without
+    /// it, a lookup that FAILED and a repo that is genuinely absent from the
+    /// graph leave identical records, and a soak cannot count a false negative
+    /// it cannot see (aegis-8tumi4). `serde(default)` so a reply from an older
+    /// daemon still deserialises — it reports false, and the caller's latency
+    /// cross-check is what covers that gap until the daemon is upgraded.
+    #[serde(default)]
+    pub unreachable: bool,
     /// Age of the cached verdict in seconds; 0 when freshly resolved.
     pub age_secs: u64,
     /// The rule-set hash this verdict is bound to.
@@ -158,6 +168,10 @@ impl ExposureCache {
             verdict: verdict.to_string(),
             reason,
             from_cache: false,
+            // The same fact `cacheable` already encodes: we do not cache what we
+            // never learned. Reporting it costs nothing and is the only way a
+            // reader tells a failed lookup from an absent repo.
+            unreachable: !cacheable,
             age_secs: 0,
             rules_hash: format!("{rules_hash:x}"),
         }
@@ -178,6 +192,9 @@ impl ExposureCache {
             verdict: verdict.to_string(),
             reason,
             from_cache: true,
+            // A cache hit is an ANSWER by construction: only `Answered` is ever
+            // stored, precisely so a transient failure is never frozen for a TTL.
+            unreachable: false,
             age_secs: age,
             rules_hash: format!("{rules_hash:x}"),
         })

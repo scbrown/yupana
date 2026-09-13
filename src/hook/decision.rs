@@ -34,9 +34,15 @@ pub(super) struct Decision {
     /// fresh, while a projected registry may be serving a stale cache, and only
     /// the plane that evaluated the rules knows which.
     pub(super) freshness: crate::types::Freshness,
-    /// Exposure and repository used by the governed plane for THIS decision.
-    /// Absent when that plane did not produce it; never resolved by the recorder.
-    pub(super) governed_context: Option<(&'static str, String)>,
+    /// Exposure, HOW THAT EXPOSURE WAS OBTAINED, and repository used by the
+    /// governed plane for THIS decision. Absent when that plane did not produce
+    /// it; never resolved by the recorder.
+    ///
+    /// The middle field is not decoration. `unknown` is two facts wearing one
+    /// token — quipu answering "I do not know this repo", and us never reaching
+    /// quipu — and both fail open. Without the source they leave identical rows,
+    /// so a soak cannot count a fail-open it cannot see (aegis-8tumi4).
+    pub(super) governed_context: Option<(&'static str, &'static str, String)>,
 }
 
 impl From<Outcome> for Decision {

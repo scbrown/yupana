@@ -122,6 +122,20 @@ configured TTL the cache is refused rather than served, and resolution degrades
 to `Unknown`. A retired rule that keeps firing out of a cache is worse than no
 rule, because nothing outside the process can falsify it.
 
+## Work-item evidence
+
+A fresh session plate with an explicit empty or null item is a known absence and
+fails the work-item predicate. An unreadable, malformed, stale or mismatched-session
+plate is unknown and fails open for this predicate only. Owner identity and policy
+resolution keep their existing refusal behavior. This avoids coupling the ability
+to land a repair to the work-item publisher's availability.
+
+The signed provenance includes `work_item_readable` so unknown evidence can be
+distinguished from a known empty plate. The host adapter records its work-item
+verdict in advise mode separately from the actual ownership verdict; an advisory
+refusal does not block the merge. Existing host overrides bypass that observation.
+Enforcement promotion still requires a measured clean soak.
+
 ## Attestation
 
 Every decision — allow as well as refuse — is a signed action-certification

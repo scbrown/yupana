@@ -86,9 +86,29 @@ pub fn path_from_env() -> Option<PathBuf> {
 /// both directions.
 #[must_use]
 pub fn parse(doc: &str, now: u64, max_age: u64, session: Option<&str>) -> Option<String> {
+    parse_observation(doc, now, max_age, session).flatten()
+}
+
+/// A validated plate: outer `None` is unknown, `Some(None)` is positively empty.
+#[must_use]
+pub fn parse_observation(
+    doc: &str,
+    now: u64,
+    max_age: u64,
+    session: Option<&str>,
+) -> Option<Option<String>> {
     let v: serde_json::Value = serde_json::from_str(doc).ok()?;
-    let item = v.get("item")?.as_str()?;
-    if item.is_empty() {
+    let item = match v.get("item")? {
+        serde_json::Value::Null => None,
+        serde_json::Value::String(s) if s.is_empty() => None,
+        serde_json::Value::String(s) if !s.chars().any(char::is_whitespace) && !s.contains('=') => {
+            Some(s.clone())
+        }
+        _ => return None,
+    };
+    if v.get("session")
+        .is_some_and(|s| !s.is_null() && !s.is_string())
+    {
         return None;
     }
     // SESSION SCOPE — the other half of the window this module's docs describe.
@@ -114,7 +134,7 @@ pub fn parse(doc: &str, now: u64, max_age: u64, session: Option<&str>) -> Option
     if now.saturating_sub(at) > max_age {
         return None;
     }
-    Some(item.to_string())
+    Some(item)
 }
 
 /// This agent's current work item, or `None` for UNKNOWN.
@@ -124,6 +144,12 @@ pub fn parse(doc: &str, now: u64, max_age: u64, session: Option<&str>) -> Option
 /// what the guard it annotates decides.
 #[must_use]
 pub fn current(session: Option<&str>) -> Option<String> {
+    observation(session).flatten()
+}
+
+/// Read one plate while preserving unknown versus positively empty evidence.
+#[must_use]
+pub fn observation(session: Option<&str>) -> Option<Option<String>> {
     let path = path_from_env()?;
     let doc = std::fs::read_to_string(path).ok()?;
     let now = std::time::SystemTime::now()
@@ -133,7 +159,7 @@ pub fn current(session: Option<&str>) -> Option<String> {
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(DEFAULT_MAX_AGE_SECS);
-    parse(&doc, now, max_age, session)
+    parse_observation(&doc, now, max_age, session)
 }
 
 #[cfg(test)]
@@ -256,5 +282,32 @@ mod tests {
         // are independent and either one abstaining is enough.
         let d = doc_session("abc-4", NOW - MAX - 1, "sess-abc");
         assert!(parse(&d, NOW, MAX, Some("sess-abc")).is_none());
+    }
+    #[test]
+    fn empty_requires_a_valid_fresh_matching_plate() {
+        let empty = r#"{"item":null,"at":1000000,"session":"current"}"#;
+        assert_eq!(
+            parse_observation(empty, NOW, MAX, Some("current")),
+            Some(None)
+        );
+        assert_eq!(parse_observation(empty, NOW, MAX, Some("other")), None);
+        assert_eq!(
+            parse_observation(empty, NOW + MAX + 1, MAX, Some("current")),
+            None
+        );
+        for bad in [
+            "{",
+            "[]",
+            r#"{"item":null}"#,
+            r#"{"at":1000000}"#,
+            r#"{"item":null,"at":true}"#,
+            r#"{"item":null,"at":1000000,"session":3}"#,
+        ] {
+            assert_eq!(parse_observation(bad, NOW, MAX, None), None, "{bad}");
+        }
+        assert_eq!(
+            parse_observation(&doc("abc-1", NOW), NOW, MAX, None),
+            Some(Some("abc-1".into()))
+        );
     }
 }

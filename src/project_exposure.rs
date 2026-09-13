@@ -7,7 +7,7 @@ use crate::project_queries::EXPOSURE_POLICY_IRI;
 
 /// How exposed is the repo an edit lands in? Three-valued BY DESIGN (the
 /// mqnl seam): collapsing "not in the graph" into either answer is the bug.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RepoExposure {
     /// The graph says this repo has a public remote: block-tier rules block.
     Public,
@@ -20,6 +20,17 @@ pub enum RepoExposure {
     /// the reason so the verdict can explain itself.
     Unknown(String),
 }
+
+/// The `exposure_source` label for a lookup that FAILED with nothing cached to
+/// serve — as distinct from `"cache"` (failed, last-known served) and
+/// `"answered"` (quipu replied, even if the reply was "no such repo").
+///
+/// IT IS A CONST BECAUSE TWO PLACES MUST AGREE ON IT AND THEY ARE IN DIFFERENT
+/// MODULES: `serve_last_known` produces it, and `text_plane` refuses on it. A
+/// string literal compared across a module boundary is the drift this whole
+/// rule set keeps finding elsewhere, and it would fail OPEN — a typo would
+/// silently restore the pass that aegis-8tumi4 exists to remove.
+pub const SOURCE_UNREACHABLE: &str = "unreachable";
 
 /// Ask quipu whether `repo` (by label) is public, via the governed policy's
 /// own `/policy/check` — the same signed-verdict seam every other consumer of

@@ -319,6 +319,8 @@ impl Cli {
         let resolved =
             crate::git::resolve_commit(path, commit).unwrap_or_else(|| commit.to_string());
         let source = format!("yupana promote {repo}@{resolved} (cli)");
+        let (_, valid_from) = crate::git::commit_identity(path, &resolved)
+            .ok_or_else(|| anyhow::anyhow!("cannot read authored time for {resolved}"))?;
         // SUBSET: write only the changed files' partitions, each under its own
         // producer key. Diverges here, AFTER the projection is complete, because
         // the whole point is that the READ is unchanged — see `promote_subset`.
@@ -331,6 +333,7 @@ impl Cli {
                 changed.as_deref(),
                 &turtle,
                 &source,
+                &valid_from,
                 endpoint.as_deref(),
                 dry_run,
                 sub.list_keys,
@@ -373,10 +376,16 @@ impl Cli {
         }
         let outcome = match (dry_run, &endpoint) {
             (true, ep) => crate::promote::dry_run(ep.as_deref(), &turtle, &source)?,
-            (false, Some(ep)) if replace_snapshot => {
-                crate::promote::promote_snapshot(ep, &turtle, &source, &format!("code:{repo}"))?
+            (false, Some(ep)) if replace_snapshot => crate::promote::promote_snapshot_at(
+                ep,
+                &turtle,
+                &source,
+                &format!("code:{repo}"),
+                Some(&valid_from),
+            )?,
+            (false, Some(ep)) => {
+                crate::promote::promote_at(ep, &turtle, &source, Some(&valid_from))?
             }
-            (false, Some(ep)) => crate::promote::promote(ep, &turtle, &source)?,
             // Unreachable: the resolution above bails on a write with no target.
             // Spelled as a refusal rather than an `expect` so that if that match
             // is ever edited, a missing target degrades to a refusal, never a panic

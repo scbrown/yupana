@@ -386,6 +386,8 @@ use pre_edit_util::{decide, fail_open, introduced_text};
 mod rule_planes;
 #[path = "scope_arm.rs"]
 mod scope_arm;
+#[path = "text_plane.rs"]
+mod text_plane_mod;
 #[path = "tripwire_arm.rs"]
 mod tripwire_arm;
 #[path = "verify_arm.rs"]
@@ -398,7 +400,7 @@ pub(super) use verify_arm::proposed_buffer;
 // The text plane's pure core is exercised directly by `pre_edit_test`, which
 // sits beside this module rather than beside the plane it tests.
 #[cfg(all(test, feature = "quipu"))]
-use rule_planes::text_plane;
+use text_plane_mod::text_plane;
 
 #[cfg(test)]
 #[path = "pre_edit_test.rs"]
