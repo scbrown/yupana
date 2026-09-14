@@ -32,6 +32,18 @@ pub struct LandingRequest {
     pub bead: Option<String>,
     /// Whether a fresh session plate was positively read; unknown fails open.
     pub work_item_readable: bool,
+    /// The host guard's override GRANT for this landing, when it issued one —
+    /// carrying the reason it recorded.
+    ///
+    /// Evidence, not a credential. The override token is single-use and is
+    /// consumed by the host guard before this policy runs, so re-reading it
+    /// here is not merely redundant, it is impossible: by the time the governed
+    /// policy is asked, the token has already been unlinked (aegis-d7jpdw,
+    /// measured through the real guard chain). Taking the grant as evidence
+    /// inherits every check the host makes — regular file, owning uid, TTL,
+    /// non-empty reason, removability — without replicating one of them, and a
+    /// replica of a security check drifts.
+    pub override_grant: Option<String>,
 }
 
 /// The verdict.
@@ -140,7 +152,17 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
                 };
             };
 
-            if repo.rule.owner_only() && !repo.is_owner(agent) {
+            // An override relaxes ONE fault and only when the graph names this
+            // agent as an authority for it. `may_override` additionally
+            // requires a recorded owner, so the ownerless case below keeps its
+            // refusal — an override there would turn a missing fact into a
+            // permanent bypass.
+            let grant = req.override_grant.as_deref().filter(|g| !g.is_empty());
+            let authorised = grant.filter(|_| repo.may_override(agent));
+            let overrode_owner_rule =
+                repo.rule.owner_only() && !repo.is_owner(agent) && authorised.is_some();
+
+            if repo.rule.owner_only() && !repo.is_owner(agent) && !overrode_owner_rule {
                 codes.push("agent_is_not_repo_owner".into());
                 faults.push(match repo.owner.as_deref() {
                     Some(owner) => format!(
@@ -156,6 +178,23 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
                         req.repo
                     ),
                 });
+                // A grant was offered and did NOT apply. Said separately from
+                // the fault it failed to relax, because "refused, no override
+                // involved" and "refused despite an override" are different
+                // events and only the second is worth an operator's attention.
+                if grant.is_some() {
+                    codes.push("override_not_authorised".into());
+                    faults.push(format!(
+                        "the host guard granted an override, but the graph does not authorise \
+                         `{agent}` to override the owner-only rule on `{}`{}",
+                        req.repo,
+                        if repo.owner.is_none() {
+                            " — and no override can stand in for an owner the graph never recorded"
+                        } else {
+                            ""
+                        }
+                    ));
+                }
             }
 
             if req.work_item_readable && req.bead.as_deref().filter(|b| !b.is_empty()).is_none() {
@@ -169,12 +208,25 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
 
             if faults.is_empty() {
                 return Decision::Allow {
-                    reason: format!(
-                        "`{agent}` satisfies the `{}` rule on `{}` ({})",
-                        repo.rule.as_str(),
-                        req.repo,
-                        req.bead.as_deref().unwrap_or("no work item")
-                    ),
+                    reason: match authorised.filter(|_| overrode_owner_rule) {
+                        // Never silently. An overridden landing reads differently
+                        // from a satisfied one in the record a soak adjudicates,
+                        // and collapsing the two would hide the exception the
+                        // whole mechanism exists to make visible.
+                        Some(why) => format!(
+                            "`{agent}` is not the owner of `{}`, but the graph authorises it to \
+                             override the `{}` rule and the host guard granted one: {why} ({})",
+                            req.repo,
+                            repo.rule.as_str(),
+                            req.bead.as_deref().unwrap_or("no work item")
+                        ),
+                        None => format!(
+                            "`{agent}` satisfies the `{}` rule on `{}` ({})",
+                            repo.rule.as_str(),
+                            req.repo,
+                            req.bead.as_deref().unwrap_or("no work item")
+                        ),
+                    },
                 };
             }
             Decision::Refuse {
@@ -208,201 +260,5 @@ fn ref_matches(a: &str, b: &str) -> bool {
 
 #[cfg(test)]
 #[allow(non_snake_case)]
-mod tests {
-    use super::*;
-    use crate::project_landing::{LandingRule, RepoLanding};
-
-    fn repo(rule: LandingRule, owner: Option<&str>) -> LandingAuthority {
-        LandingAuthority::Governed(Box::new(RepoLanding {
-            repo_iri: "aegis:repo_quipu".into(),
-            matched_name: "repo_quipu".into(),
-            owner: owner.map(str::to_string),
-            rule,
-            protected_refs: vec!["main".into()],
-            protected_refs_declared: true,
-            ownership_state: Some("RULED".into()),
-            aliases: vec!["quipu".into()],
-        }))
-    }
-
-    fn req(agent: Option<&str>, bead: Option<&str>, git_ref: &str) -> LandingRequest {
-        LandingRequest {
-            verb: "merge",
-            repo: "quipu".into(),
-            git_ref: git_ref.into(),
-            ref_assumed: false,
-            agent: agent.map(str::to_string),
-            bead: bead.map(str::to_string),
-            work_item_readable: true,
-        }
-    }
-
-    #[test]
-    fn the_owner_with_a_work_item_is_ALLOWED() {
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(Some("malcolm"), Some("aegis-1"), "main"),
-        );
-        assert!(matches!(d, Decision::Allow { .. }), "{d:?}");
-    }
-
-    #[test]
-    fn a_NON_owner_is_refused_under_single_writer() {
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(Some("grant"), Some("aegis-1"), "main"),
-        );
-        let Decision::Refuse { codes, .. } = &d else {
-            panic!("expected refusal, got {d:?}")
-        };
-        assert_eq!(codes, &["agent_is_not_repo_owner"]);
-    }
-
-    #[test]
-    fn the_owner_WITHOUT_a_work_item_is_still_refused() {
-        // The rule the host guard enforces too: single-writer is not a licence
-        // for the owner to land untraceably.
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(Some("malcolm"), None, "main"),
-        );
-        let Decision::Refuse { codes, .. } = &d else {
-            panic!("expected refusal, got {d:?}")
-        };
-        assert_eq!(codes, &["work_item_missing"]);
-    }
-
-    #[test]
-    fn a_non_owner_with_no_work_item_reports_BOTH_faults() {
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(Some("grant"), None, "main"),
-        );
-        let Decision::Refuse { codes, .. } = &d else {
-            panic!("expected refusal")
-        };
-        assert_eq!(codes, &["agent_is_not_repo_owner", "work_item_missing"]);
-    }
-
-    #[test]
-    fn any_owner_with_bead_lets_a_NON_owner_land_when_cited() {
-        let d = decide(
-            &repo(LandingRule::AnyOwnerWithBead, Some("malcolm")),
-            &req(Some("grant"), Some("aegis-1"), "main"),
-        );
-        assert!(matches!(d, Decision::Allow { .. }), "{d:?}");
-    }
-
-    #[test]
-    fn a_declared_rule_with_NO_owner_refuses_EVERYONE() {
-        for agent in ["malcolm", "grant", "sattler"] {
-            let d = decide(
-                &repo(LandingRule::SingleWriter, None),
-                &req(Some(agent), Some("aegis-1"), "main"),
-            );
-            assert!(d.refuses(), "{agent} must not satisfy an ownerless rule");
-        }
-    }
-
-    #[test]
-    fn an_unreported_agent_is_refused_and_says_so() {
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(None, Some("aegis-1"), "main"),
-        );
-        let Decision::Refuse { codes, .. } = &d else {
-            panic!("expected refusal")
-        };
-        assert_eq!(codes, &["acting_agent_unknown"]);
-    }
-
-    #[test]
-    fn a_TOPIC_branch_is_not_applicable_and_asks_nothing_about_identity() {
-        // The applicability test runs BEFORE identity, so ordinary work never
-        // reaches the spool and never depends on the agent being reported.
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(None, None, "wt/grant"),
-        );
-        assert!(matches!(d, Decision::NotApplicable { .. }), "{d:?}");
-    }
-
-    #[test]
-    fn an_UNGOVERNED_repo_is_allowed_even_on_main() {
-        let d = decide(
-            &LandingAuthority::Ungoverned {
-                name: "bobbin".into(),
-            },
-            &req(Some("grant"), None, "main"),
-        );
-        assert!(matches!(d, Decision::NotApplicable { .. }), "{d:?}");
-    }
-
-    #[test]
-    fn an_UNKNOWN_authority_refuses_the_protected_ref() {
-        let d = decide(
-            &LandingAuthority::Unknown("projection timed out".into()),
-            &req(Some("grant"), Some("aegis-1"), "main"),
-        );
-        assert!(d.refuses(), "{d:?}");
-        let Decision::Refuse { reason, codes } = &d else {
-            unreachable!()
-        };
-        assert_eq!(codes, &["landing_policy_unresolved"]);
-        // The reason has to carry the CAUSE: "refused" and "refused because the
-        // projection timed out" are different findings.
-        assert!(reason.contains("projection timed out"), "{reason}");
-    }
-
-    #[test]
-    fn an_UNKNOWN_authority_leaves_every_other_ref_ALONE() {
-        // The bounded blast radius, asserted rather than asserted-about: when
-        // the graph is unreachable, only the default protected ref refuses.
-        for git_ref in ["wt/grant", "release/1.2", "refs/tags/v1", "feature"] {
-            let d = decide(
-                &LandingAuthority::Unknown("quipu unreachable".into()),
-                &req(Some("grant"), None, git_ref),
-            );
-            assert!(
-                matches!(d, Decision::NotApplicable { .. }),
-                "{git_ref} must be unaffected, got {d:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_fully_qualified_ref_is_the_same_ref_as_its_short_name() {
-        let d = decide(
-            &repo(LandingRule::SingleWriter, Some("malcolm")),
-            &req(Some("grant"), Some("aegis-1"), "refs/heads/main"),
-        );
-        assert!(d.refuses(), "refs/heads/main IS main: {d:?}");
-    }
-
-    #[test]
-    fn an_assumed_ref_says_so_in_the_refusal() {
-        let mut r = req(Some("grant"), Some("aegis-1"), "main");
-        r.ref_assumed = true;
-        let Decision::Refuse { reason, .. } =
-            decide(&repo(LandingRule::SingleWriter, Some("malcolm")), &r)
-        else {
-            panic!("expected refusal")
-        };
-        assert!(reason.contains("resolved, not"), "{reason}");
-    }
-    #[test]
-    fn unknown_plate_fails_open_without_bypassing_ownership() {
-        let authority = repo(LandingRule::SingleWriter, Some("malcolm"));
-        let mut request = req(Some("malcolm"), None, "main");
-        request.work_item_readable = false;
-        assert!(matches!(
-            decide(&authority, &request),
-            Decision::Allow { .. }
-        ));
-        request.agent = Some("other".into());
-        let Decision::Refuse { codes, .. } = decide(&authority, &request) else {
-            panic!("ownership must still refuse")
-        };
-        assert_eq!(codes, ["agent_is_not_repo_owner"]);
-    }
-}
+#[path = "landing_decision_test.rs"]
+mod tests;

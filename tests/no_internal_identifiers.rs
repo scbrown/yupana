@@ -259,6 +259,11 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
         // its sibling projections do: which repository declares a landing rule,
         // and who owns it, are facts under this base.
         "src/project_landing.rs",
+        // Its tests decode SPARQL rows whose subjects and objects are real IRIs
+        // under this base, so the literal is the input under test rather than a
+        // mention. (Size-exempt sibling: the tests moved out of the module when
+        // the override-authority work pushed it past the file-size limit.)
+        "src/project_landing_test.rs",
         // Project-memory policy asks the governed graph which commands are
         // memory-heavy, so its SPARQL uses the same deployed vocabulary as
         // the other project query surfaces.

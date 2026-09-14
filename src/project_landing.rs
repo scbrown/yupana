@@ -113,6 +113,20 @@ pub struct RepoLanding {
     /// still loads, restoring an empty alias set honestly.
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// Agents the graph authorises to land here WITHOUT being the declared
+    /// owner, when the host guard has granted an override for that landing.
+    ///
+    /// `aegis:landingOverrideAuthority`. Empty means nobody may override, which
+    /// is the behaviour every governed repository had before this field existed
+    /// — so, like `aliases`, it is defaulted rather than required: a cache
+    /// written before this plane restores as "no authority", never as "anyone".
+    ///
+    /// This names WHO may override. It never decides WHETHER one was granted:
+    /// that evidence comes from the single consumer of the override token, and
+    /// re-deriving it here would put a second consumer on a single-use
+    /// credential (aegis-d7jpdw).
+    #[serde(default)]
+    pub override_authorities: Vec<String>,
 }
 
 impl RepoLanding {
@@ -131,6 +145,21 @@ impl RepoLanding {
     #[must_use]
     pub fn is_owner(&self, agent: &str) -> bool {
         self.owner.as_deref().is_some_and(|o| o == agent)
+    }
+
+    /// Whether the graph authorises `agent` to override the owner-only rule
+    /// here.
+    ///
+    /// Deliberately AND-ed with a declared owner. An override relaxes "you are
+    /// not the owner"; where the graph records no owner at all there is no such
+    /// fault to relax, and the refusal `decide()` emits for that case says so in
+    /// as many words — *"the graph records NO owner, so no agent can satisfy it.
+    /// Fix the ownership fact, do not override"*. Letting an override through
+    /// there would convert a missing fact into a permanent bypass, which is the
+    /// one thing this field must never become.
+    #[must_use]
+    pub fn may_override(&self, agent: &str) -> bool {
+        self.owner.is_some() && self.override_authorities.iter().any(|a| a == agent)
     }
 }
 
@@ -159,7 +188,7 @@ pub const LANDING_POLICY_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state WHERE {
+SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state ?overrideAuthority WHERE {
   ?repo aegis:landingPolicy ?rule .
   ?repo a aegis:GitRepo .
   OPTIONAL { ?repo rdfs:label ?label }
@@ -167,6 +196,7 @@ SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state WHERE {
   OPTIONAL { ?repo aegis:owned_by ?owner }
   OPTIONAL { ?repo aegis:protectedRef ?protectedRef }
   OPTIONAL { ?repo aegis:ownershipState ?state }
+  OPTIONAL { ?repo aegis:landingOverrideAuthority ?overrideAuthority }
 }";
 
 /// Strip the ontology prefix from an IRI or prefixed name, leaving the local
@@ -227,6 +257,7 @@ pub fn decode_landing_policies(body: &str) -> Result<Vec<RepoLanding>> {
             protected_refs_declared: false,
             ownership_state: state.clone(),
             aliases: Vec::new(),
+            override_authorities: Vec::new(),
         });
 
         conflict_check(&entry.repo_iri, "landingPolicy", entry.rule == rule)?;
@@ -241,10 +272,21 @@ pub fn decode_landing_policies(body: &str) -> Result<Vec<RepoLanding>> {
         if entry.ownership_state.is_none() {
             entry.ownership_state = state;
         }
-        // Aliases and protected refs accumulate.
-        for (key, sink) in [("label", 0u8), ("alt", 0), ("protectedRef", 1)] {
+        // Aliases, protected refs and override authorities all accumulate:
+        // each is genuinely multi-valued and arrives as N rows.
+        for (key, sink) in [
+            ("label", 0u8),
+            ("alt", 0),
+            ("protectedRef", 1),
+            ("overrideAuthority", 2),
+        ] {
             let Some(v) = get(key) else { continue };
-            if sink == 1 {
+            if sink == 2 {
+                let name = local_name(&v);
+                if !entry.override_authorities.contains(&name) {
+                    entry.override_authorities.push(name);
+                }
+            } else if sink == 1 {
                 if !entry.protected_refs.contains(&v) {
                     entry.protected_refs.push(v);
                 }
@@ -332,164 +374,5 @@ impl crate::project::ProjectionRegistry {
 
 #[cfg(test)]
 #[allow(non_snake_case)]
-mod tests {
-    use super::*;
-
-    fn body(rows: &str) -> String {
-        format!(r#"{{"results":{{"bindings":[{rows}]}}}}"#)
-    }
-    fn v(key: &str, value: &str) -> String {
-        format!(r#""{key}":{{"value":"{value}"}}"#)
-    }
-
-    fn one_repo() -> String {
-        body(&format!(
-            "{{{}}}",
-            [
-                v("repo", "http://aegis.gastown.local/ontology/repo_quipu"),
-                v("label", "repo_quipu"),
-                v("owner", "http://aegis.gastown.local/ontology/malcolm"),
-                v("rule", "single-writer"),
-                v("state", "RULED"),
-            ]
-            .join(",")
-        ))
-    }
-
-    #[test]
-    fn a_declared_repo_decodes_with_its_owner_and_rule() {
-        let repos = decode_landing_policies(&one_repo()).unwrap();
-        assert_eq!(repos.len(), 1);
-        assert_eq!(repos[0].owner.as_deref(), Some("malcolm"));
-        assert_eq!(repos[0].rule, LandingRule::SingleWriter);
-        assert_eq!(repos[0].ownership_state.as_deref(), Some("RULED"));
-    }
-
-    #[test]
-    fn an_undeclared_protected_ref_defaults_and_SAYS_it_defaulted() {
-        let repos = decode_landing_policies(&one_repo()).unwrap();
-        assert_eq!(repos[0].protected_refs, ["main"]);
-        // The verdict must never present this assumption as a declared fact.
-        assert!(!repos[0].protected_refs_declared);
-    }
-
-    #[test]
-    fn an_unrecognised_rule_REFUSES_rather_than_defaulting() {
-        let rows = body(&format!(
-            "{{{}}}",
-            [
-                v("repo", "aegis:repo_x"),
-                v("label", "repo_x"),
-                v("rule", "whatever-the-future-adds"),
-            ]
-            .join(",")
-        ));
-        let err = decode_landing_policies(&rows).unwrap_err().to_string();
-        assert!(err.contains("does not understand"), "{err}");
-    }
-
-    #[test]
-    fn conflicting_owners_across_rows_REFUSE_the_projection() {
-        let rows = body(&format!(
-            "{{{}}},{{{}}}",
-            [
-                v("repo", "aegis:repo_x"),
-                v("owner", "aegis:a"),
-                v("rule", "single-writer"),
-            ]
-            .join(","),
-            [
-                v("repo", "aegis:repo_x"),
-                v("owner", "aegis:b"),
-                v("rule", "single-writer"),
-            ]
-            .join(",")
-        ));
-        let err = decode_landing_policies(&rows).unwrap_err().to_string();
-        assert!(err.contains("conflicting"), "{err}");
-    }
-
-    #[test]
-    fn the_repo_PREFIX_convention_resolves_a_bare_name() {
-        // The measured gap: aegis:repo_yupana carries the label `repo_yupana`
-        // and NO `yupana` alias. A bare-name-only lookup reports a governed
-        // repository as ungoverned, which is the silent un-guarding this test
-        // exists to prevent.
-        let repos = decode_landing_policies(&one_repo()).unwrap();
-        assert!(matches!(
-            resolve(&repos, "quipu"),
-            LandingAuthority::Governed(_)
-        ));
-        assert!(matches!(
-            resolve(&repos, "repo_quipu"),
-            LandingAuthority::Governed(_)
-        ));
-    }
-
-    #[test]
-    fn a_repo_absent_from_the_catalogue_is_UNGOVERNED_not_unknown() {
-        let repos = decode_landing_policies(&one_repo()).unwrap();
-        assert!(matches!(
-            resolve(&repos, "bobbin"),
-            LandingAuthority::Ungoverned { .. }
-        ));
-    }
-
-    #[test]
-    fn protects_compares_short_ref_names() {
-        let repos = decode_landing_policies(&one_repo()).unwrap();
-        assert!(repos[0].protects("main"));
-        assert!(repos[0].protects("refs/heads/main"));
-        assert!(!repos[0].protects("wt/grant"));
-    }
-
-    /// The REAL body the live graph returns, captured 2026-09-05 immediately
-    /// after the policy facts were written.
-    ///
-    /// It is a cross-product — 2 `rdfs:label` values x 4 `skos:altLabel` values
-    /// = 8 rows for ONE repository — and that shape is not something the
-    /// hand-built fixtures above exercise. A decoder that treated each row as a
-    /// repository would report eight governed repositories where there is one,
-    /// and every scalar would "conflict" with itself.
-    #[test]
-    fn the_LIVE_cross_product_decodes_to_exactly_one_repo() {
-        let body = include_str!("../tests/fixtures/landing-policy-live.json");
-        let repos = decode_landing_policies(body).expect("the live body decodes");
-        assert_eq!(repos.len(), 1, "8 rows are one repository, not eight");
-        let quipu = &repos[0];
-        assert_eq!(quipu.owner.as_deref(), Some("malcolm"));
-        assert_eq!(quipu.rule, LandingRule::SingleWriter);
-        assert_eq!(quipu.ownership_state.as_deref(), Some("RULED"));
-        // The repeated `protectedRef` across all 8 rows must collapse, not stack.
-        assert_eq!(quipu.protected_refs, ["main"]);
-        assert!(quipu.protected_refs_declared, "the graph DECLARED this ref");
-        // Every alias the graph carries resolves, and so does the bare name.
-        for name in ["quipu", "repo_quipu", "Quipu", "quipu-repo-github"] {
-            assert!(
-                matches!(resolve(&repos, name), LandingAuthority::Governed(_)),
-                "`{name}` must resolve to the governed repository"
-            );
-        }
-        assert!(matches!(
-            resolve(&repos, "yupana"),
-            LandingAuthority::Ungoverned { .. }
-        ));
-    }
-
-    #[test]
-    fn a_declared_rule_with_NO_owner_cannot_be_satisfied_by_anyone() {
-        let rows = body(&format!(
-            "{{{}}}",
-            [
-                v("repo", "aegis:repo_x"),
-                v("label", "repo_x"),
-                v("rule", "single-writer"),
-            ]
-            .join(",")
-        ));
-        let repos = decode_landing_policies(&rows).unwrap();
-        assert!(repos[0].owner.is_none());
-        assert!(!repos[0].is_owner("anyone"));
-        assert!(!repos[0].is_owner(""));
-    }
-}
+#[path = "project_landing_test.rs"]
+mod tests;
