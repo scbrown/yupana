@@ -155,6 +155,11 @@ fn merge_optional(
     if values.insert(add.clone()) {
         match existing {
             None => *existing = Some(add),
+            Some(have) if field == "exempt_path_regex" => {
+                // Exemptions are executable alternatives, not explanatory
+                // prose. Group both arms to preserve anchors and alternation.
+                *have = format!("(?:{have})|(?:{add})");
+            }
             Some(have) => {
                 have.push_str(" — ");
                 have.push_str(&add);

@@ -4,7 +4,7 @@
 //! then reconstruct the same required/optional row product as `TEXT_POLICY_QUERY`;
 //! the existing decoder keeps every distinct optional value and rejects conflicts.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::{json, Value};
 
@@ -46,6 +46,72 @@ fn property_name(iri: &str) -> String {
         .replace("http://www.w3.org/2000/01/rdf-schema#", "rdfs:")
 }
 
+fn safe_iri(value: &Value) -> Result<String> {
+    let iri = value.get("value").and_then(Value::as_str).unwrap_or("");
+    if value.get("type").and_then(Value::as_str) != Some("uri")
+        || !iri.contains(':')
+        || iri
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || "<>\\\"{}|^`".contains(c))
+    {
+        return Err(error("subject is not a safe absolute IRI"));
+    }
+    Ok(iri.to_owned())
+}
+
+/// Shared path selectors add exemptions to a rule's local path exceptions.
+/// Resolve only explicit links, once per selector per refresh. A missing or
+/// malformed selector is a failed projection, never a silently narrower scope.
+fn shared_exemptions(
+    endpoint: &str,
+    properties: &mut Vec<Value>,
+    cache: &mut HashMap<String, Vec<Value>>,
+) -> Result<()> {
+    let mut inherited = Vec::new();
+    for row in properties.iter() {
+        let Some(property) = binding_value(row, "property") else {
+            continue;
+        };
+        if property_name(&property) != "aegis:exemptionSelector" {
+            continue;
+        }
+        let iri = safe_iri(&row["value"])?;
+        if !cache.contains_key(&iri) {
+            let selector = read(
+                endpoint,
+                &format!("SELECT ?property ?value WHERE {{ <{iri}> ?property ?value }}"),
+            )?;
+            let paths: Vec<_> = rows_of(&selector)?
+                .iter()
+                .filter(|row| {
+                    binding_value(row, "property")
+                        .is_some_and(|p| property_name(&p) == "aegis:exemptPathRegex")
+                })
+                .cloned()
+                .collect();
+            if paths.is_empty() {
+                return Err(error(format!("exemption selector {iri} has no path regex")));
+            }
+            for path in &paths {
+                let value = &path["value"];
+                let regex = value.get("value").and_then(Value::as_str).unwrap_or("");
+                if value.get("type").and_then(Value::as_str) != Some("literal")
+                    || regex.is_empty()
+                    || regex::Regex::new(regex).is_err()
+                {
+                    return Err(error(format!(
+                        "exemption selector {iri} has invalid path regex"
+                    )));
+                }
+            }
+            cache.insert(iri.clone(), paths);
+        }
+        inherited.extend(cache[&iri].iter().cloned());
+    }
+    properties.extend(inherited);
+    Ok(())
+}
+
 /// Preserve the OPTIONAL cross product, including multi-valued exemptions and
 /// rationales. No first-value selection or LIMIT can silently shrink a rule.
 fn expand(subject: &Value, properties: &[Value]) -> Result<Vec<Value>> {
@@ -85,20 +151,13 @@ fn expand(subject: &Value, properties: &[Value]) -> Result<Vec<Value>> {
 pub(super) fn fetch(endpoint: &str) -> Result<Vec<TextRule>> {
     let members = read(endpoint, MEMBERS)?;
     let mut seen = HashSet::new();
+    let mut selectors = HashMap::new();
     let mut bindings = Vec::new();
     for member in rows_of(&members)? {
         let subject = member.get("s").ok_or_else(|| error("missing subject"))?;
-        let iri = binding_value(member, "s").ok_or_else(|| error("missing subject IRI"))?;
+        let iri = safe_iri(subject)?;
         // IRIREF cannot contain these delimiters. Never interpolate graph data
         // as executable SPARQL, and never silently omit an unsupported identity.
-        if subject.get("type").and_then(Value::as_str) != Some("uri")
-            || !iri.contains(':')
-            || iri
-                .chars()
-                .any(|c| c.is_whitespace() || c.is_control() || "<>\\\"{}|^`".contains(c))
-        {
-            return Err(error("subject is not a safe absolute IRI"));
-        }
         if !seen.insert(iri.clone()) {
             continue;
         }
@@ -106,7 +165,9 @@ pub(super) fn fetch(endpoint: &str) -> Result<Vec<TextRule>> {
             endpoint,
             &format!("SELECT ?property ?value WHERE {{ <{iri}> ?property ?value }}"),
         )?;
-        bindings.extend(expand(subject, rows_of(&properties)?)?);
+        let mut properties = rows_of(&properties)?.clone();
+        shared_exemptions(endpoint, &mut properties, &mut selectors)?;
+        bindings.extend(expand(subject, &properties)?);
     }
     decode_text_rules(&json!({"results":{"bindings":bindings}}).to_string())
 }
