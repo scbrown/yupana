@@ -190,6 +190,23 @@ shantytown emits this hook per role/card). It is versioned with the binary: if
 any clause below changes, the change lands here in the same commit.</p>
 <p>Blocking is <strong>opt-in and off by default</strong>. A wrong hard-deny is worse than no
 guard at all.</p>
+<h2 id="shared-path-exemptions"><a class="header" href="#shared-path-exemptions">Shared path exemptions</a></h2>
+<p>Text rules can link to shared path selections with <code>aegis:exemptionSelector</code>.
+The target is a governed <code>aegis:Selector</code> with <code>aegis:name</code>, an
+<code>aegis:evidenceSource</code> describing repo-relative paths, and one or more
+<code>aegis:exemptPathRegex</code> strings. Several rules can share one selector, so its
+paths are maintained in one place.</p>
+<p>The reader combines a rule's local <code>exemptPathRegex</code> values with the values
+on its explicitly linked selectors as regex alternatives. Selectors are read
+once per refresh; nested selector links are not followed. A rule with no link
+inherits nothing. This lets a liveness canary remain applicable everywhere
+while other rules share guard implementation or fixture exceptions.</p>
+<p>A missing selector regex, invalid target IRI, empty regex, or malformed shared
+regex fails projection and follows the guard's existing projection-error path.
+It never silently becomes an exemption for every file. Deploy compatible
+readers before replacing local regex values with links, and verify the same
+paths remain governed after migration. This support does not change a rule's
+enforcement tier or the host's mode.</p>
 <h2 id="a-input--the-payload-on-stdin"><a class="header" href="#a-input--the-payload-on-stdin">(a) Input — the payload on stdin</a></h2>
 <p>The hook reads one JSON object on stdin, the standard Claude Code <code>PreToolUse</code>
 payload:</p>
