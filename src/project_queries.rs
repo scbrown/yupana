@@ -93,7 +93,7 @@ SELECT ?s ?label ?regex ?class ?tier ?exempt ?rationale WHERE {
      aegis:enforcementTier ?tier .
   OPTIONAL { ?s rdfs:label ?label }
   OPTIONAL { ?s aegis:identifierClass ?class }
-  OPTIONAL { ?s aegis:exemptPathRegex ?exempt }
+  OPTIONAL { ?s (aegis:exemptPathRegex|aegis:exemptionSelector/aegis:exemptPathRegex) ?exempt }
   OPTIONAL { ?s rdfs:comment ?rationale }
 }";
 

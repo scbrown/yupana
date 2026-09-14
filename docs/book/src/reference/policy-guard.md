@@ -11,6 +11,27 @@ any clause below changes, the change lands here in the same commit.
 Blocking is **opt-in and off by default**. A wrong hard-deny is worse than no
 guard at all.
 
+## Shared path exemptions
+
+Text rules can link to shared path selections with `aegis:exemptionSelector`.
+The target is a governed `aegis:Selector` with `aegis:name`, an
+`aegis:evidenceSource` describing repo-relative paths, and one or more
+`aegis:exemptPathRegex` strings. Several rules can share one selector, so its
+paths are maintained in one place.
+
+The reader combines a rule's local `exemptPathRegex` values with the values
+on its explicitly linked selectors as regex alternatives. Selectors are read
+once per refresh; nested selector links are not followed. A rule with no link
+inherits nothing. This lets a liveness canary remain applicable everywhere
+while other rules share guard implementation or fixture exceptions.
+
+A missing selector regex, invalid target IRI, empty regex, or malformed shared
+regex fails projection and follows the guard's existing projection-error path.
+It never silently becomes an exemption for every file. Deploy compatible
+readers before replacing local regex values with links, and verify the same
+paths remain governed after migration. This support does not change a rule's
+enforcement tier or the host's mode.
+
 ## (a) Input — the payload on stdin
 
 The hook reads one JSON object on stdin, the standard Claude Code `PreToolUse`

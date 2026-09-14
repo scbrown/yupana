@@ -44,6 +44,77 @@ fn body(rows: Vec<Value>) -> Value {
     json!({"results":{"bindings":Value::Array(rows)}})
 }
 
+fn selector_link() -> Value {
+    json!({
+        "property": {"type":"uri", "value":"http://aegis.gastown.local/ontology/exemptionSelector"},
+        "value": {"type":"uri", "value":"https://example.org/shared-guard-paths"},
+    })
+}
+
+#[test]
+fn shared_selector_is_read_once_and_unioned_with_local_exemptions() {
+    let mut props = properties()[..2].to_vec();
+    props.push(property("aegis:exemptPathRegex", "^tests/"));
+    props.push(selector_link());
+    let (endpoint, thread) = server(vec![
+        body(vec![
+            json!({"s":subject()}),
+            json!({"s":{"type":"uri","value":"https://example.org/another-rule"}}),
+        ]),
+        body(props.clone()),
+        body(vec![property(
+            "http://aegis.gastown.local/ontology/exemptPathRegex",
+            "^src/guard[.]rs$",
+        )]),
+        body(props),
+    ]);
+    let rules = fetch(&endpoint).unwrap();
+    assert_eq!(rules.len(), 2);
+    for rule in rules {
+        assert!(!rule.applies("src/guard.rs"));
+        assert!(!rule.applies("tests/fixture.rs"));
+        assert!(rule.applies("src/production.rs"));
+        assert!(rule.applies("docs/guide.md"));
+    }
+    let queries = thread.join().unwrap();
+    assert_eq!(queries.len(), 4);
+    assert_eq!(
+        queries
+            .iter()
+            .filter(|q| q.contains("shared-guard-paths"))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn broken_selector_cannot_silently_drop_scope_or_inject_a_query() {
+    for paths in [vec![], vec![property("aegis:exemptPathRegex", "[")]] {
+        let (endpoint, thread) = server(vec![body(paths)]);
+        assert!(
+            shared_exemptions(&endpoint, &mut vec![selector_link()], &mut HashMap::new()).is_err()
+        );
+        thread.join().unwrap();
+    }
+    for value in [
+        literal("https://example.org/not-an-iri"),
+        json!({"type":"uri","value":"https://example.org/> ?s ?p ?o"}),
+    ] {
+        let mut link = selector_link();
+        link["value"] = value;
+        assert!(shared_exemptions(
+            "http://unused.invalid",
+            &mut vec![link],
+            &mut HashMap::new()
+        )
+        .is_err());
+    }
+    let mut props = properties()[..2].to_vec();
+    shared_exemptions("http://unused.invalid", &mut props, &mut HashMap::new()).unwrap();
+    let rules = decode_text_rules(&body(expand(&subject(), &props).unwrap()).to_string()).unwrap();
+    assert!(rules[0].applies("src/guard.rs")); // no explicit link: still governed
+}
+
 #[test]
 fn optional_products_equal_the_join_without_losing_any_values() {
     let mut expected = Vec::new();
