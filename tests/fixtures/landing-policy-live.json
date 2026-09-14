@@ -7,7 +7,8 @@
       "owner",
       "rule",
       "protectedRef",
-      "state"
+      "state",
+      "overrideAuthority"
     ]
   },
   "results": {
@@ -40,6 +41,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -70,6 +75,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -100,6 +109,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -130,6 +143,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -160,6 +177,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -190,6 +211,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -220,6 +245,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       },
       {
@@ -250,6 +279,10 @@
         "state": {
           "type": "literal",
           "value": "RULED"
+        },
+        "overrideAuthority": {
+          "type": "uri",
+          "value": "http://aegis.gastown.local/ontology/wu"
         }
       }
     ]

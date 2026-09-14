@@ -32,6 +32,18 @@ pub struct LandingRequest {
     pub bead: Option<String>,
     /// Whether a fresh session plate was positively read; unknown fails open.
     pub work_item_readable: bool,
+    /// The host guard's override GRANT for this landing, when it issued one —
+    /// carrying the reason it recorded.
+    ///
+    /// Evidence, not a credential. The override token is single-use and is
+    /// consumed by the host guard before this policy runs, so re-reading it
+    /// here is not merely redundant, it is impossible: by the time the governed
+    /// policy is asked, the token has already been unlinked (aegis-d7jpdw,
+    /// measured through the real guard chain). Taking the grant as evidence
+    /// inherits every check the host makes — regular file, owning uid, TTL,
+    /// non-empty reason, removability — without replicating one of them, and a
+    /// replica of a security check drifts.
+    pub override_grant: Option<String>,
 }
 
 /// The verdict.
@@ -140,7 +152,17 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
                 };
             };
 
-            if repo.rule.owner_only() && !repo.is_owner(agent) {
+            // An override relaxes ONE fault and only when the graph names this
+            // agent as an authority for it. `may_override` additionally
+            // requires a recorded owner, so the ownerless case below keeps its
+            // refusal — an override there would turn a missing fact into a
+            // permanent bypass.
+            let grant = req.override_grant.as_deref().filter(|g| !g.is_empty());
+            let authorised = grant.filter(|_| repo.may_override(agent));
+            let overrode_owner_rule =
+                repo.rule.owner_only() && !repo.is_owner(agent) && authorised.is_some();
+
+            if repo.rule.owner_only() && !repo.is_owner(agent) && !overrode_owner_rule {
                 codes.push("agent_is_not_repo_owner".into());
                 faults.push(match repo.owner.as_deref() {
                     Some(owner) => format!(
@@ -156,6 +178,23 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
                         req.repo
                     ),
                 });
+                // A grant was offered and did NOT apply. Said separately from
+                // the fault it failed to relax, because "refused, no override
+                // involved" and "refused despite an override" are different
+                // events and only the second is worth an operator's attention.
+                if grant.is_some() {
+                    codes.push("override_not_authorised".into());
+                    faults.push(format!(
+                        "the host guard granted an override, but the graph does not authorise \
+                         `{agent}` to override the owner-only rule on `{}`{}",
+                        req.repo,
+                        if repo.owner.is_none() {
+                            " — and no override can stand in for an owner the graph never recorded"
+                        } else {
+                            ""
+                        }
+                    ));
+                }
             }
 
             if req.work_item_readable && req.bead.as_deref().filter(|b| !b.is_empty()).is_none() {
@@ -169,12 +208,25 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
 
             if faults.is_empty() {
                 return Decision::Allow {
-                    reason: format!(
-                        "`{agent}` satisfies the `{}` rule on `{}` ({})",
-                        repo.rule.as_str(),
-                        req.repo,
-                        req.bead.as_deref().unwrap_or("no work item")
-                    ),
+                    reason: match authorised.filter(|_| overrode_owner_rule) {
+                        // Never silently. An overridden landing reads differently
+                        // from a satisfied one in the record a soak adjudicates,
+                        // and collapsing the two would hide the exception the
+                        // whole mechanism exists to make visible.
+                        Some(why) => format!(
+                            "`{agent}` is not the owner of `{}`, but the graph authorises it to \
+                             override the `{}` rule and the host guard granted one: {why} ({})",
+                            req.repo,
+                            repo.rule.as_str(),
+                            req.bead.as_deref().unwrap_or("no work item")
+                        ),
+                        None => format!(
+                            "`{agent}` satisfies the `{}` rule on `{}` ({})",
+                            repo.rule.as_str(),
+                            req.repo,
+                            req.bead.as_deref().unwrap_or("no work item")
+                        ),
+                    },
                 };
             }
             Decision::Refuse {
@@ -222,7 +274,21 @@ mod tests {
             protected_refs_declared: true,
             ownership_state: Some("RULED".into()),
             aliases: vec!["quipu".into()],
+            override_authorities: Vec::new(),
         }))
+    }
+
+    /// The same repository, additionally authorising `authorities` to override.
+    fn repo_with_override(
+        rule: LandingRule,
+        owner: Option<&str>,
+        authorities: &[&str],
+    ) -> LandingAuthority {
+        let LandingAuthority::Governed(mut r) = repo(rule, owner) else {
+            unreachable!()
+        };
+        r.override_authorities = authorities.iter().map(|a| (*a).to_string()).collect();
+        LandingAuthority::Governed(r)
     }
 
     fn req(agent: Option<&str>, bead: Option<&str>, git_ref: &str) -> LandingRequest {
@@ -234,6 +300,15 @@ mod tests {
             agent: agent.map(str::to_string),
             bead: bead.map(str::to_string),
             work_item_readable: true,
+            override_grant: None,
+        }
+    }
+
+    /// The same request, carrying a host override grant.
+    fn req_granted(agent: Option<&str>, bead: Option<&str>, git_ref: &str) -> LandingRequest {
+        LandingRequest {
+            override_grant: Some("malcolm DOWN (st crew), tier lead merges per em5oaz".into()),
+            ..req(agent, bead, git_ref)
         }
     }
 
@@ -256,6 +331,143 @@ mod tests {
             panic!("expected refusal, got {d:?}")
         };
         assert_eq!(codes, &["agent_is_not_repo_owner"]);
+    }
+
+    // ── The tier-lead override (aegis-d7jpdw) ──────────────────────────────
+    //
+    // Modelled from two MEASURED landings on 2026-09-14 that the host guard
+    // ALLOWED on a consumed override token and this policy refused — the 2-of-8
+    // systematic false positive that disproved the zero-FP gate. Each test below
+    // names the arm it pins, because the value of an override is decided by what
+    // it refuses to relax.
+
+    #[test]
+    fn an_AUTHORISED_override_lets_a_NON_owner_land() {
+        // Replays 13:16:36Z (PR #230) and 14:06:34Z (PR #241): agent wu, owner
+        // malcolm, `agent_is_not_repo_owner` the sole fault, work item cited.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, Some("malcolm"), &["wu"]),
+            &req_granted(Some("wu"), Some("aegis-otg3xz"), "main"),
+        );
+        let Decision::Allow { reason } = &d else {
+            panic!("expected allow, got {d:?}")
+        };
+        // Never silently: the record a soak reads must show an exception was
+        // taken, not merely that the landing passed.
+        assert!(reason.contains("override"), "{reason}");
+        assert!(
+            reason.contains("em5oaz"),
+            "the grant's reason rides along: {reason}"
+        );
+    }
+
+    #[test]
+    fn an_override_from_an_agent_the_graph_does_NOT_name_still_refuses() {
+        // THE CONTROL. A grant is evidence that the host let the command
+        // through; it is not authority to land. Authority is graph data.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, Some("malcolm"), &["wu"]),
+            &req_granted(Some("grant"), Some("aegis-1"), "main"),
+        );
+        let Decision::Refuse { codes, .. } = &d else {
+            panic!("expected refusal, got {d:?}")
+        };
+        assert_eq!(
+            codes,
+            &["agent_is_not_repo_owner", "override_not_authorised"]
+        );
+    }
+
+    #[test]
+    fn a_NON_owner_with_NO_grant_still_refuses_even_when_authorised() {
+        // Replays 14:06:21Z — wu's FIRST attempt at PR #241, thirteen seconds
+        // before the one above. The host REFUSED that one too (no token was
+        // armed yet), so it is a TRUE positive and must stay refused. This is
+        // the whole reason the policy evaluates the host's grant rather than
+        // the agent's authority alone.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, Some("malcolm"), &["wu"]),
+            &req(Some("wu"), Some("aegis-otg3xz"), "main"),
+        );
+        let Decision::Refuse { codes, .. } = &d else {
+            panic!("expected refusal, got {d:?}")
+        };
+        assert_eq!(codes, &["agent_is_not_repo_owner"]);
+    }
+
+    #[test]
+    fn an_override_does_NOT_relax_a_missing_work_item() {
+        // Traceability should survive an override, not be what it buys. The
+        // host's own override lines carry `bead=-`, so this DIVERGES from host
+        // parity deliberately: parity is on the owner arm only.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, Some("malcolm"), &["wu"]),
+            &req_granted(Some("wu"), None, "main"),
+        );
+        let Decision::Refuse { codes, .. } = &d else {
+            panic!("expected refusal, got {d:?}")
+        };
+        assert_eq!(codes, &["work_item_missing"]);
+    }
+
+    #[test]
+    fn an_override_does_NOT_rescue_a_rule_with_NO_recorded_owner() {
+        // An override relaxes "you are not the owner". Where the graph records
+        // no owner there is no such fault to relax, and granting one would
+        // convert a missing fact into a permanent bypass.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, None, &["wu"]),
+            &req_granted(Some("wu"), Some("aegis-1"), "main"),
+        );
+        let Decision::Refuse { codes, reason } = &d else {
+            panic!("expected refusal, got {d:?}")
+        };
+        assert_eq!(
+            codes,
+            &["agent_is_not_repo_owner", "override_not_authorised"]
+        );
+        assert!(reason.contains("Fix the ownership fact"), "{reason}");
+    }
+
+    #[test]
+    fn an_override_does_NOT_attribute_an_unreported_agent() {
+        // Attribution is the precondition for every other check: an
+        // unattributable landing cannot be authorised by anyone, because there
+        // is nobody for the authority list to match.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, Some("malcolm"), &["wu"]),
+            &req_granted(None, Some("aegis-1"), "main"),
+        );
+        let Decision::Refuse { codes, .. } = &d else {
+            panic!("expected refusal, got {d:?}")
+        };
+        assert_eq!(codes, &["acting_agent_unknown"]);
+    }
+
+    #[test]
+    fn the_OWNERs_own_landing_is_never_reported_as_an_override() {
+        // A grant present on a landing that needed no relaxation relaxed
+        // nothing. Reporting it as an override would put a fictitious exception
+        // into the signed corpus.
+        let d = decide(
+            &repo_with_override(LandingRule::SingleWriter, Some("malcolm"), &["wu"]),
+            &req_granted(Some("malcolm"), Some("aegis-1"), "main"),
+        );
+        let Decision::Allow { reason } = &d else {
+            panic!("expected allow, got {d:?}")
+        };
+        assert!(!reason.contains("override"), "{reason}");
+    }
+
+    #[test]
+    fn a_repo_naming_NO_override_authority_behaves_exactly_as_before() {
+        // The default. Every governed repository that predates this field must
+        // keep refusing non-owners, grant or no grant.
+        let d = decide(
+            &repo(LandingRule::SingleWriter, Some("malcolm")),
+            &req_granted(Some("wu"), Some("aegis-1"), "main"),
+        );
+        assert!(d.refuses(), "{d:?}");
     }
 
     #[test]

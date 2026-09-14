@@ -113,6 +113,20 @@ pub struct RepoLanding {
     /// still loads, restoring an empty alias set honestly.
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// Agents the graph authorises to land here WITHOUT being the declared
+    /// owner, when the host guard has granted an override for that landing.
+    ///
+    /// `aegis:landingOverrideAuthority`. Empty means nobody may override, which
+    /// is the behaviour every governed repository had before this field existed
+    /// — so, like `aliases`, it is defaulted rather than required: a cache
+    /// written before this plane restores as "no authority", never as "anyone".
+    ///
+    /// This names WHO may override. It never decides WHETHER one was granted:
+    /// that evidence comes from the single consumer of the override token, and
+    /// re-deriving it here would put a second consumer on a single-use
+    /// credential (aegis-d7jpdw).
+    #[serde(default)]
+    pub override_authorities: Vec<String>,
 }
 
 impl RepoLanding {
@@ -131,6 +145,21 @@ impl RepoLanding {
     #[must_use]
     pub fn is_owner(&self, agent: &str) -> bool {
         self.owner.as_deref().is_some_and(|o| o == agent)
+    }
+
+    /// Whether the graph authorises `agent` to override the owner-only rule
+    /// here.
+    ///
+    /// Deliberately AND-ed with a declared owner. An override relaxes "you are
+    /// not the owner"; where the graph records no owner at all there is no such
+    /// fault to relax, and the refusal `decide()` emits for that case says so in
+    /// as many words — *"the graph records NO owner, so no agent can satisfy it.
+    /// Fix the ownership fact, do not override"*. Letting an override through
+    /// there would convert a missing fact into a permanent bypass, which is the
+    /// one thing this field must never become.
+    #[must_use]
+    pub fn may_override(&self, agent: &str) -> bool {
+        self.owner.is_some() && self.override_authorities.iter().any(|a| a == agent)
     }
 }
 
@@ -159,7 +188,7 @@ pub const LANDING_POLICY_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state WHERE {
+SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state ?overrideAuthority WHERE {
   ?repo aegis:landingPolicy ?rule .
   ?repo a aegis:GitRepo .
   OPTIONAL { ?repo rdfs:label ?label }
@@ -167,6 +196,7 @@ SELECT ?repo ?label ?alt ?owner ?rule ?protectedRef ?state WHERE {
   OPTIONAL { ?repo aegis:owned_by ?owner }
   OPTIONAL { ?repo aegis:protectedRef ?protectedRef }
   OPTIONAL { ?repo aegis:ownershipState ?state }
+  OPTIONAL { ?repo aegis:landingOverrideAuthority ?overrideAuthority }
 }";
 
 /// Strip the ontology prefix from an IRI or prefixed name, leaving the local
@@ -227,6 +257,7 @@ pub fn decode_landing_policies(body: &str) -> Result<Vec<RepoLanding>> {
             protected_refs_declared: false,
             ownership_state: state.clone(),
             aliases: Vec::new(),
+            override_authorities: Vec::new(),
         });
 
         conflict_check(&entry.repo_iri, "landingPolicy", entry.rule == rule)?;
@@ -241,10 +272,21 @@ pub fn decode_landing_policies(body: &str) -> Result<Vec<RepoLanding>> {
         if entry.ownership_state.is_none() {
             entry.ownership_state = state;
         }
-        // Aliases and protected refs accumulate.
-        for (key, sink) in [("label", 0u8), ("alt", 0), ("protectedRef", 1)] {
+        // Aliases, protected refs and override authorities all accumulate:
+        // each is genuinely multi-valued and arrives as N rows.
+        for (key, sink) in [
+            ("label", 0u8),
+            ("alt", 0),
+            ("protectedRef", 1),
+            ("overrideAuthority", 2),
+        ] {
             let Some(v) = get(key) else { continue };
-            if sink == 1 {
+            if sink == 2 {
+                let name = local_name(&v);
+                if !entry.override_authorities.contains(&name) {
+                    entry.override_authorities.push(name);
+                }
+            } else if sink == 1 {
                 if !entry.protected_refs.contains(&v) {
                     entry.protected_refs.push(v);
                 }
@@ -460,6 +502,16 @@ mod tests {
         assert_eq!(quipu.owner.as_deref(), Some("malcolm"));
         assert_eq!(quipu.rule, LandingRule::SingleWriter);
         assert_eq!(quipu.ownership_state.as_deref(), Some("RULED"));
+        // Captured from the LIVE graph after the override authority was written
+        // to it (aegis-d7jpdw). This assertion is the proof that adding an
+        // authority is a GRAPH WRITE and not a yupana build: nothing in this
+        // repository names `wu`, and the only way this line passes is that the
+        // projection carried the fact out of quipu.
+        assert_eq!(quipu.override_authorities, ["wu"]);
+        assert!(quipu.may_override("wu"));
+        assert!(!quipu.may_override("grant"), "the control");
+        // Repeated across all 8 rows of the cross-product, and must collapse.
+        assert_eq!(quipu.override_authorities.len(), 1);
         // The repeated `protectedRef` across all 8 rows must collapse, not stack.
         assert_eq!(quipu.protected_refs, ["main"]);
         assert!(quipu.protected_refs_declared, "the graph DECLARED this ref");
@@ -474,6 +526,87 @@ mod tests {
             resolve(&repos, "yupana"),
             LandingAuthority::Ungoverned { .. }
         ));
+    }
+
+    #[test]
+    fn override_authorities_ACCUMULATE_across_rows_and_strip_the_prefix() {
+        // Multi-valued like `altLabel` and `protectedRef`: N authorities arrive
+        // as N rows of the same cross-product and must collapse onto one repo.
+        let rows = body(&format!(
+            "{{{}}},{{{}}}",
+            [
+                v("repo", "aegis:repo_quipu"),
+                v("label", "repo_quipu"),
+                v("owner", "aegis:malcolm"),
+                v("rule", "single-writer"),
+                v(
+                    "overrideAuthority",
+                    "http://aegis.gastown.local/ontology/wu"
+                ),
+            ]
+            .join(","),
+            [
+                v("repo", "aegis:repo_quipu"),
+                v("label", "repo_quipu"),
+                v("owner", "aegis:malcolm"),
+                v("rule", "single-writer"),
+                v("overrideAuthority", "aegis:sattler"),
+            ]
+            .join(",")
+        ));
+        let repos = decode_landing_policies(&rows).unwrap();
+        assert_eq!(repos.len(), 1);
+        assert_eq!(repos[0].override_authorities, ["wu", "sattler"]);
+        assert!(repos[0].may_override("wu"));
+        assert!(repos[0].may_override("sattler"));
+        assert!(
+            !repos[0].may_override("grant"),
+            "the control: an agent the graph does not name"
+        );
+    }
+
+    #[test]
+    fn an_override_authority_is_INERT_without_a_recorded_owner() {
+        // `may_override` requires an owner, so the predicate cannot be used to
+        // manufacture a writer for a repository whose ownership is missing.
+        let rows = body(&format!(
+            "{{{}}}",
+            [
+                v("repo", "aegis:repo_x"),
+                v("label", "repo_x"),
+                v("rule", "single-writer"),
+                v("overrideAuthority", "aegis:wu"),
+            ]
+            .join(",")
+        ));
+        let repos = decode_landing_policies(&rows).unwrap();
+        assert_eq!(repos[0].override_authorities, ["wu"]);
+        assert!(repos[0].owner.is_none());
+        assert!(!repos[0].may_override("wu"));
+    }
+
+    #[test]
+    fn a_repo_declaring_NO_override_authority_authorises_NOBODY() {
+        // The default must be "nobody", which is the behaviour every governed
+        // repository had before this field existed.
+        let repos = decode_landing_policies(&one_repo()).unwrap();
+        assert!(repos[0].override_authorities.is_empty());
+        for agent in ["wu", "malcolm", "sattler", ""] {
+            assert!(!repos[0].may_override(agent));
+        }
+    }
+
+    #[test]
+    fn a_cache_written_BEFORE_this_plane_restores_as_authorising_nobody() {
+        // `#[serde(default)]`: a durable projection cache predating the field
+        // must load, and must load as "no authority" rather than failing or —
+        // far worse — deserialising into something permissive.
+        let old = r#"{"repo_iri":"aegis:repo_quipu","matched_name":"repo_quipu",
+            "owner":"malcolm","rule":"single-writer","protected_refs":["main"],
+            "protected_refs_declared":true,"ownership_state":"RULED"}"#;
+        let restored: RepoLanding = serde_json::from_str(old).expect("an old cache still loads");
+        assert!(restored.override_authorities.is_empty());
+        assert!(!restored.may_override("wu"));
     }
 
     #[test]

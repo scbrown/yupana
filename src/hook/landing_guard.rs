@@ -104,6 +104,7 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
         agent: acting_agent(),
         work_item_readable: plate.is_some(),
         bead: plate.flatten(),
+        override_grant: override_grant(),
     };
     let decision = decide(&authority, &request);
 
@@ -144,6 +145,27 @@ fn acting_agent() -> Option<String> {
     ["SHANTY_AGENT", "GT_CREW", "YUPANA_AGENT"]
         .iter()
         .find_map(|key| std::env::var(key).ok())
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// The host guard's override grant for THIS command, if it issued one.
+///
+/// Published by the guard chain into the environment of this single invocation
+/// (`bash-guards.sh` runs the host guard first and this hook last), so the grant
+/// cannot outlive the tool call it was issued for and needs no expiry of its
+/// own. That scoping is the design: the override token it derives from is
+/// SINGLE-USE and the host guard unlinks it before deciding, so by the time this
+/// policy runs there is nothing left to read and a second consumer is not
+/// merely redundant but impossible (aegis-d7jpdw).
+///
+/// Absent means no grant — never "assume one". A landing the host refused
+/// publishes nothing, which is exactly what keeps a refused attempt refused
+/// here too.
+#[cfg(feature = "quipu")]
+fn override_grant() -> Option<String> {
+    std::env::var("YUPANA_LANDING_OVERRIDE")
+        .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
 }
@@ -359,6 +381,12 @@ fn record(
             "ref_stated_by_command": !request.ref_assumed,
             "command": landing.evidence,
             "work_item_readable": request.work_item_readable,
+            // Whether the host guard granted an override for this landing, and
+            // why. A soak adjudicating this corpus against the host log must be
+            // able to tell an overridden landing from an ordinary one WITHOUT
+            // re-joining the two sources by timestamp.
+            "override_granted": request.override_grant.is_some(),
+            "override_reason": request.override_grant.clone(),
             // Preserve the actual policy diagnosis under the signature; the
             // generic certification mismatch alone cannot explain a refusal.
             "decision_codes": match decision {
