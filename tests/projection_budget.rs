@@ -12,6 +12,9 @@
 // `project` is behind the `quipu` feature, so this whole file is too — otherwise every
 // non-quipu CI job fails to COMPILE rather than failing a test.
 #![cfg(feature = "quipu")]
+// Test names SHOUT the invariant they turn on — the repo house convention
+// (see src/landing_test.rs). Scoped to this test binary.
+#![allow(non_snake_case)]
 
 use std::time::Duration;
 
