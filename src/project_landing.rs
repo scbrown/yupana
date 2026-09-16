@@ -73,9 +73,31 @@ impl LandingRule {
     }
 
     /// Whether this rule restricts landing to the declared owner.
+    ///
+    /// ⚠️ EXHAUSTIVE ON PURPOSE. This was `matches!(self, Self::SingleWriter)`,
+    /// which is FAIL-PERMISSIVE: every rule variant added afterwards would be
+    /// silently NOT owner-restricted, because a `matches!` answers `false` for
+    /// anything it was not told about. A policy hole one enum line away, with
+    /// nothing to notice it — the compiler cannot warn about a `matches!` that
+    /// is merely incomplete, and the guard would keep allowing.
+    ///
+    /// An exhaustive `match` makes the same mistake a COMPILE ERROR: adding a
+    /// variant does not build until somebody says whether it restricts landing
+    /// to the owner. That is the decision being forced, and it is exactly the
+    /// decision a new rule's author is best placed to make and least likely to
+    /// be asked for.
+    ///
+    /// Do not "simplify" this back to a `matches!`, and do not add a `_ =>` arm
+    /// — a wildcard restores the hazard while looking like the fix.
     #[must_use]
     pub fn owner_only(self) -> bool {
-        matches!(self, Self::SingleWriter)
+        match self {
+            Self::SingleWriter => true,
+            // Any owner may land, provided they cite a work item. The bead half
+            // is enforced separately by `work_item_missing` in `decide()`, so
+            // returning false here relaxes ONLY the owner check.
+            Self::AnyOwnerWithBead => false,
+        }
     }
 }
 
