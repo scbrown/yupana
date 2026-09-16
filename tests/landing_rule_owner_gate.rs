@@ -2,7 +2,7 @@
 //! dangerous one.
 //!
 //! It was `matches!(self, Self::SingleWriter)`. A `matches!` answers `false` for
-//! anything it was not told about, so every LandingRule variant added later
+//! anything it was not told about, so every `LandingRule` variant added later
 //! would be silently NOT owner-restricted — a policy hole one enum line away,
 //! with no compiler warning and no runtime symptom except that the guard keeps
 //! allowing. Found 2026-09-16 (wu) while reading why a governed repo produced no
@@ -14,6 +14,9 @@
 // `project_landing` is behind the `quipu` feature, so this whole file is too —
 // otherwise every non-quipu CI job fails to COMPILE rather than failing a test.
 #![cfg(feature = "quipu")]
+// Test names SHOUT the invariant they turn on — the repo house convention
+// (src/hook/scope_arm_test.rs:9). Scoped to this test binary.
+#![allow(non_snake_case)]
 
 use yupana::project_landing::LandingRule;
 
