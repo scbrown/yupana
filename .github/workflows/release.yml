@@ -293,16 +293,38 @@ jobs:
   # release PRs sit `action_required` until a human approves, so the push copy is the
   # one that protects releases. Keep both — the PR one covers human CHANGELOG edits.
   #
-  # ⚠ THAT DARKNESS DOES NOT APPLY HERE, MEASURED (aegis-z3oz35, 2026-09-16). The
-  # sentence above is quipu's history and it was carried across with the port; on
-  # yupana the `pull_request` copy RUNS on bot-authored release-PR heads:
+  # ⚠ THE DARKNESS APPLIES HERE TOO — and the obvious check says it does not.
+  # Measured and then CORRECTED the same hour (aegis-z3oz35, 2026-09-16).
   #
-  #   run 35069095888  head ea93a294  author github-actions[bot]  success  19s
-  #   run 35069490939  head c37d1d27  author github-actions[bot]  failure  12s
+  # I first read two runs on this repo's release-PR branch as proof that the
+  # `pull_request` copy executes on bot-authored heads:
   #
-  # Both executed with real durations and real conclusions. Do not read a green
-  # release PR here as "the check was skipped", and do not read quipu's note as
-  # applying to this repo — check the run's DURATION and CONCLUSION either way.
+  #   run 35069095888  head ea93a294  github-actions[bot]  success  19s
+  #   run 35069490939  head c37d1d27  github-actions[bot]  failure  12s
+  #
+  # Real durations, real conclusions, right branch, right author. The conclusion
+  # was still WRONG. Both are `run_attempt: 2` — attempt 1 of each sat
+  # `action_required` and a human clicked Approve. The tell is in the timestamps,
+  # not the conclusion:
+  #
+  #   35069490939  created 07:37:39Z  run_started 07:48:12Z   <- an 11-minute
+  #                                                              approval gap
+  #   35073841251  created 08:27:07Z  run_started 08:27:07Z  attempt 1
+  #                -> action_required, 0s, never executed
+  #
+  # So a conclusion of `success` on a bot-authored head means "a human approved
+  # this", not "this gate is unattended". `conclusion` and `duration` cannot tell
+  # the two apart. **Read `run_attempt` and compare `created_at` with
+  # `run_started_at`.** attempt 2 with a gap = it was dark and somebody opened it.
+  #
+  # Operational consequence: after the corrector above pushes a fixed section, the
+  # release PR's required checks sit `action_required` until approved, and the PR
+  # shows BLOCKED with nothing red on it. That is the gate working, not a failure —
+  # approve the runs (`gh api -X POST repos/OWNER/REPO/actions/runs/<id>/approve`)
+  # and read the attempt-2 result.
+  #
+  # The unattended copy is the `verify-changelog` job below, which runs on `push`
+  # to main and needs no approval. That is why both exist.
   verify-changelog:
     name: Verify changelog
     needs: release-plz
