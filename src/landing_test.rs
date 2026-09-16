@@ -186,3 +186,79 @@ fn unrelated_commands_abstain() {
         assert!(r(cmd).is_none(), "{cmd}");
     }
 }
+
+// ── Forgejo REST landings (aegis-zks1dl) ────────────────────────────────────
+//
+// The route a standing directive mandates for a protected-branch repo whose
+// push whitelist excludes the account agents authenticate as. Six PRs landed
+// this way inside a live soak window and produced ZERO verdicts, because
+// `resolve_segment` matched only `git` and `gh`. These tests pull in opposite
+// directions on purpose: the POST must resolve, and the READ of the same URL
+// must not — the status polling that found the defect used that read, and
+// classifying it as a landing would put fabricated ALLOWs into the corpus the
+// promotion gate divides by.
+
+#[test]
+fn a_forgejo_api_merge_is_a_landing() {
+    let l = r("curl -X POST https://forge.example:3000/api/v1/repos/acme/widget/pulls/255/merge")
+        .expect("the mandated REST landing route is a landing");
+    assert_eq!(l.verb, LandingVerb::Merge);
+    assert_eq!(l.repo, RepoRef::Slug("acme/widget".into()));
+    assert_eq!(l.git_ref, RefTarget::Unstated);
+}
+
+#[test]
+fn a_body_flag_states_POST_without_an_explicit_method() {
+    // curl switches to POST on its own when given a body.
+    let l = r(
+        "curl -s https://forge.example/api/v1/repos/acme/widget/pulls/256/merge \
+         -H 'Content-Type: application/json' -d '{\"Do\":\"merge\"}'",
+    )
+    .expect("a body states the method by implication");
+    assert_eq!(l.verb, LandingVerb::Merge);
+    assert_eq!(l.repo, RepoRef::Slug("acme/widget".into()));
+}
+
+#[test]
+fn READING_a_pull_request_is_NOT_a_landing() {
+    // The exact polling this investigation ran. A GET must never enter the corpus.
+    assert!(r("curl -s https://forge.example/api/v1/repos/acme/widget/pulls/252").is_none());
+    assert!(r("curl -s https://forge.example/api/v1/repos/acme/widget/pulls/252/merge").is_none());
+}
+
+#[test]
+fn an_explicit_method_OVERRIDES_an_inferred_one() {
+    // `-d ... -X GET` is a GET however much it looks like a write.
+    assert!(
+        r("curl -d '{}' -X GET https://forge.example/api/v1/repos/a/b/pulls/5/merge").is_none()
+    );
+    assert!(
+        r("curl --request=POST https://forge.example/api/v1/repos/a/b/pulls/5/merge").is_some()
+    );
+}
+
+#[test]
+fn the_api_prefix_and_the_bare_gh_path_resolve_the_SAME_slug() {
+    // One window scanner, two spellings — the gh form is the window at offset 0.
+    let forgejo = r("curl -X POST https://forge.example/api/v1/repos/a/b/pulls/5/merge").unwrap();
+    let github = r("gh api repos/a/b/pulls/5/merge -X PUT").unwrap();
+    assert_eq!(forgejo.repo, github.repo);
+}
+
+#[test]
+fn a_curl_that_is_not_a_merge_abstains() {
+    assert!(r("curl -X POST https://forge.example/api/v1/repos/a/b/pulls/5/comments").is_none());
+    assert!(r("curl -X POST https://forge.example/api/v1/repos/a/b/pulls").is_none());
+    assert!(r("curl -X POST https://graph.example/episode -d '{}'").is_none());
+    // a non-numeric PR number is not a pull request
+    assert!(r("curl -X POST https://forge.example/api/v1/repos/a/b/pulls/abc/merge").is_none());
+}
+
+#[test]
+fn a_forgejo_merge_after_a_cd_still_carries_the_cd() {
+    let l = r("cd /srv/work/widget && curl -X POST \
+               https://forge.example/api/v1/repos/acme/widget/pulls/255/merge")
+    .expect("compound lines are split, per the module note");
+    assert_eq!(l.verb, LandingVerb::Merge);
+    assert_eq!(l.cwd_hint.as_deref(), Some("/srv/work/widget"));
+}

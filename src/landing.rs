@@ -1,8 +1,9 @@
 //! landing — resolve a shell command line to a LANDING attempt, or abstain.
 //!
 //! A *landing* is the act of putting code onto a repository's protected branch:
-//! `git push` and `gh pr merge` (including its REST spelling). It is the action
-//! the governed single-writer policy is written against
+//! `git push`, `gh pr merge` (including its REST spelling), and the Forgejo REST
+//! merge `curl -X POST .../repos/<owner>/<name>/pulls/<n>/merge`. It is the
+//! action the governed single-writer policy is written against
 //! (`docs/design/landing-policy.md`).
 //!
 //! This module is the ACTION SELECTOR half of that policy's vocabulary, and it
@@ -222,6 +223,7 @@ fn resolve_segment(seg: &str) -> Option<Landing> {
     match prog.as_str() {
         "git" => resolve_git_push(rest, seg),
         "gh" => resolve_gh(rest, seg),
+        "curl" => resolve_curl(rest, seg),
         _ => None,
     }
 }
@@ -349,18 +351,99 @@ fn resolve_gh(rest: &[&str], seg: &str) -> Option<Landing> {
     })
 }
 
-/// `repos/<owner>/<name>/pulls/<n>/merge` -> `<owner>/<name>`.
+/// `curl -X POST <url>/repos/<owner>/<name>/pulls/<n>/merge` — the Forgejo REST
+/// landing.
+///
+/// This arm exists because it is the route a standing directive MANDATES, not
+/// because curl is worth chasing in general. The repository in question has a
+/// protected main whose push whitelist excludes the account every agent
+/// authenticates as, so `git push origin <branch>:main` is refused by the
+/// pre-receive hook and the API merge is the only way to land. Measured
+/// 2026-09-16 (aegis-zks1dl): six PRs landed that way inside a live soak window
+/// and produced ZERO verdicts, because `resolve_segment` matched only `git` and
+/// `gh`.
+///
+/// Deliberately NOT generalised to every HTTP client (`wget`, `python -c`,
+/// `httpie`). Matching all of them is not achievable, and a guard that half-
+/// matches is worse than one with a stated boundary — see the module note on
+/// abstaining producing a bypass rather than a cautious non-answer.
+///
+/// The METHOD must be stated, for the same reason every other field must be:
+/// the identical URL is read by the status polling this very investigation ran
+/// (`curl .../pulls/<n>`), and classifying a read as a landing would put
+/// fabricated ALLOWs into the soak corpus that the gate divides by.
+fn resolve_curl(rest: &[&str], seg: &str) -> Option<Landing> {
+    if !curl_is_post(rest) {
+        return None;
+    }
+    let slug = rest.iter().find_map(|w| api_merge_slug(w))?;
+    Some(Landing {
+        verb: LandingVerb::Merge,
+        repo: RepoRef::Slug(slug),
+        // As for `gh pr merge`: a merge lands on the pull request's BASE, which
+        // the command line does not carry.
+        git_ref: RefTarget::Unstated,
+        evidence: seg.trim().to_string(),
+        cwd_hint: None,
+    })
+}
+
+/// Does the command line SAY it is a POST?
+///
+/// Either an explicit method, or a body flag — curl switches to POST on its own
+/// when given `-d`/`--data*`, so a body is the method being stated by
+/// implication rather than a guess about intent.
+fn curl_is_post(rest: &[&str]) -> bool {
+    let mut explicit_method: Option<&str> = None;
+    let mut has_body = false;
+    let mut want_method = false;
+    for word in rest {
+        if want_method {
+            explicit_method = Some(word);
+            want_method = false;
+            continue;
+        }
+        match *word {
+            "-X" | "--request" => want_method = true,
+            w if w.starts_with("--request=") => {
+                explicit_method = w.split_once('=').map(|(_, v)| v);
+            }
+            w if w.starts_with("-d") && w.len() > 2 => has_body = true,
+            "-d" | "--data" | "--data-raw" | "--data-binary" | "--data-urlencode"
+            | "--data-ascii" | "--json" => has_body = true,
+            w if w.starts_with("--data") && w.contains('=') => has_body = true,
+            _ => {}
+        }
+    }
+    match explicit_method {
+        // An explicit method wins over an inferred one: `-d ... -X GET` is a GET.
+        Some(m) => m.eq_ignore_ascii_case("post"),
+        None => has_body,
+    }
+}
+
+/// `[<scheme>://<host>/...]/repos/<owner>/<name>/pulls/<n>/merge` ->
+/// `<owner>/<name>`.
+///
+/// Scans for the six-segment window anywhere in the path rather than anchoring
+/// at position 0, because Forgejo serves this under an `/api/v1` prefix and a
+/// full URL also carries scheme and host. `gh api repos/...` still matches: the
+/// window is simply at offset 0 there.
 fn api_merge_slug(word: &str) -> Option<String> {
-    let path = word.split('?').next()?.trim_matches('/');
-    let parts: Vec<&str> = path.split('/').collect();
+    let word = word.trim_matches(|c| c == '\'' || c == '"');
+    let path = word.split('?').next()?.split('#').next()?;
+    let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
     // repos / owner / name / pulls / n / merge
-    if parts.len() < 6 || parts[0] != "repos" || parts[3] != "pulls" || parts[5] != "merge" {
-        return None;
-    }
-    if !parts[4].chars().all(|c| c.is_ascii_digit()) || parts[4].is_empty() {
-        return None;
-    }
-    Some(format!("{}/{}", parts[1], parts[2]))
+    parts.windows(6).find_map(|w| {
+        (w[0] == "repos"
+            && w[3] == "pulls"
+            && w[5] == "merge"
+            && !w[4].is_empty()
+            && w[4].chars().all(|c| c.is_ascii_digit())
+            && !w[1].is_empty()
+            && !w[2].is_empty())
+        .then(|| format!("{}/{}", w[1], w[2]))
+    })
 }
 
 /// Resolve a command line to the first landing attempt it contains, or `None`.
