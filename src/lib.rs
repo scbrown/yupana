@@ -110,6 +110,9 @@ pub mod project_trajectory;
 /// the projection that serves them.
 #[cfg(feature = "quipu")]
 pub mod project_tripwire;
+/// One TOTAL projection budget per hook invocation — see `projection_budget`.
+#[cfg(feature = "quipu")]
+pub mod projection_budget;
 /// The DURABLE half of the projection cache — what lets a projection failure
 /// degrade to stale-but-enforcing instead of to unguarded (aegis-0upyu).
 #[cfg(feature = "quipu")]

@@ -231,7 +231,7 @@ fn use_daemon_false_resolves_exposure_live() {
 /// `http_timeout` cannot silently reintroduce it.
 #[test]
 fn the_exposure_budget_outlasts_the_live_call_it_may_wait_on() {
-    let live = crate::project::http_timeout();
+    let live = crate::projection_budget::http_timeout();
     let exposure = super::daemon_exposure_timeout();
     assert!(
         exposure > live,
