@@ -57,12 +57,12 @@ const DAEMON_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150
 /// would print a spurious daemon-down notice and then make its OWN live call, so
 /// a cold repo would cost TWO `/policy/check` round-trips instead of one.
 ///
-/// So this must exceed the live path's own ceiling (`project::http_timeout`,
+/// So this must exceed the live path's own ceiling (`projection_budget::http_timeout`,
 /// default 10s), not merely the loopback hop. The margin covers the hop itself —
 /// giving up one tick before the daemon answers would produce exactly the double
 /// call this exists to prevent.
 fn daemon_exposure_timeout() -> std::time::Duration {
-    crate::project::http_timeout() + std::time::Duration::from_secs(2)
+    crate::projection_budget::http_timeout() + std::time::Duration::from_secs(2)
 }
 
 /// Try the resident daemon. See the module docs for the three outcomes.

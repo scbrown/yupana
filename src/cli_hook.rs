@@ -37,7 +37,7 @@ pub(crate) fn run(
     //
     // A hook is the only yupana entry point with a PARENT THAT KILLS IT — it
     // runs as a harness PreToolUse hook, while the daemon is a service and the
-    // CLI is a shell command. `project::http_timeout` bounds one call at 10s and
+    // CLI is a shell command. `projection_budget::http_timeout` bounds one call at 10s and
     // nothing bounded their sum, so a pre-edit making 7-9 serial queries could
     // run for 71.87s (measured) and be killed mid-request, leaving quipu holding
     // a read for a caller that no longer exists. Measured the same day:
@@ -47,7 +47,7 @@ pub(crate) fn run(
     // function's job is attribution, and folding an unrelated policy into it
     // would hide this one from anybody reading either.
     #[cfg(feature = "quipu")]
-    crate::project::open_budget(crate::project::default_total_budget());
+    crate::projection_budget::open_budget(crate::projection_budget::default_total_budget());
     match event {
         HookEvent::PostEdit => crate::hook::run_post_edit(tenant),
         HookEvent::PostBash => crate::hook::run_post_bash(),

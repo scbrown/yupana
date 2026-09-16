@@ -18,7 +18,7 @@
 
 use std::time::Duration;
 
-use yupana::project::budgeted;
+use yupana::projection_budget::budgeted;
 
 #[test]
 fn NO_budget_leaves_the_per_call_ceiling_exactly_as_it_was() {
