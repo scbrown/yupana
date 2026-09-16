@@ -100,3 +100,63 @@ fn record_ids_are_stable_per_command_and_differ_across_commands() {
     );
     assert_ne!(md5_ish("git push origin main"), md5_ish("gh pr merge 3"));
 }
+
+#[test]
+fn two_agents_landing_the_same_command_in_one_second_get_DIFFERENT_record_ids() {
+    // aegis-an6v8i. This is the whole defect in one assertion: the key was
+    // `landing-{ts}-{hash(command)}`, `ts` is whole seconds, and the hash covers
+    // only the command — so these two collided, `append` refused the second
+    // because its payload differed, and `record` discarded that error. The
+    // second verdict was written nowhere and reported nowhere.
+    //
+    // Measured on the live path before the fix: wu and grant, same command, same
+    // second, ONE row in the spool and exit 0 from both invocations.
+    let cmd = "gh pr merge 230 --repo scbrown/quipu --merge";
+    assert_ne!(
+        landing_record_id(1_789_528_644, "wu", cmd),
+        landing_record_id(1_789_528_644, "grant", cmd),
+        "same command, same second, different agents MUST NOT share a key"
+    );
+    // The test that stood here before checked `md5_ish` alone and passed
+    // throughout the defect's life — the hash was never the broken part. A key
+    // needs testing as a key.
+}
+
+#[test]
+fn the_SAME_agent_retrying_the_same_command_in_one_second_keeps_ONE_record_id() {
+    // Load-bearing in the opposite direction, and the reason the fix is not
+    // simply "make every id unique". An identical retry must still collide, so
+    // that `append` sees a matching id AND a matching signed payload hash and
+    // treats it as the idempotent re-send it is. Making ids unique per call
+    // would turn every duplicate hook invocation into a second spool row and
+    // inflate the very denominator the soak divides by.
+    let cmd = "gh pr merge 230 --repo scbrown/quipu --merge";
+    assert_eq!(
+        landing_record_id(1_789_528_644, "wu", cmd),
+        landing_record_id(1_789_528_644, "wu", cmd)
+    );
+}
+
+#[test]
+fn the_record_id_still_varies_by_second_and_by_command() {
+    // Guard the two properties the agent field must not have cost us.
+    let cmd = "gh pr merge 230 --repo scbrown/quipu --merge";
+    assert_ne!(
+        landing_record_id(1_789_528_644, "wu", cmd),
+        landing_record_id(1_789_528_645, "wu", cmd)
+    );
+    assert_ne!(
+        landing_record_id(1_789_528_644, "wu", cmd),
+        landing_record_id(1_789_528_644, "wu", "git push origin main")
+    );
+}
+
+#[test]
+fn the_record_id_keeps_the_landing_prefix_every_consumer_filters_on() {
+    // `soak-landing-policy.sh` and `check-landing-verdict-coverage.sh` both
+    // partition the shared spool with `record_id.startswith("landing-")` — the
+    // host adapter's rows start `quipu-writer-`. Inserting the agent must not
+    // disturb that, or the soak silently stops seeing governed evaluations and
+    // reports a corpus of zero as an honest answer.
+    assert!(landing_record_id(1_789_528_644, "wu", "gh pr merge 3").starts_with("landing-"));
+}
