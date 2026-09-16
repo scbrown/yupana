@@ -81,7 +81,7 @@ pub fn fetch_exposure_answer(endpoint: &str, repo: &str) -> ExposureAnswer {
     let target = format!("http://aegis.gastown.local/ontology/repo_{repo}");
     let body = serde_json::json!({ "policy": EXPOSURE_POLICY_IRI, "target": target }).to_string();
     let resp = match ureq::post(&url)
-        .timeout(crate::project::http_timeout())
+        .timeout(crate::projection_budget::http_timeout())
         .set("Content-Type", "application/json")
         .set("X-Quipu-Client", crate::quipu_label::current())
         .send_string(&body)

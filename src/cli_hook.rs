@@ -33,6 +33,21 @@ pub(crate) fn run(
     tenant: Option<&str>,
     config: Option<&std::path::Path>,
 ) -> anyhow::Result<()> {
+    // OPEN THE TOTAL PROJECTION BUDGET FOR THIS INVOCATION (aegis-h9c0no).
+    //
+    // A hook is the only yupana entry point with a PARENT THAT KILLS IT — it
+    // runs as a harness PreToolUse hook, while the daemon is a service and the
+    // CLI is a shell command. `projection_budget::http_timeout` bounds one call at 10s and
+    // nothing bounded their sum, so a pre-edit making 7-9 serial queries could
+    // run for 71.87s (measured) and be killed mid-request, leaving quipu holding
+    // a read for a caller that no longer exists. Measured the same day:
+    // `yupana-hook` abandoned 26.4% of 424 reads, `yupana-daemon` 0.0% of 42.
+    //
+    // Deliberately set HERE and not in `cli_use::declare_quipu_caller`: that
+    // function's job is attribution, and folding an unrelated policy into it
+    // would hide this one from anybody reading either.
+    #[cfg(feature = "quipu")]
+    crate::projection_budget::open_budget(crate::projection_budget::default_total_budget());
     match event {
         HookEvent::PostEdit => crate::hook::run_post_edit(tenant),
         HookEvent::PostBash => crate::hook::run_post_bash(),
