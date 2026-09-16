@@ -11,6 +11,10 @@
 //! These tests cannot detect a future `matches!` regression on their own — a new
 //! variant would simply not be listed here either. The EXHAUSTIVE MATCH is the
 //! real guard; this file pins the two answers that exist today and states why.
+// `project_landing` is behind the `quipu` feature, so this whole file is too —
+// otherwise every non-quipu CI job fails to COMPILE rather than failing a test.
+#![cfg(feature = "quipu")]
+
 use yupana::project_landing::LandingRule;
 
 #[test]
