@@ -9,6 +9,10 @@
 //! abandoned 0.0% of 42.
 //!
 //! These turn on the decision itself, not on wall-clock, so they cannot flake.
+// `project` is behind the `quipu` feature, so this whole file is too — otherwise every
+// non-quipu CI job fails to COMPILE rather than failing a test.
+#![cfg(feature = "quipu")]
+
 use std::time::Duration;
 
 use yupana::project::budgeted;
