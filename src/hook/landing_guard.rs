@@ -354,30 +354,8 @@ fn record(
         evidence_ref: format!("landing:{}:{}", request.repo, request.git_ref),
     }];
     let agent = request.agent.clone().unwrap_or_else(|| "unknown".into());
-    // The acting agent is PART OF THE KEY, not decoration (aegis-an6v8i).
-    // `ts` is whole seconds and the hash is of the command text, so without the
-    // agent two landings of the SAME command inside one second collide. `append`
-    // refuses a colliding id whose payload differs and the caller below discards
-    // that error, so the second verdict was silently dropped and left no trace:
-    // no duplicate id, no gap, nothing distinguishable from a landing that never
-    // happened. Measured on the live path — wu and grant, same command, same
-    // second, one row.
-    //
-    // The realistic shape is not two agents. It is ONE agent retrying inside a
-    // second with a DIFFERENT outcome — refuse, arm an override, retry — which is
-    // exactly the 2026-09-14 wu sequence, saved only by being 13s apart. Dropping
-    // the ALLOW and keeping the REFUSE manufactures a false positive inside the
-    // soak that decides the block-tier flip.
-    //
-    // A byte-identical retry by the same agent still dedupes: the id matches AND
-    // the signed payload hash matches, which is the branch `append` treats as an
-    // idempotent re-send. That property is load-bearing and is asserted in the
-    // tests alongside the split.
     let input = crate::action_certification::ActionInput {
-        record_id: format!(
-            "landing-{ts}-{agent}-{}",
-            &format!("{:x}", md5_ish(&landing.evidence))[..8]
-        ),
+        record_id: landing_record_id(ts, &agent, &landing.evidence),
         correlation_id: session.clone(),
         session,
         ts,
@@ -425,6 +403,34 @@ fn record(
             eprintln!("yupana: landing record NOT spooled ({error})");
         }
     }
+}
+
+/// The spool key for one governed landing.
+///
+/// The acting agent is PART OF THE KEY, not decoration (aegis-an6v8i). `ts` is
+/// whole seconds and the hash covers only the command text, so without the agent
+/// two landings of the SAME command inside one second collide.
+/// [`crate::action_certification::append`] refuses a colliding id whose signed
+/// payload differs, and `record` above discards that error, so the second verdict
+/// was written nowhere and reported nowhere — no duplicate id, no gap, nothing
+/// distinguishable from a landing that never happened. Measured on the live path:
+/// wu and grant, same command, same second, ONE row.
+///
+/// The realistic shape is not two agents. It is ONE agent retrying inside a second
+/// with a DIFFERENT outcome — refuse, arm an override token, retry — which is
+/// exactly the 2026-09-14 wu sequence on scbrown/quipu #241, saved only by the
+/// retry being 13 seconds later. Keeping the REFUSE and dropping the ALLOW
+/// manufactures a false positive inside the soak that gates the block-tier flip.
+///
+/// A byte-identical retry by the same agent still dedupes: the id matches AND the
+/// signed payload hash matches, which is the branch `append` treats as an
+/// idempotent re-send. That property is load-bearing and is asserted in the tests.
+#[cfg(feature = "quipu")]
+fn landing_record_id(ts: u64, agent: &str, evidence: &str) -> String {
+    format!(
+        "landing-{ts}-{agent}-{}",
+        &format!("{:x}", md5_ish(evidence))[..8]
+    )
 }
 
 /// A tiny non-cryptographic digest, used ONLY to give a record a stable id per
