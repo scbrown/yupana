@@ -15,11 +15,12 @@
   <a href="docs/yupana-spec.md"><img src="https://img.shields.io/badge/spec-v0.1-blueviolet.svg" alt="Specification"/></a>
 </p>
 
-> *Bobbin holds the thread. Quipu ties the knots. **Yupana** keeps the working coil — live, per-tenant, ready.* 🧶
+> *Bobbin holds the thread. Quipu ties the knots. **Yupana** does the counting — live, per-tenant, ready.* 🧮
 
-A [yupana](https://en.wikipedia.org/wiki/Yupana_(textile)) is a coiled skein of yarn
-kept ready while you work. **Yupana** keeps a codebase's live structural graph the
-same way: extracted once at a baseline, then layered with a lightweight
+A [yupana](https://en.wikipedia.org/wiki/Yupana) is the Andean counting board that
+worked alongside the quipu: the quipu recorded, the yupana computed. **Yupana** plays
+the same role for a codebase's live structural graph: extracted once at a baseline,
+then layered with a lightweight
 per-developer overlay so a whole team of humans and agents can edit at the same
 time without corrupting each other's view. It answers the questions embeddings
 and git-history can't — *what calls this, what does this flow into, what will
@@ -33,7 +34,7 @@ or blocking, and emitting a signed verdict bound to what was actually checked. A
 rule is a graph assertion rather than another bespoke linter, which is why the policy
 layer grows without the tooling growing with it.
 
-## 🧶 See It In Action
+## 🧮 See It In Action
 
 ```text
 $ yupana analyze src
