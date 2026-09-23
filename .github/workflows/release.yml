@@ -191,15 +191,56 @@ jobs:
     # cannot trigger anything.
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
+    # TWO CREDENTIALS, ONE PER HALF (aegis-bjmwen; same split as quipu's staged
+    # 3i6v7j wiring, see docs/release-token.md):
+    #
+    #   release     GITHUB_TOKEN       tags + creates the GitHub release. Kept on
+    #                                  the default token ON PURPOSE: a PAT here would
+    #                                  make `release: published` fire, and crates.yml
+    #                                  still listens for it, racing the inline
+    #                                  `crates` job below.
+    #   release-pr  RELEASE_PLZ_TOKEN  opens/updates the release PR.
+    #   corrector   RELEASE_PLZ_TOKEN  pushes the changelog fix to that PR.
+    #
+    # The PR-side pushes must NOT be GITHUB_TOKEN-authored: on this public repo a
+    # bot-authored head parks every run at `action_required` until someone
+    # approves it (v0.9.2 took 6 approvals by hand plus 9 from the cron). The fix
+    # is the identity. The fork-PR approval policy stays as it is.
     steps:
+      - name: Require the release PR credential
+        env:
+          RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_PLZ_TOKEN" ]; then
+            echo "::error::Configure RELEASE_PLZ_TOKEN; see docs/release-token.md"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: MarcoIeni/release-plz-action@v0.5
         id: release
+        with:
+          command: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Re-checkout WITH the PR credential persisted: the corrector below does a
+      # plain `git push`, which uses whatever the checkout stored. Setting only the
+      # action's env would leave that push GITHUB_TOKEN-authored and still parked.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+          persist-credentials: true
+
+      - uses: MarcoIeni/release-plz-action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
 
       # git-cliff + python3 for the corrector below. Installed AFTER release-plz so a
       # tool-install failure cannot be mistaken for a release-plz failure.
@@ -240,7 +281,7 @@ jobs:
       # another correction.
       - name: Correct the release PR's changelog section
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
         run: |
           set -euo pipefail
           BR="$(gh pr list --state open --json headRefName \
