@@ -160,12 +160,29 @@ SELECT ?parent WHERE {
   ?p aegis:identifier ?parent .
 }";
 
-/// The grounding query itself — the authoritative work-item id set, projected
-/// into the hot plane at refresh time so evaluation is O(1) membership per
-/// token, never SPARQL per keystroke.
-pub const GROUNDING_SET_QUERY: &str = "\
+/// The grounding set — the authoritative work-item id set, projected into the
+/// hot plane at refresh time so evaluation is O(1) membership per token, never
+/// SPARQL per keystroke.
+///
+/// It is TWO queries intersected client-side (see
+/// [`crate::project_decode::intersect_grounding_ids`]), not the one join
+/// `?w a aegis:WorkItem ; aegis:identifier ?id`. Measured against the live
+/// store (aegis-vwvjwl, 2026-09-23): each pattern alone answers in ~40 ms
+/// (4754 work items, 1810 identifiers), while the join, in either order and
+/// in the asserted-only FILTER form, hits quipu's 10 s query deadline (HTTP
+/// 408). A grounding set that cannot be projected renders every grounded rule
+/// UNEVALUATED on every edit, so the shape of this query is load-bearing. The
+/// intersection keeps the join's exact semantics: an identifier counts only
+/// when its subject is a work item.
+pub const GROUNDING_WORK_ITEMS_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
-SELECT ?id WHERE { ?w a aegis:WorkItem ; aegis:identifier ?id }";
+SELECT ?w WHERE { ?w a aegis:WorkItem }";
+
+/// The identifier half of the grounding set: every `(subject, identifier)`
+/// pair. Filtered to work items by [`GROUNDING_WORK_ITEMS_QUERY`].
+pub const GROUNDING_IDENTIFIERS_QUERY: &str = "\
+PREFIX aegis: <http://aegis.gastown.local/ontology/>
+SELECT ?w ?id WHERE { ?w aegis:identifier ?id }";
 
 /// The SPARQL SELECT that pulls quipu's TRIPWIRE policies — `boundary:"action"`
 /// policies whose whole condition is their `aegis:appliesTo` path scope (quipu
