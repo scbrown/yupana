@@ -109,8 +109,14 @@ jobs:
       # quipu-ingest cron advance its marker past a commit that was never
       # promoted. All arms pass in ci.yml (quipu + mcp,quipu arms), so this
       # remains a proven build.
+      # golden-path added 2026-09-23 (aegis-vwvjwl) for the same reason as quipu:
+      # the FR-40..42 guard (src/goldenpath/, `yupana_path_check`, `POST
+      # /path/check`) was built, documented as BUILT, and absent from every
+      # installed binary. `just install` builds --all-features, so a local
+      # install had it and the release asset did not: two install paths
+      # quietly shipping different tools.
       - name: Build release binary
-        run: cargo build --release --features mcp,langs-extra,quipu
+        run: cargo build --release --features mcp,langs-extra,quipu,golden-path
 
       - name: Package
         env:
