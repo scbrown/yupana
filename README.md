@@ -5,13 +5,13 @@
 <h1 align="center">yupana</h1>
 
 <p align="center">
-  <em>🧮 Know what a change will break before you make it</em>
+  <em>🧵 Know what a change will break before you make it</em>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
-  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust 2021"/></a>
-  <a href="docs/book/src/SUMMARY.md"><img src="https://img.shields.io/badge/docs-book-green.svg" alt="Documentation"/></a>
+  <a href="https://github.com/scbrown/yupana/actions/workflows/ci.yml"><img src="https://github.com/scbrown/yupana/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://github.com/scbrown/caboodle"><img src="https://img.shields.io/badge/stack-quipu-8B5E3C.svg" alt="Part of the quipu stack"/></a>
 </p>
 
 **Yupana reads a codebase and answers structural questions about it: what calls
@@ -145,10 +145,13 @@ are in [Harness Integration](docs/book/src/getting-started/harness-integration.m
 Rules that come from Quipu are covered in the
 [pre-edit policy guard](docs/book/src/reference/policy-guard.md).
 
-## Languages
+## Before you start
 
-Rust is always built in. The `langs-extra` feature, included in the release
-build and the source command above, adds the rest.
+**Platforms.** The release is built for Linux x86_64. On macOS and anywhere
+else, use the source install above; it needs a Rust toolchain and nothing else.
+
+**Languages.** Rust is always built in. The `langs-extra` feature, included in
+the release and in the source command above, adds the rest.
 
 | language | extensions |
 |---|---|
@@ -166,9 +169,21 @@ build and the source command above, adds the rest.
   and reference, in reading order.
 - [Map of all docs](docs/book/src/docs-map.md): where every design note,
   spec and research document lives, and which ones are historical.
-- [The stack](docs/book/src/concepts/the-stack.md): how Yupana works with
-  [Quipu](https://github.com/scbrown/quipu) and
-  [Bobbin](https://github.com/scbrown/bobbin).
+- [Why Yupana](docs/book/src/concepts/why-yupana.md) and
+  [how it works with Quipu and Bobbin](docs/book/src/concepts/the-stack.md).
+
+## 🧺 The stack
+
+Caboodle installs these together and proves each one works; every tool also stands alone.
+
+| tool | what it gives your agents |
+|---|---|
+| [caboodle](https://github.com/scbrown/caboodle) | one wizard that installs the stack and proves it works |
+| [quipu](https://github.com/scbrown/quipu) | a knowledge graph that refuses facts that break its rules |
+| [camayoc](https://github.com/scbrown/camayoc) | the starter vocabulary, and how new knowledge earns its way in |
+| [bobbin](https://github.com/scbrown/bobbin) | search and context over your repositories, served over MCP |
+| [yupana](https://github.com/scbrown/yupana) **(you are here)** | which code calls which: the blast radius before an edit |
+| [desire-path](https://github.com/scbrown/desire-path) | the tool calls your agents get wrong, so you can fix them |
 
 ## Contributing
 
@@ -182,6 +197,6 @@ Use `just`, not raw `cargo`. Conventions are in [`AGENTS.md`](AGENTS.md) and
 [`CONTRIBUTING.md`](CONTRIBUTING.md); releases are described in
 [`docs/RELEASING.md`](docs/RELEASING.md).
 
-## License
+## 📜 License
 
 [MIT](LICENSE) © 2026 Steve Brown
