@@ -57,6 +57,18 @@ repos:
         # the whole defect.
         verbose: true
 
+      - id: markdown-links
+        name: markdown links resolve
+        entry: scripts/check-md-links.py
+        language: script
+        # Every tracked .md on every run, not just the changed ones: deleting or
+        # renaming a TARGET breaks links in files this commit never touched.
+        # Offline (repo-relative and this repo's GitHub URLs only), so it is fast
+        # and cannot flake on the network.
+        pass_filenames: false
+        always_run: true
+        verbose: true
+
       - id: internal-identifier-ratchet
         name: internal identifier ratchet
         entry: cargo test --test no_internal_identifiers
