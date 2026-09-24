@@ -134,4 +134,23 @@ mod tests {
         let pairs = vec![("aegis:x".to_string(), "x-1".to_string())];
         assert!(intersect_grounding_ids(&[], &pairs).is_empty());
     }
+
+    /// aegis-jrobfn: camayoc syncs observed work items into its trusted
+    /// crew-records plane, not the default graph. Reading the default graph
+    /// alone made today's real beads look fabricated. Both halves must read
+    /// the plane, or the intersection loses them.
+    #[test]
+    fn both_grounding_queries_read_the_crew_records_plane() {
+        use crate::project_queries::{GROUNDING_IDENTIFIERS_QUERY, GROUNDING_WORK_ITEMS_QUERY};
+        for query in [GROUNDING_WORK_ITEMS_QUERY, GROUNDING_IDENTIFIERS_QUERY] {
+            assert!(
+                query.contains("GRAPH <https://camayoc.local/plane/crew/records>"),
+                "{query}"
+            );
+            assert!(
+                query.contains("UNION"),
+                "the default graph must still be read: {query}"
+            );
+        }
+    }
 }
