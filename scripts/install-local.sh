@@ -25,7 +25,13 @@ if [[ $commit != UNKNOWN && -n "$dirty" ]]; then
         exit 1
     fi
 fi
-install_root=${YUPANA_INSTALL_ROOT:-${CARGO_INSTALL_ROOT:-$HOME/.local}}
+# The stack's other cargo-installed tools (quipu, bobbin) get no --root/-–install-dir
+# override, so they land wherever plain `cargo install` puts them:
+# ${CARGO_HOME:-$HOME/.cargo}/bin. Matching that default here — rather than the
+# previous $HOME/.local — is what makes this agree with them instead of silently
+# shadowing or being shadowed by them on a PATH that orders the two differently
+# (aegis-ro425e.11: reproduced live on quipu, not just yupana, once both existed).
+install_root=${YUPANA_INSTALL_ROOT:-${CARGO_INSTALL_ROOT:-${CARGO_HOME:-$HOME/.cargo}}}
 cargo_bin=${CARGO_BIN:-cargo}
 bin_dir="$install_root/bin"
 canonical="$bin_dir/yupana"

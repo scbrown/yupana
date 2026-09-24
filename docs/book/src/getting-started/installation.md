@@ -36,9 +36,12 @@ requires curl, Python 3, `flock`, and Linux file utilities, but not Rust.
 identifies the source commit and dirty state. Dirty shared checkouts with linked
 worktrees are refused; use your own worktree for source development.
 
-Both paths publish atomically under an install lock to `~/.local/bin/yupana`
-and install `~/.local/bin/hank` as a relative symlink to that executable. Set
-`YUPANA_INSTALL_ROOT` to use another prefix. To roll back a release, run
+Both paths publish atomically under an install lock to
+`${CARGO_HOME:-~/.cargo}/bin/yupana` and install `hank` alongside it as a
+relative symlink — the same default `cargo install` itself uses, so this
+agrees with quipu, bobbin and anything else in the stack installed via plain
+`cargo install`. Set `YUPANA_INSTALL_ROOT` to use another prefix. To roll back
+a release, run
 `just install-release` with the previous version.
 
 ## Install the git hooks
