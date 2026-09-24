@@ -197,6 +197,7 @@ COMMANDS:
     export      Emit the referential structure as Turtle (bobbin: ontology)
     hook        Harness hook adapter (post-edit advisory / pre-edit guard)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
+    rule-test   Run governed text rules on sample cases, no side effects [quipu feature]
     promote     Promote a commit's structural facts into Quipu    [Phase 4]
     verifier    Show the verdict-signing public key to register  [quipu feature]
     verdicts    Drain the local signed-verdict spool into quipu  [quipu feature]
@@ -508,6 +509,27 @@ a generated narrowing pattern <strong>offered for human approval</strong>, and t
 exemplar's embedding as a similarity anchor with a suggested threshold that
 quipu's backtest replaces. Nothing emitted is a policy; quipu's
 definition-time placement check remains the refusal authority.</p>
+<h2 id="yupana-rule-test"><a class="header" href="#yupana-rule-test"><code>yupana rule-test</code></a></h2>
+<p>Runs recorded cases for governed text rules through the engine the pre-edit
+guard uses, <code>textrules::evaluate_in</code>, with the same path and repo exemptions.
+It exists for enforcement-readiness checks. A rule's cases have to be proven by
+the enforcer itself, because another regex engine can disagree with it.</p>
+<pre><code class="language-bash">echo '[{"rule":"textrule_patent-application-number","text":"filed as 63/123,456","expect":"match"},
+       {"rule":"textrule_patent-application-number","text":"release 63.1","expect":"no-match"}]' \
+  | yupana rule-test
+</code></pre>
+<p>Each case is <code>{rule, text, expect, path?, repo?}</code>. <code>expect</code> is <code>match</code> or
+<code>no-match</code>. <code>path</code> defaults to <code>rule-test-case.txt</code>, and a missing <code>repo</code>
+means unresolved, which exempts nothing. The rules come from the projection
+cache the hook serves (<code>--projection</code> overrides it), and the report states
+that cache's age.</p>
+<p>The verb writes nothing: no verdict spool, no metrics line, no cache refresh
+and no quipu request.</p>
+<p>Each case is <code>pass</code>, <code>fail</code>, or <code>unknown</code>. A case is <code>unknown</code> when its rule is
+absent from the projection or does not compile, because the guard fails open on
+such a rule. <code>unknown</code> is never a pass.</p>
+<p>Exit codes: <code>0</code> all cases pass · <code>1</code> any case fails · <code>2</code> nothing failed but
+something is unknown, or there were no cases.</p>
 <h2 id="rust-cpg-dataflow-cpg-feature"><a class="header" href="#rust-cpg-dataflow-cpg-feature">Rust CPG dataflow (<code>cpg</code> feature)</a></h2>
 <p>Build with <code>just build --features cpg</code>. The ordinary <code>dataflow</code> command keeps its
 intra-procedural, <code>treesitter</code> result in every build. Opt in explicitly:</p>
