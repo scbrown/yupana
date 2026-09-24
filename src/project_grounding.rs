@@ -14,8 +14,13 @@
 use crate::errors::Result;
 use crate::grounding::{GroundedRule, GroundingSet};
 use crate::project::ProjectionRegistry;
-use crate::project_decode::{decode_grounded_rules, decode_grounding_ids};
-use crate::project_queries::{GROUNDED_POLICY_QUERY, GROUNDING_SET_QUERY};
+use crate::project_decode::{
+    decode_grounded_rules, decode_identifier_pairs, decode_work_item_subjects,
+    intersect_grounding_ids,
+};
+use crate::project_queries::{
+    GROUNDED_POLICY_QUERY, GROUNDING_IDENTIFIERS_QUERY, GROUNDING_WORK_ITEMS_QUERY,
+};
 
 /// Fetch and decode the entity-grounded rule catalogue over HTTP. A quipu
 /// whose catalog predates the vocabulary returns zero rows — an empty
@@ -36,9 +41,18 @@ pub fn fetch_grounding_set(endpoint: &str, rules: &[GroundedRule]) -> Option<Gro
     if rules.is_empty() {
         return None;
     }
-    match crate::project::query(endpoint, GROUNDING_SET_QUERY)
-        .and_then(|body| decode_grounding_ids(&body).map(GroundingSet::new))
-    {
+    // Two queries, intersected here: the single join times out in quipu
+    // (see GROUNDING_WORK_ITEMS_QUERY). Either failing fails the whole set.
+    let set = crate::project::query(endpoint, GROUNDING_WORK_ITEMS_QUERY)
+        .and_then(|body| decode_work_item_subjects(&body))
+        .and_then(|items| {
+            let pairs = decode_identifier_pairs(&crate::project::query(
+                endpoint,
+                GROUNDING_IDENTIFIERS_QUERY,
+            )?)?;
+            Ok(GroundingSet::new(intersect_grounding_ids(&items, &pairs)))
+        });
+    match set {
         Ok(set) => Some(set),
         Err(e) => {
             eprintln!(
@@ -72,5 +86,52 @@ impl ProjectionRegistry {
     pub fn set_grounding(&mut self, rules: Vec<GroundedRule>, set: Option<GroundingSet>) {
         self.grounded_rules = rules;
         self.grounding = set;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::project_decode::{
+        decode_identifier_pairs, decode_work_item_subjects, intersect_grounding_ids,
+    };
+
+    fn rows(rows: &serde_json::Value) -> String {
+        serde_json::json!({ "results": { "bindings": rows } }).to_string()
+    }
+
+    #[test]
+    fn only_identifiers_of_work_items_ground() {
+        let items = decode_work_item_subjects(&rows(&serde_json::json!([
+            {"w": {"value": "aegis:aegis-l50p"}},
+            {"w": {"value": "aegis:aegis-mpdmd"}},
+        ])))
+        .unwrap();
+        let pairs = decode_identifier_pairs(&rows(&serde_json::json!([
+            {"w": {"value": "aegis:aegis-l50p"}, "id": {"value": "aegis-l50p"}},
+            {"w": {"value": "aegis:aegis-mpdmd"}, "id": {"value": "aegis-mpdmd"}},
+            // An identifier on something that is NOT a work item must not
+            // ground: the intersection is the join's semantics, not a superset.
+            {"w": {"value": "aegis:some-host"}, "id": {"value": "host-7"}},
+        ])))
+        .unwrap();
+        let mut ids = intersect_grounding_ids(&items, &pairs);
+        ids.sort();
+        assert_eq!(ids, ["aegis-l50p", "aegis-mpdmd"]);
+    }
+
+    #[test]
+    fn a_pair_row_missing_a_binding_is_dropped_not_misattributed() {
+        let pairs = decode_identifier_pairs(&rows(&serde_json::json!([
+            {"id": {"value": "orphan-1"}},
+            {"w": {"value": "aegis:x"}},
+        ])))
+        .unwrap();
+        assert!(pairs.is_empty());
+    }
+
+    #[test]
+    fn no_work_items_means_an_empty_set_not_every_identifier() {
+        let pairs = vec![("aegis:x".to_string(), "x-1".to_string())];
+        assert!(intersect_grounding_ids(&[], &pairs).is_empty());
     }
 }

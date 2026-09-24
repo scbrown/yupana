@@ -402,14 +402,42 @@ pub fn decode_grounded_rules(sparql_json: &str) -> Result<Vec<crate::grounding::
     Ok(out)
 }
 
-/// Decode the projected work-item id set (the grounding query's rows).
-pub fn decode_grounding_ids(sparql_json: &str) -> Result<Vec<String>> {
+/// Decode the work-item subjects (the `?w` rows of
+/// [`crate::project_queries::GROUNDING_WORK_ITEMS_QUERY`]).
+pub fn decode_work_item_subjects(sparql_json: &str) -> Result<Vec<String>> {
     let value: serde_json::Value = serde_json::from_str(sparql_json)
         .map_err(|e| Error::Projection(format!("results are not JSON: {e}")))?;
     Ok(rows_of(&value)?
         .iter()
-        .filter_map(|b| binding_value(b, "id"))
+        .filter_map(|b| binding_value(b, "w"))
         .collect())
+}
+
+/// Decode `(subject, identifier)` pairs (the rows of
+/// [`crate::project_queries::GROUNDING_IDENTIFIERS_QUERY`]). A row missing
+/// either binding is dropped: it cannot be attributed to a work item.
+pub fn decode_identifier_pairs(sparql_json: &str) -> Result<Vec<(String, String)>> {
+    let value: serde_json::Value = serde_json::from_str(sparql_json)
+        .map_err(|e| Error::Projection(format!("results are not JSON: {e}")))?;
+    Ok(rows_of(&value)?
+        .iter()
+        .filter_map(|b| Some((binding_value(b, "w")?, binding_value(b, "id")?)))
+        .collect())
+}
+
+/// The grounding id set: identifiers whose subject is a work item. This is the
+/// client-side half of the join quipu cannot answer inside its deadline (see
+/// [`crate::project_queries::GROUNDING_WORK_ITEMS_QUERY`]). Subjects compare as
+/// the store returns them; both queries go to the same store, so they share one
+/// IRI rendering.
+#[must_use]
+pub fn intersect_grounding_ids(work_items: &[String], pairs: &[(String, String)]) -> Vec<String> {
+    let items: std::collections::HashSet<&str> = work_items.iter().map(String::as_str).collect();
+    pairs
+        .iter()
+        .filter(|(w, _)| items.contains(w.as_str()))
+        .map(|(_, id)| id.clone())
+        .collect()
 }
 
 /// Decode the observed work-item scope rows (`?id ?path` pairs). A row missing
