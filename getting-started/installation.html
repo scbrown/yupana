@@ -208,9 +208,12 @@ requires curl, Python 3, <code>flock</code>, and Linux file utilities, but not R
 <p><code>install</code> builds the current checkout, including uncommitted changes. Its banner
 identifies the source commit and dirty state. Dirty shared checkouts with linked
 worktrees are refused; use your own worktree for source development.</p>
-<p>Both paths publish atomically under an install lock to <code>~/.local/bin/yupana</code>
-and install <code>~/.local/bin/hank</code> as a relative symlink to that executable. Set
-<code>YUPANA_INSTALL_ROOT</code> to use another prefix. To roll back a release, run
+<p>Both paths publish atomically under an install lock to
+<code>${CARGO_HOME:-~/.cargo}/bin/yupana</code> and install <code>hank</code> alongside it as a
+relative symlink — the same default <code>cargo install</code> itself uses, so this
+agrees with quipu, bobbin and anything else in the stack installed via plain
+<code>cargo install</code>. Set <code>YUPANA_INSTALL_ROOT</code> to use another prefix. To roll back
+a release, run
 <code>just install-release</code> with the previous version.</p>
 <h2 id="install-the-git-hooks"><a class="header" href="#install-the-git-hooks">Install the git hooks</a></h2>
 <pre><code class="language-bash">just setup            # installs pre-commit hooks
