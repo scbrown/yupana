@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
     echo 'Usage: install-release.sh VERSION'
     echo 'Install a checksummed published release (Linux x86_64). VERSION may start with v.'
-    echo 'YUPANA_INSTALL_ROOT overrides the default ~/.local install prefix.'
+    echo 'YUPANA_INSTALL_ROOT overrides the default ${CARGO_HOME:-~/.cargo} install prefix.'
 }
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then usage; exit 0; fi
 [[ $# == 1 && $1 =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { usage >&2; exit 2; }
@@ -16,7 +16,11 @@ version=${1#v}
 tag="v$version"
 archive="yupana-$tag-x86_64-linux-gnu.tar.gz"
 url="https://github.com/scbrown/yupana/releases/download/$tag/$archive"
-install_root=${YUPANA_INSTALL_ROOT:-${CARGO_INSTALL_ROOT:-$HOME/.local}}
+# Match install-local.sh's default (aegis-ro425e.11): the stack's other
+# cargo-installed tools get no --root override, so they land at
+# ${CARGO_HOME:-$HOME/.cargo}/bin by cargo's own default. Disagreeing here
+# risks shadowing or being shadowed depending on PATH order.
+install_root=${YUPANA_INSTALL_ROOT:-${CARGO_INSTALL_ROOT:-${CARGO_HOME:-$HOME/.cargo}}}
 bin_dir="$install_root/bin"
 mkdir -p "$bin_dir"
 stage=$(mktemp -d)
