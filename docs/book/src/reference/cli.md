@@ -16,6 +16,7 @@ COMMANDS:
     export      Emit the referential structure as Turtle (bobbin: ontology)
     hook        Harness hook adapter (post-edit advisory / pre-edit guard)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
+    rule-test   Run governed text rules on sample cases, no side effects [quipu feature]
     promote     Promote a commit's structural facts into Quipu    [Phase 4]
     verifier    Show the verdict-signing public key to register  [quipu feature]
     verdicts    Drain the local signed-verdict spool into quipu  [quipu feature]
@@ -412,6 +413,35 @@ a generated narrowing pattern **offered for human approval**, and the
 exemplar's embedding as a similarity anchor with a suggested threshold that
 quipu's backtest replaces. Nothing emitted is a policy; quipu's
 definition-time placement check remains the refusal authority.
+
+## `yupana rule-test`
+
+Runs recorded cases for governed text rules through the engine the pre-edit
+guard uses, `textrules::evaluate_in`, with the same path and repo exemptions.
+It exists for enforcement-readiness checks. A rule's cases have to be proven by
+the enforcer itself, because another regex engine can disagree with it.
+
+```bash
+echo '[{"rule":"textrule_patent-application-number","text":"filed as 63/123,456","expect":"match"},
+       {"rule":"textrule_patent-application-number","text":"release 63.1","expect":"no-match"}]' \
+  | yupana rule-test
+```
+
+Each case is `{rule, text, expect, path?, repo?}`. `expect` is `match` or
+`no-match`. `path` defaults to `rule-test-case.txt`, and a missing `repo`
+means unresolved, which exempts nothing. The rules come from the projection
+cache the hook serves (`--projection` overrides it), and the report states
+that cache's age.
+
+The verb writes nothing: no verdict spool, no metrics line, no cache refresh
+and no quipu request.
+
+Each case is `pass`, `fail`, or `unknown`. A case is `unknown` when its rule is
+absent from the projection or does not compile, because the guard fails open on
+such a rule. `unknown` is never a pass.
+
+Exit codes: `0` all cases pass · `1` any case fails · `2` nothing failed but
+something is unknown, or there were no cases.
 
 ## Rust CPG dataflow (`cpg` feature)
 

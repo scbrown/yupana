@@ -223,6 +223,10 @@ enum Commands {
         #[arg(long)]
         buffer: PathBuf,
     },
+    /// Run governed text rules on sample text through the guard's own engine,
+    /// with no side effects (aegis-l26g8x).
+    #[cfg(feature = "quipu")]
+    RuleTest(crate::rule_test::RuleTestArgs),
     /// Draft policy raw material from an exemplar: Selector + tiered
     /// predicate candidates (policy-by-example, step 2). Output is JSON for
     /// quipu's drafting scaffold; the placement check remains the refusal
@@ -408,6 +412,8 @@ impl Cli {
             Commands::Verify { file, buffer } => {
                 cli_cmds::verify(self.json, self.quiet, file, buffer)
             }
+            #[cfg(feature = "quipu")]
+            Commands::RuleTest(args) => args.run(),
             Commands::Exemplar {
                 text,
                 file,
