@@ -59,6 +59,19 @@ pub struct TextRule {
     /// forbidden tokens to forbid them. Tested against the repo-relative path.
     #[serde(default)]
     pub exempt_path_regex: Option<String>,
+    /// Repos where this rule deliberately does not apply (`aegis:exemptRepo`,
+    /// aegis-40j2pq): e.g. "infra calls outside goldblum" exempts goldblum.
+    /// Matched against the edited file's `origin` repo name, so every worktree
+    /// of that repo is exempt. An unresolvable repo is NOT exempt: failing
+    /// toward the warning, like a malformed `exempt_path_regex`.
+    #[serde(default)]
+    pub exempt_repos: Vec<String>,
+    /// A literal marker that exempts a match on the same introduced line
+    /// (`aegis:exemptLineMarker`), for text that names a pattern on purpose,
+    /// such as an incident runbook. Literal, not a regex, so it stays explicit
+    /// and greppable (RE2 has no lookaround to fold it into the pattern).
+    #[serde(default)]
+    pub exempt_line_marker: Option<String>,
     /// Why the rule exists (`rdfs:comment`); carried into the verdict so a
     /// refusal explains itself instead of citing an opaque rule id.
     #[serde(default)]
@@ -129,7 +142,27 @@ impl TextRule {
     /// here; [`errors`] reports it and the guard fails open loudly.
     #[must_use]
     pub fn violations(&self, introduced: &str, rel: &str) -> Vec<TextViolation> {
-        if !self.applies(rel) {
+        self.violations_in(introduced, rel, None)
+    }
+
+    /// Whether this rule governs an edit to `rel` in the repo named `repo`
+    /// (`None` = the repo could not be resolved, which exempts nothing).
+    #[must_use]
+    pub fn applies_in(&self, rel: &str, repo: Option<&str>) -> bool {
+        let repo_exempt =
+            repo.is_some_and(|r| self.exempt_repos.iter().any(|e| e.eq_ignore_ascii_case(r)));
+        !repo_exempt && self.applies(rel)
+    }
+
+    /// [`TextRule::violations`], knowing which repo the edited file is in.
+    #[must_use]
+    pub fn violations_in(
+        &self,
+        introduced: &str,
+        rel: &str,
+        repo: Option<&str>,
+    ) -> Vec<TextViolation> {
+        if !self.applies_in(rel, repo) {
             return Vec::new();
         }
         let Ok(re) = regex::Regex::new(&self.pattern) else {
@@ -139,6 +172,9 @@ impl TextRule {
         // in one edit is one fact to tell the model, not nine lines of it.
         let mut seen: Vec<&str> = Vec::new();
         for m in re.find_iter(introduced) {
+            if self.marked_line(introduced, m.start()) {
+                continue;
+            }
             if !seen.contains(&m.as_str()) {
                 seen.push(m.as_str());
             }
@@ -151,6 +187,19 @@ impl TextRule {
                 matched: token.to_string(),
             })
             .collect()
+    }
+
+    /// Whether the introduced line holding byte `at` carries this rule's
+    /// exemption marker.
+    fn marked_line(&self, introduced: &str, at: usize) -> bool {
+        let Some(marker) = self.exempt_line_marker.as_deref() else {
+            return false;
+        };
+        let start = introduced[..at].rfind('\n').map_or(0, |i| i + 1);
+        let end = introduced[at..]
+            .find('\n')
+            .map_or(introduced.len(), |i| at + i);
+        introduced[start..end].contains(marker)
     }
 
     /// The model-facing message for one matched token: names the token, the
@@ -202,9 +251,20 @@ pub fn errors(rules: &[TextRule]) -> Vec<(String, String)> {
 /// path — a `.yml` edit is judged exactly like a `.rs` one.
 #[must_use]
 pub fn evaluate(rules: &[TextRule], introduced: &str, rel: &str) -> Vec<TextViolation> {
+    evaluate_in(rules, introduced, rel, None)
+}
+
+/// [`evaluate`], knowing the edited file's repo so `aegis:exemptRepo` can apply.
+#[must_use]
+pub fn evaluate_in(
+    rules: &[TextRule],
+    introduced: &str,
+    rel: &str,
+    repo: Option<&str>,
+) -> Vec<TextViolation> {
     rules
         .iter()
-        .flat_map(|r| r.violations(introduced, rel))
+        .flat_map(|r| r.violations_in(introduced, rel, repo))
         .collect()
 }
 
@@ -220,6 +280,8 @@ mod tests {
             tier: TextTier::Block,
             class: Some("hostname".into()),
             exempt_path_regex: Some(r"(^|/)no_internal_identifiers\.rs$".into()),
+            exempt_repos: Vec::new(),
+            exempt_line_marker: None,
             rationale: Some("Maps the private estate.".into()),
         }
     }
@@ -232,6 +294,8 @@ mod tests {
             tier: TextTier::Warn,
             class: None,
             exempt_path_regex: None,
+            exempt_repos: Vec::new(),
+            exempt_line_marker: None,
             rationale: None,
         }
     }
@@ -325,6 +389,8 @@ mod tests {
             tier: TextTier::Block,
             class: None,
             exempt_path_regex: None,
+            exempt_repos: Vec::new(),
+            exempt_line_marker: None,
             rationale: None,
         };
         assert!(node
@@ -349,6 +415,8 @@ mod tests {
             label: Some("probe rule".into()),
             class: None,
             exempt_path_regex: None,
+            exempt_repos: Vec::new(),
+            exempt_line_marker: None,
             rationale: None,
         };
         let v = rule.violations("call TOKEN-aaa then TOKEN-aaa then TOKEN-bbb", "a.md");
@@ -360,5 +428,39 @@ mod tests {
         );
         // and the message still names it, so neither representation regressed
         assert!(v[0].message.contains("TOKEN-aaa"));
+    }
+
+    fn infra_rule() -> TextRule {
+        TextRule {
+            exempt_repos: vec!["goldblum".into()],
+            exempt_line_marker: Some("goldblum-iac: incident-runbook".into()),
+            ..bead_rule()
+        }
+    }
+
+    /// aegis-40j2pq arms: fires in a crew repo, silent in goldblum (any
+    /// worktree shares the origin name), and an UNRESOLVED repo still fires.
+    #[test]
+    fn exempt_repo_silences_only_the_named_repo() {
+        let r = infra_rule();
+        let text = "see aegis-abc1 for context";
+        assert_eq!(r.violations_in(text, "x.sh", Some("aegis")).len(), 1);
+        assert!(r.violations_in(text, "x.sh", Some("goldblum")).is_empty());
+        assert!(r.violations_in(text, "x.sh", Some("Goldblum")).is_empty());
+        assert_eq!(
+            r.violations_in(text, "x.sh", None).len(),
+            1,
+            "unknown repo is not exempt"
+        );
+        assert_eq!(evaluate_in(&[r], text, "x.sh", Some("aegis")).len(), 1);
+    }
+
+    #[test]
+    fn the_line_marker_exempts_its_own_line_only() {
+        let r = infra_rule();
+        let marked = "aegis-abc1  # goldblum-iac: incident-runbook\nnothing here";
+        assert!(r.violations_in(marked, "x.md", Some("aegis")).is_empty());
+        let other_line = "# goldblum-iac: incident-runbook\nthen aegis-abc1 unmarked";
+        assert_eq!(r.violations_in(other_line, "x.md", Some("aegis")).len(), 1);
     }
 }

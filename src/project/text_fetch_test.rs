@@ -282,3 +282,36 @@ fn a_failed_subject_read_keeps_the_previous_registry_stale() {
     assert_eq!(registry.text_rules(), old);
     assert_eq!(registry.freshness(), crate::types::Freshness::Stale);
 }
+
+/// aegis-40j2pq: `exemptRepo` is repeatable and reaches the rule through the
+/// LIVE fetch path (subject expansion), not only the share-path query. A field
+/// missing from `FIELDS` would load silently as "exempt nowhere".
+#[test]
+fn exempt_repos_are_fetched_and_unioned_and_the_line_marker_carries() {
+    let mut props = properties()[..2].to_vec();
+    props.push(property(
+        "http://aegis.gastown.local/ontology/exemptRepo",
+        "goldblum",
+    ));
+    props.push(property(
+        "http://aegis.gastown.local/ontology/exemptRepo",
+        "goldblum-infra",
+    ));
+    props.push(property(
+        "http://aegis.gastown.local/ontology/exemptLineMarker",
+        "goldblum-iac: incident-runbook",
+    ));
+    let rules = decode_text_rules(&body(expand(&subject(), &props).unwrap()).to_string()).unwrap();
+    assert_eq!(
+        rules.len(),
+        1,
+        "one entity is one rule across the row product"
+    );
+    let mut repos = rules[0].exempt_repos.clone();
+    repos.sort();
+    assert_eq!(repos, ["goldblum", "goldblum-infra"]);
+    assert_eq!(
+        rules[0].exempt_line_marker.as_deref(),
+        Some("goldblum-iac: incident-runbook")
+    );
+}

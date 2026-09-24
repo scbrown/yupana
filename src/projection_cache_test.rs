@@ -40,6 +40,8 @@ fn a_text_rule(name: &str) -> TextRule {
         tier: TextTier::Block,
         class: None,
         exempt_path_regex: None,
+        exempt_repos: Vec::new(),
+        exempt_line_marker: None,
         rationale: None,
     }
 }

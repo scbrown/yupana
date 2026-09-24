@@ -63,6 +63,8 @@ pub fn decode_text_rules(sparql_json: &str) -> Result<Vec<TextRule>> {
             tier,
             class: get("class"),
             exempt_path_regex: get("exempt"),
+            exempt_repos: get("exemptRepo").into_iter().collect(),
+            exempt_line_marker: get("exemptLineMarker"),
             rationale: get("rationale"),
         };
 
@@ -121,6 +123,19 @@ pub fn decode_text_rules(sparql_json: &str) -> Result<Vec<TextRule>> {
                     &mut optional_values,
                     &rule.name,
                     "class",
+                );
+                // Repeatable (aegis-40j2pq): every distinct repo exempts.
+                for repo in rule.exempt_repos {
+                    if !existing.exempt_repos.contains(&repo) {
+                        existing.exempt_repos.push(repo);
+                    }
+                }
+                merge_optional(
+                    &mut existing.exempt_line_marker,
+                    rule.exempt_line_marker,
+                    &mut optional_values,
+                    &rule.name,
+                    "exempt_line_marker",
                 );
                 merge_optional(
                     &mut existing.exempt_path_regex,
