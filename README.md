@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache-2.0"/></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust 2021"/></a>
   <a href="docs/book/src/SUMMARY.md"><img src="https://img.shields.io/badge/docs-mdbook-green.svg" alt="Documentation"/></a>
   <a href="docs/yupana-spec.md"><img src="https://img.shields.io/badge/spec-v0.1-blueviolet.svg" alt="Specification"/></a>
@@ -315,4 +315,4 @@ Conventions live in [`AGENTS.md`](AGENTS.md); contribution guidance in
 
 ## License
 
-[MIT](LICENSE) © 2026 Steve Brown
+Licensed under the Apache License, Version 2.0 (see [LICENSE](LICENSE)). Releases before 2026-09-24 were MIT-licensed. Copyright 2026 Steve Brown.
