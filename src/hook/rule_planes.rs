@@ -365,20 +365,31 @@ pub(super) fn governed_check(
         // carry, and "unknown" made every one read as a soak failure. The
         // verdict itself is unchanged (still Unknown: warn, never block), since
         // such text can still leave by another road, e.g. pasted into a bead.
+        //
+        // A tree with NO remotes is likewise labelled `local-only` / `no-remotes`
+        // (aegis-su1rjv), and kept distinct from `no-origin`: remotes named
+        // `fork`, `forge` or `github` push publicly, so `no-origin` stays
+        // `unknown` and stays IN the soak. A git failure is not "no remotes".
+        let no_remotes = repo.is_none()
+            && target_root
+                .as_deref()
+                .and_then(crate::git::has_no_remotes)
+                .unwrap_or(false);
         exposure_label = match exposure {
             RepoExposure::Public => "public",
             RepoExposure::Internal => "internal",
             RepoExposure::Unknown(_) if target_root.is_none() => "unversioned",
+            RepoExposure::Unknown(_) if no_remotes => "local-only",
             RepoExposure::Unknown(_) => "unknown",
         };
         // The other arms decided WITHOUT asking: answers, not failures.
         if exposure_source == "n/a" {
             exposure_source = "local";
         }
-        let why = if target_root.is_some() {
-            "no-origin"
-        } else {
-            "no-worktree"
+        let why = match (&target_root, no_remotes) {
+            (None, _) => "no-worktree",
+            (Some(_), true) => "no-remotes",
+            (Some(_), false) => "no-origin",
         };
         target_repo = repo.or_else(|| Some(why.to_string()));
         let (text_messages, text_blocks) = text_plane(&text_violations, &exposure, exposure_source);

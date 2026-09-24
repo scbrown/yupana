@@ -224,6 +224,20 @@ pub fn origin_repo_name(root: &Path) -> Option<String> {
     git(root, &["remote", "get-url", "origin"]).and_then(|s| repo_name_from_url(s.trim()))
 }
 
+/// Whether the work tree at `root` has NO remotes at all: `Some(true)` when
+/// `git remote` succeeds and lists nothing, `Some(false)` when it lists any,
+/// and `None` when git could not answer.
+///
+/// WHY THIS EXISTS (aegis-su1rjv): "no `origin`" conflated two cases with
+/// opposite exposure. A tree with no remotes cannot push anywhere; a tree whose
+/// remotes are named `fork`, `forge` or `github` pushes publicly all the same.
+/// Only the first may be scoped out of an enforce-readiness soak, so the caller
+/// must be able to tell them apart — and a failed answer must not read as "none".
+#[must_use]
+pub fn has_no_remotes(root: &Path) -> Option<bool> {
+    git(root, &["remote"]).map(|s| s.trim().is_empty())
+}
+
 /// The work-tree root that CONTAINS `path`, resolved from the path itself and
 /// never from the caller's working directory.
 ///

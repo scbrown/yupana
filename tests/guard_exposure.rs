@@ -90,8 +90,26 @@ impl Drop for ExposureServer {
     }
 }
 
+/// Where the edited file lives, which decides the `repo` label.
+#[derive(Clone, Copy, PartialEq)]
+enum Tree {
+    /// Not inside any git work tree -> `no-worktree`.
+    Outside,
+    /// A work tree with no remotes at all -> `no-remotes` (aegis-su1rjv).
+    NoRemotes,
+    /// Remotes, none named `origin` (a `fork`) -> `no-origin`.
+    ForkOnly,
+    /// An `origin` remote -> the repo name.
+    Origin,
+}
+
 fn probe(outcome: &'static str, expected: &str, mode: &str, matching: bool, origin: bool) {
-    probe_with(outcome, expected, mode, matching, origin, None, true);
+    let tree = if origin {
+        Tree::Origin
+    } else {
+        Tree::NoRemotes
+    };
+    probe_with(outcome, expected, mode, matching, tree, None);
 }
 
 /// `endpoint_override` points the guard at a REFUSED port, so "we never got an
@@ -103,17 +121,17 @@ fn probe_with(
     expected: &str,
     mode: &str,
     matching: bool,
-    origin: bool,
+    tree: Tree,
     endpoint_override: Option<&str>,
-    worktree: bool,
 ) {
+    let origin = tree == Tree::Origin;
     let mut server = ExposureServer::new(outcome);
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let target = root.join("artifact");
     std::fs::create_dir(&target).unwrap();
     assert!(
-        !worktree
+        tree == Tree::Outside
             || Command::new("git")
                 .args(["init", "--quiet"])
                 .arg(&target)
@@ -128,6 +146,21 @@ fn probe_with(
                 "remote",
                 "add",
                 "origin",
+                "https://github.com/example/artifact.git"
+            ])
+            .status()
+            .unwrap()
+            .success());
+    }
+    if tree == Tree::ForkOnly {
+        // A remote NOT named origin: how beads_rust worktrees (`fork`),
+        // shantytown (`forge`) and others push publicly (aegis-su1rjv).
+        assert!(Command::new("git")
+            .current_dir(&target)
+            .args([
+                "remote",
+                "add",
+                "fork",
                 "https://github.com/example/artifact.git"
             ])
             .status()
@@ -212,10 +245,11 @@ fn probe_with(
         assert_eq!(guard["exposure_source"], governed["exposure_source"]);
         assert_eq!(
             guard["repo"],
-            match (worktree, origin) {
-                (false, _) => "no-worktree",
-                (true, false) => "no-origin",
-                (true, true) => "artifact",
+            match tree {
+                Tree::Outside => "no-worktree",
+                Tree::NoRemotes => "no-remotes",
+                Tree::ForkOnly => "no-origin",
+                Tree::Origin => "artifact",
             }
         );
         assert_eq!(guard["exposure"], governed["exposure"]);
@@ -261,8 +295,26 @@ fn exposure_and_provenance_share_the_decision_record() {
 
 #[test]
 fn unresolved_repo_is_unknown_and_unmatched_edits_omit_exposure() {
-    probe("satisfied", "unknown", "enforce", true, false);
+    // Remotes exist but none is `origin`: it can still push publicly, so it
+    // stays `unknown` / `no-origin` and stays IN the soak (aegis-su1rjv).
+    probe_with(
+        "satisfied",
+        "unknown",
+        "enforce",
+        true,
+        Tree::ForkOnly,
+        None,
+    );
     probe("satisfied", "n/a", "advise", false, true);
+}
+
+/// A work tree with NO remotes at all is `local-only` / `no-remotes`, distinct
+/// from `no-origin` (aegis-su1rjv, sattler's ruling on aegis #61): nothing can
+/// be pushed from it, so only this label may be scoped out of the soak. The
+/// DECISION is unchanged: it warns and never blocks, even at enforce tier.
+#[test]
+fn a_tree_with_no_remotes_is_labelled_local_only_not_no_origin() {
+    probe("satisfied", "local-only", "enforce", true, false);
 }
 
 /// THE FAIL-OPEN, CLOSED. This test used to assert that a quipu we never reached
@@ -286,9 +338,8 @@ fn an_UNREACHABLE_quipu_is_recorded_as_unreachable_not_as_a_plain_unknown() {
         "unknown",
         "enforce",
         true,
-        true,
+        Tree::Origin,
         Some("http://127.0.0.1:1"),
-        true,
     );
 }
 
@@ -304,8 +355,7 @@ fn a_file_outside_any_work_tree_is_labelled_unversioned_and_still_only_warns() {
         "unversioned",
         "enforce",
         true,
-        false,
+        Tree::Outside,
         None,
-        false,
     );
 }
