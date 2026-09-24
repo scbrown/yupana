@@ -210,7 +210,68 @@ embedding and co-change signals and serves explained context over MCP.</li>
 <p><strong>Status:</strong> early Phase-1 scaffold. See the
 <a href="design/specification.html">phasing</a> for what is built and what is next.</p>
 </blockquote>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="map-of-all-docs"><a class="header" href="#map-of-all-docs">Map of all docs</a></h1>
+<p>Every document in this repository, grouped by what it is for, with its status.
+If you are new, read <a href="getting-started/installation.html">Installation</a> and
+<a href="getting-started/quick-start.html">Quick Start</a> first; everything else here is for
+when you need it.</p>
+<p>Documents outside the book live under <code>docs/</code> in the repository and open on
+GitHub.</p>
+<h2 id="start-here"><a class="header" href="#start-here">Start here</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>what it gives you</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/README.md">README</a></td><td>install, a first success, and wiring into an agent</td></tr>
+<tr><td><a href="getting-started/installation.html">Installation</a> · <a href="getting-started/quick-start.html">Quick Start</a></td><td>the same path, in more depth</td></tr>
+<tr><td><a href="getting-started/configuration.html">Configuration</a> · <a href="getting-started/harness-integration.html">Harness Integration</a></td><td>making it part of your workflow</td></tr>
+<tr><td><a href="concepts/why-yupana.html">Why Yupana</a> · <a href="concepts/the-stack.html">The Stack</a></td><td>what it is for, and how it fits with Quipu and Bobbin</td></tr>
+</tbody></table>
+</div>
+<h2 id="reference"><a class="header" href="#reference">Reference</a></h2>
+<p>Everything under <strong>Reference</strong> in the book's sidebar: the
+<a href="reference/cli.html">CLI</a>, <a href="reference/config.html">configuration</a>,
+<a href="reference/mcp-tools.html">MCP tools</a>, the <a href="reference/daemon.html">resident daemon</a>,
+the <a href="reference/policy-guard.html">pre-edit policy guard</a>,
+<a href="reference/golden-path.html">golden-path conformance</a>,
+the <a href="reference/enforcement-trace.html">enforcement trace</a>, and
+<a href="reference/share-bundles.html">share bundles</a>.</p>
+<div class="table-wrapper"><table><thead><tr><th>outside the book</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/action-certification.md">Agent action certification</a>: the <code>yupana certify</code> record format</td><td>current</td></tr>
+</tbody></table>
+</div>
+<h2 id="specification-and-vision"><a class="header" href="#specification-and-vision">Specification and vision</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md">Specification</a>: the full build spec (requirements, architecture, phasing)</td><td>living; the reference for FR numbers</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/vision.md">Vision</a>: Bobbin × Yupana × Quipu</td><td>north star</td></tr>
+</tbody></table>
+</div>
+<h2 id="design"><a class="header" href="#design">Design</a></h2>
+<p>The book's <strong>Design</strong> section summarises the addenda below and links to them.</p>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md">Golden-path conformance guard</a> (FR-40..42)</td><td>built, first cut</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/neuralamplifier-harness.md">Game-state and policy harness</a> (FR-35..39)</td><td>built</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/work-scoped-governance.md">Work-scoped agent governance</a></td><td>partially implemented; the doc says which parts</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/design/landing-policy.md">Governed landing policy</a></td><td>design, advise tier first</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/design/paper.md">Paper plan</a>: evidence-local constraint enforcement</td><td>planned</td></tr>
+</tbody></table>
+</div>
+<h2 id="research-and-evaluation"><a class="header" href="#research-and-evaluation">Research and evaluation</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/briefing-retrieval-eval.md">Briefing retrieval eval</a></td><td>measured 2026-08-15; reproducible with <code>just e2e f1</code></td></tr>
+<tr><td><a href="reference/e2e-grounding-eval.html">E2E grounding eval</a></td><td>reference</td></tr>
+</tbody></table>
+</div>
+<h2 id="working-on-yupana"><a class="header" href="#working-on-yupana">Working on Yupana</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>what it covers</th></tr></thead><tbody>
+<tr><td><a href="reference/contributing.html">Contributing</a></td><td>build, test and the pre-push gate</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/RELEASING.md">Releasing</a></td><td>how release-plz cuts a release, and the crates.io lane</td></tr>
+</tbody></table>
+</div>
+<h2 id="historical"><a class="header" href="#historical">Historical</a></h2>
+<p>Kept for the record. They describe decisions already made, not how things work
+today.</p>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>what it records</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/rename-from-hank.md">Rename: hank → yupana</a></td><td>the 2026-08-09 rename; <code>hank</code> survives only as a compatibility name</td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
 <p>Yupana is a Rust project built with <a href="https://github.com/casey/just"><code>just</code></a>.</p>
 <h2 id="source-build-prerequisites"><a class="header" href="#source-build-prerequisites">Source-build prerequisites</a></h2>
 <ul>
@@ -462,6 +523,134 @@ guard needs. The daemon being down degrades differently per hook: the pre-edit
 guard fails open <strong>loudly</strong>, the post-edit advisory falls back silently (it is
 advice, not enforcement). See
 <a href="getting-started/../design/specification.html">the specification</a> §5.9 (FR-30/FR-31).</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="why-yupana-and-how-it-compares"><a class="header" href="#why-yupana-and-how-it-compares">Why Yupana, and how it compares</a></h1>
+<p>Structural code intelligence is not new, and the strongest tools each prove out
+one signal. Yupana takes the best idea from each, then adds what none of them
+have: <strong>a whole team editing at once, governance, and time.</strong></p>
+<h2 id="what-it-is-for"><a class="header" href="#what-it-is-for">What it is for</a></h2>
+<ul>
+<li>🧵 <strong>Correct while a team edits.</strong> A shared base graph plus a copy-on-write
+overlay per developer or agent keeps every view right while many of them edit
+the same code at once. See <a href="concepts/tenancy-model.html">The Tenancy Model</a>.</li>
+<li>🔀 <strong>Fusion, not one signal.</strong> Call and dataflow structure, plus historical
+co-change, plus embeddings. A coupling backed by a dataflow path is real; one
+without it is a refactoring smell, and only fusion tells them apart.</li>
+<li>🪢 <strong>Governed and time-travelable.</strong> Committed facts promote into
+<a href="https://github.com/scbrown/quipu">Quipu</a> as SHACL-validated, bitemporal RDF:
+a versioned source of truth, not a best-effort cache. See
+<a href="concepts/promotion.html">Promotion to Quipu</a>.</li>
+<li>💥 <strong>Blast radius as a primitive.</strong> "What will this change break" is one
+query, per tenant, and it doubles as the incremental-update engine.</li>
+<li>⚡ <strong>Two-tier freshness.</strong> Tree-sitter speed for breadth and LSP precision for
+depth, with every fact tagged by the tier that produced it so an agent knows
+what it is trusting. See <a href="concepts/tiers-and-freshness.html">Tiers and Freshness</a>.</li>
+<li>🛡️ <strong>Structure scopes the sandbox.</strong> Per-tenant blast radius bounds what an
+autonomous agent may touch, and can act as a guardrail on what it generates,
+not only as context.</li>
+<li>🪙 <strong>Token-cheap.</strong> Structural answers instead of whole files in context.</li>
+</ul>
+<h2 id="how-it-compares"><a class="header" href="#how-it-compares">How it compares</a></h2>
+<div class="table-wrapper"><table><thead><tr><th></th><th style="text-align: center"><strong>codebase-memory</strong></th><th style="text-align: center"><strong>Joern (CPG)</strong></th><th style="text-align: center"><strong>LSP / multilspy</strong></th><th style="text-align: center"><strong>Embeddings / co-change</strong></th><th style="text-align: center"><strong>Yupana</strong></th></tr></thead><tbody>
+<tr><td>Fast structural graph, low token cost</td><td style="text-align: center">✅</td><td style="text-align: center">⚠️</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td><td style="text-align: center">✅</td></tr>
+<tr><td>Call graph + <strong>dataflow / taint</strong></td><td style="text-align: center">⚠️</td><td style="text-align: center">✅</td><td style="text-align: center">⚠️</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td></tr>
+<tr><td>Precise LSP-grade types</td><td style="text-align: center">tiered</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td><td style="text-align: center">❌</td><td style="text-align: center">tiered</td></tr>
+<tr><td>Incremental freshness on edit</td><td style="text-align: center">✅</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td><td style="text-align: center">❌</td><td style="text-align: center">✅ <em>(frontier-bounded)</em></td></tr>
+<tr><td><strong>Correct while a team edits concurrently</strong></td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">✅ <em>(per-tenant overlays)</em></td></tr>
+<tr><td><strong>Governed, versioned, time-travel record</strong></td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">✅ <em>(→ Quipu)</em></td></tr>
+<tr><td>Blast radius scopes an <strong>agent trust boundary</strong></td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td></tr>
+</tbody></table>
+</div>
+<p>Each of these proves one piece. <a href="https://github.com/microsoft/multilspy">multilspy</a>
+shows that LSP facts can also guard what a model generates;
+<a href="https://joern.io">Joern</a> established the Code Property Graph and dataflow;
+codebase-memory is a lean standalone analyzer with content-hash incremental
+freshness. Yupana is closest in spirit to codebase-memory, extended with
+Joern-style dataflow, LSP precision, tenancy, and a governed projection into
+Quipu.</p>
+<blockquote>
+<p>The advantage is not any single signal. It is <strong>fusion, governance, time and
+tenancy</strong>, kept correct while a whole team edits.</p>
+</blockquote>
+<h2 id="what-is-built-today"><a class="header" href="#what-is-built-today">What is built today</a></h2>
+<ul>
+<li><strong>Structure:</strong> <code>analyze</code>, <code>refs</code>, <code>callers</code>, <code>impact</code> (with <code>--cochange</code>
+reconciliation), intra-procedural <code>dataflow</code>, and <code>verify</code>, which returns a
+verdict on a proposed edit buffer. See the <a href="concepts/../reference/cli.html">CLI reference</a>.</li>
+<li><strong>Serving:</strong> an MCP server (<code>yupana serve</code>) exposing the <code>yupana_*</code> tools, and
+a resident daemon (<code>yupana daemon</code>) that keeps the base graph and per-tenant
+overlays hot. See <a href="concepts/../reference/mcp-tools.html">MCP Tools</a> and
+<a href="concepts/../reference/daemon.html">Resident Daemon</a>.</li>
+<li><strong>Governance, around the graph:</strong> the pre-edit policy guard (scopes,
+structural and text rules, tripwires, and the work-item scope ladder), the
+record-only Bash action hook, session-start work-item briefings, the
+game-state harness, and the golden-path conformance guard. See
+<a href="concepts/../reference/policy-guard.html">Pre-Edit Policy Guard</a>.</li>
+</ul>
+<p>Rules that come from Quipu start at the advise tier: they warn, and they block
+only once their own enforcement gates are met. <code>yupana exemplar</code> drafts rule
+candidates from an example of what should have been caught, and
+<code>yupana verifier</code> prints the key that signs verdicts, for registering in Quipu.
+The full phasing is in the
+<a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md#12-milestones--phasing">specification</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="the-stack-three-tools-one-job-each"><a class="header" href="#the-stack-three-tools-one-job-each">The Stack: three tools, one job each</a></h1>
+<pre><code class="language-text">        edit / save / file-watch
+                 │
+                 ▼
+   ┌──────────────────────────┐   promote on commit/merge   ┌──────────┐
+   │          YUPANA          │ ──────────────────────────► │  QUIPU   │
+   │  base graph + overlays   │   (SHACL-validated Turtle)  │ EAVT log │
+   │  tree-sitter + LSP + CPG │ ◄────────────────────────── │ SPARQL   │
+   └────────────┬─────────────┘  SPARQL over committed code └──────────┘
+                │ blast radius (per tenant)
+                ▼
+        ┌───────────────┐     trust boundary      ┌──────────┐
+        │ Bobbin fusion │◄────────────────────────│  agents  │
+        │ + serving     │────────────────────────►│          │
+        └───────────────┘   explained context     └──────────┘
+</code></pre>
+<ul>
+<li><strong><a href="https://github.com/scbrown/yupana">Yupana</a></strong> (this project) extracts and
+serves live, per-tenant code structure.</li>
+<li><strong><a href="https://github.com/scbrown/quipu">Quipu</a></strong> governs and versions the
+committed record: bitemporal RDF, queried with SPARQL, validated with SHACL.</li>
+<li><strong><a href="https://github.com/scbrown/bobbin">Bobbin</a></strong> fuses everything with its
+statistical and embedding signals and serves explained context over MCP.</li>
+</ul>
+<p>The north star is the
+<a href="https://github.com/scbrown/yupana/blob/main/docs/vision.md">vision document</a>;
+the full build spec is the
+<a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md">specification</a>.</p>
+<h2 id="what-yupana-and-quipu-unlock-together"><a class="header" href="#what-yupana-and-quipu-unlock-together">What Yupana and Quipu unlock together</a></h2>
+<p>Yupana holds the <em>live</em> structure; Quipu governs the <em>committed</em> record.
+Together they do things neither does alone:</p>
+<ul>
+<li><strong>Governed SPARQL over code.</strong> Query committed structure as typed, validated
+facts: "every public function with no test", "modules that violate the
+layering", "who still calls this deprecated API". Not a cache you hope is
+fresh.</li>
+<li><strong>Impact over history.</strong> Bitemporal facts answer what a change broke and when
+a coupling first appeared: blast radius that accounts for how the code got
+here, replayable at any point in time.</li>
+<li><strong>Ontology rules that block or steer changes.</strong> Architectural constraints are
+authored as rules in Quipu (SHACL over the code graph). Yupana evaluates a
+proposed edit against them, live and per tenant, and warns or blocks before
+it lands. A new rule is a graph assertion, not a new bespoke linter.</li>
+<li><strong>Per-tenant parallel worlds.</strong> A shared base plus copy-on-write overlays map
+onto Quipu named graphs, so a whole team edits at once without corrupting
+each other's view, over one always-queryable source of truth.</li>
+<li><strong>Agent trust boundaries.</strong> Per-tenant blast radius scopes what an autonomous
+agent may touch: the structure defines the sandbox.</li>
+<li><strong>Code linked to intent.</strong> Quipu provenance ties structural facts to the
+decisions and work items that produced them: "which decision does this
+module implement", "which tickets co-occur with this code path".</li>
+<li><strong>A decidable audit.</strong> Every enforcement decision emits a trace record derived
+from the constraint set, plus an ed25519-signed verdict bound to what was
+actually checked. <code>quipu audit &lt;trace&gt;</code> then decides mechanically whether the
+trace satisfied the constraints, without access to the model, its prompts, or
+its developers. See <a href="concepts/../reference/enforcement-trace.html">The Enforcement Trace</a>
+for the record, and <a href="concepts/../design/sarc-conformance.html">SARC Conformance</a> for what
+the pair does and does not yet close.</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
 <p>Yupana is a peer of Bobbin and Quipu, not a feature of either. It quarantines the
 heavy language toolchains (tree-sitter grammars, LSP servers, any CPG/dataflow

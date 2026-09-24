@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Architecture - Yupana — Live Code Structure</title>
+        <title>Map of all docs - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -12,34 +12,34 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon.svg">
-        <link rel="shortcut icon" href="../favicon.png">
-        <link rel="stylesheet" href="../css/variables.css">
-        <link rel="stylesheet" href="../css/general.css">
-        <link rel="stylesheet" href="../css/chrome.css">
-        <link rel="stylesheet" href="../css/print.css" media="print">
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="../fonts/fonts.css">
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "";
             const default_light_theme = "coal";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex.js";
+            window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc.js"></script>
+        <script src="toc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -106,7 +106,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -141,13 +141,13 @@
                     <h1 class="menu-title">Yupana — Live Code Structure</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/concepts/architecture.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/docs-map.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,46 +181,77 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Yupana is a peer of Bobbin and Quipu, not a feature of either. It quarantines the
-heavy language toolchains (tree-sitter grammars, LSP servers, any CPG/dataflow
-machinery), holds a hot structural graph, and feeds three consumers: Bobbin
-(fusion), Quipu (promotion on commit), and the Gas Town broker/Aegis (per-tenant
-blast radius as a trust boundary).</p>
-<pre><code class="language-text">   MCP (rmcp: stdio + HTTP/axum)  ·  CLI (clap)
-   (a parallel REST HTTP API is Phase 3 — FR-27)
-                    │
-              Query / Serve layer
-   refs · defs · callgraph · dataflow · blast-radius · verify
-   (resolve against base + tenant overlay, tier/freshness tagged)
-                    │
-              Tenancy layer
-   shared read-only base  +  per-tenant copy-on-write overlays
-                    │
-              Extraction layer
-   tree-sitter (breadth) · LSP (precision) · CPG/dataflow (Phase 2)
-                    │
-   file-watch (notify) · git baseline · overlay cache
-                    │
-   Promotion boundary → Quipu (SHACL-validated Turtle)
-</code></pre>
-<h2 id="the-routing-rule"><a class="header" href="#the-routing-rule">The routing rule</a></h2>
-<p>Bobbin is on the request path <strong>only when fusion or ranking adds value.</strong>
-Multi-signal retrieval goes through Bobbin. Single-signal, analysis-only queries
-— edit verification, blast radius, live structure lookups — go straight to Yupana,
-and policy consumers like the broker read Yupana directly.</p>
-<p>See the <a href="../design/specification.html">Specification</a> §7 for the full component
-diagram and the proposed source layout.</p>
-
+                        <h1 id="map-of-all-docs"><a class="header" href="#map-of-all-docs">Map of all docs</a></h1>
+<p>Every document in this repository, grouped by what it is for, with its status.
+If you are new, read <a href="getting-started/installation.html">Installation</a> and
+<a href="getting-started/quick-start.html">Quick Start</a> first; everything else here is for
+when you need it.</p>
+<p>Documents outside the book live under <code>docs/</code> in the repository and open on
+GitHub.</p>
+<h2 id="start-here"><a class="header" href="#start-here">Start here</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>what it gives you</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/README.md">README</a></td><td>install, a first success, and wiring into an agent</td></tr>
+<tr><td><a href="getting-started/installation.html">Installation</a> · <a href="getting-started/quick-start.html">Quick Start</a></td><td>the same path, in more depth</td></tr>
+<tr><td><a href="getting-started/configuration.html">Configuration</a> · <a href="getting-started/harness-integration.html">Harness Integration</a></td><td>making it part of your workflow</td></tr>
+<tr><td><a href="concepts/why-yupana.html">Why Yupana</a> · <a href="concepts/the-stack.html">The Stack</a></td><td>what it is for, and how it fits with Quipu and Bobbin</td></tr>
+</tbody></table>
+</div>
+<h2 id="reference"><a class="header" href="#reference">Reference</a></h2>
+<p>Everything under <strong>Reference</strong> in the book's sidebar: the
+<a href="reference/cli.html">CLI</a>, <a href="reference/config.html">configuration</a>,
+<a href="reference/mcp-tools.html">MCP tools</a>, the <a href="reference/daemon.html">resident daemon</a>,
+the <a href="reference/policy-guard.html">pre-edit policy guard</a>,
+<a href="reference/golden-path.html">golden-path conformance</a>,
+the <a href="reference/enforcement-trace.html">enforcement trace</a>, and
+<a href="reference/share-bundles.html">share bundles</a>.</p>
+<div class="table-wrapper"><table><thead><tr><th>outside the book</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/action-certification.md">Agent action certification</a>: the <code>yupana certify</code> record format</td><td>current</td></tr>
+</tbody></table>
+</div>
+<h2 id="specification-and-vision"><a class="header" href="#specification-and-vision">Specification and vision</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md">Specification</a>: the full build spec (requirements, architecture, phasing)</td><td>living; the reference for FR numbers</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/vision.md">Vision</a>: Bobbin × Yupana × Quipu</td><td>north star</td></tr>
+</tbody></table>
+</div>
+<h2 id="design"><a class="header" href="#design">Design</a></h2>
+<p>The book's <strong>Design</strong> section summarises the addenda below and links to them.</p>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/golden-path-guard.md">Golden-path conformance guard</a> (FR-40..42)</td><td>built, first cut</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/neuralamplifier-harness.md">Game-state and policy harness</a> (FR-35..39)</td><td>built</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/work-scoped-governance.md">Work-scoped agent governance</a></td><td>partially implemented; the doc says which parts</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/design/landing-policy.md">Governed landing policy</a></td><td>design, advise tier first</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/design/paper.md">Paper plan</a>: evidence-local constraint enforcement</td><td>planned</td></tr>
+</tbody></table>
+</div>
+<h2 id="research-and-evaluation"><a class="header" href="#research-and-evaluation">Research and evaluation</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>status</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/briefing-retrieval-eval.md">Briefing retrieval eval</a></td><td>measured 2026-08-15; reproducible with <code>just e2e f1</code></td></tr>
+<tr><td><a href="reference/e2e-grounding-eval.html">E2E grounding eval</a></td><td>reference</td></tr>
+</tbody></table>
+</div>
+<h2 id="working-on-yupana"><a class="header" href="#working-on-yupana">Working on Yupana</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>what it covers</th></tr></thead><tbody>
+<tr><td><a href="reference/contributing.html">Contributing</a></td><td>build, test and the pre-push gate</td></tr>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/RELEASING.md">Releasing</a></td><td>how release-plz cuts a release, and the crates.io lane</td></tr>
+</tbody></table>
+</div>
+<h2 id="historical"><a class="header" href="#historical">Historical</a></h2>
+<p>Kept for the record. They describe decisions already made, not how things work
+today.</p>
+<div class="table-wrapper"><table><thead><tr><th>document</th><th>what it records</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/scbrown/yupana/blob/main/docs/rename-from-hank.md">Rename: hank → yupana</a></td><td>the 2026-08-09 rename; <code>hank</code> survives only as a compatibility name</td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts/the-stack.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/tenancy-model.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="getting-started/installation.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -230,11 +261,11 @@ diagram and the proposed source layout.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts/the-stack.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/tenancy-model.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="getting-started/installation.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
@@ -249,13 +280,13 @@ diagram and the proposed source layout.</p>
         </script>
 
 
-        <script src="../elasticlunr.min.js"></script>
-        <script src="../mark.min.js"></script>
-        <script src="../searcher.js"></script>
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
 
-        <script src="../clipboard.min.js"></script>
-        <script src="../highlight.js"></script>
-        <script src="../book.js"></script>
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
 
         <!-- Custom JS scripts -->
 

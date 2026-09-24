@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Architecture - Yupana — Live Code Structure</title>
+        <title>The Stack - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/concepts/architecture.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/concepts/the-stack.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,46 +181,75 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Yupana is a peer of Bobbin and Quipu, not a feature of either. It quarantines the
-heavy language toolchains (tree-sitter grammars, LSP servers, any CPG/dataflow
-machinery), holds a hot structural graph, and feeds three consumers: Bobbin
-(fusion), Quipu (promotion on commit), and the Gas Town broker/Aegis (per-tenant
-blast radius as a trust boundary).</p>
-<pre><code class="language-text">   MCP (rmcp: stdio + HTTP/axum)  ·  CLI (clap)
-   (a parallel REST HTTP API is Phase 3 — FR-27)
-                    │
-              Query / Serve layer
-   refs · defs · callgraph · dataflow · blast-radius · verify
-   (resolve against base + tenant overlay, tier/freshness tagged)
-                    │
-              Tenancy layer
-   shared read-only base  +  per-tenant copy-on-write overlays
-                    │
-              Extraction layer
-   tree-sitter (breadth) · LSP (precision) · CPG/dataflow (Phase 2)
-                    │
-   file-watch (notify) · git baseline · overlay cache
-                    │
-   Promotion boundary → Quipu (SHACL-validated Turtle)
+                        <h1 id="the-stack-three-tools-one-job-each"><a class="header" href="#the-stack-three-tools-one-job-each">The Stack: three tools, one job each</a></h1>
+<pre><code class="language-text">        edit / save / file-watch
+                 │
+                 ▼
+   ┌──────────────────────────┐   promote on commit/merge   ┌──────────┐
+   │          YUPANA          │ ──────────────────────────► │  QUIPU   │
+   │  base graph + overlays   │   (SHACL-validated Turtle)  │ EAVT log │
+   │  tree-sitter + LSP + CPG │ ◄────────────────────────── │ SPARQL   │
+   └────────────┬─────────────┘  SPARQL over committed code └──────────┘
+                │ blast radius (per tenant)
+                ▼
+        ┌───────────────┐     trust boundary      ┌──────────┐
+        │ Bobbin fusion │◄────────────────────────│  agents  │
+        │ + serving     │────────────────────────►│          │
+        └───────────────┘   explained context     └──────────┘
 </code></pre>
-<h2 id="the-routing-rule"><a class="header" href="#the-routing-rule">The routing rule</a></h2>
-<p>Bobbin is on the request path <strong>only when fusion or ranking adds value.</strong>
-Multi-signal retrieval goes through Bobbin. Single-signal, analysis-only queries
-— edit verification, blast radius, live structure lookups — go straight to Yupana,
-and policy consumers like the broker read Yupana directly.</p>
-<p>See the <a href="../design/specification.html">Specification</a> §7 for the full component
-diagram and the proposed source layout.</p>
+<ul>
+<li><strong><a href="https://github.com/scbrown/yupana">Yupana</a></strong> (this project) extracts and
+serves live, per-tenant code structure.</li>
+<li><strong><a href="https://github.com/scbrown/quipu">Quipu</a></strong> governs and versions the
+committed record: bitemporal RDF, queried with SPARQL, validated with SHACL.</li>
+<li><strong><a href="https://github.com/scbrown/bobbin">Bobbin</a></strong> fuses everything with its
+statistical and embedding signals and serves explained context over MCP.</li>
+</ul>
+<p>The north star is the
+<a href="https://github.com/scbrown/yupana/blob/main/docs/vision.md">vision document</a>;
+the full build spec is the
+<a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md">specification</a>.</p>
+<h2 id="what-yupana-and-quipu-unlock-together"><a class="header" href="#what-yupana-and-quipu-unlock-together">What Yupana and Quipu unlock together</a></h2>
+<p>Yupana holds the <em>live</em> structure; Quipu governs the <em>committed</em> record.
+Together they do things neither does alone:</p>
+<ul>
+<li><strong>Governed SPARQL over code.</strong> Query committed structure as typed, validated
+facts: "every public function with no test", "modules that violate the
+layering", "who still calls this deprecated API". Not a cache you hope is
+fresh.</li>
+<li><strong>Impact over history.</strong> Bitemporal facts answer what a change broke and when
+a coupling first appeared: blast radius that accounts for how the code got
+here, replayable at any point in time.</li>
+<li><strong>Ontology rules that block or steer changes.</strong> Architectural constraints are
+authored as rules in Quipu (SHACL over the code graph). Yupana evaluates a
+proposed edit against them, live and per tenant, and warns or blocks before
+it lands. A new rule is a graph assertion, not a new bespoke linter.</li>
+<li><strong>Per-tenant parallel worlds.</strong> A shared base plus copy-on-write overlays map
+onto Quipu named graphs, so a whole team edits at once without corrupting
+each other's view, over one always-queryable source of truth.</li>
+<li><strong>Agent trust boundaries.</strong> Per-tenant blast radius scopes what an autonomous
+agent may touch: the structure defines the sandbox.</li>
+<li><strong>Code linked to intent.</strong> Quipu provenance ties structural facts to the
+decisions and work items that produced them: "which decision does this
+module implement", "which tickets co-occur with this code path".</li>
+<li><strong>A decidable audit.</strong> Every enforcement decision emits a trace record derived
+from the constraint set, plus an ed25519-signed verdict bound to what was
+actually checked. <code>quipu audit &lt;trace&gt;</code> then decides mechanically whether the
+trace satisfied the constraints, without access to the model, its prompts, or
+its developers. See <a href="../reference/enforcement-trace.html">The Enforcement Trace</a>
+for the record, and <a href="../design/sarc-conformance.html">SARC Conformance</a> for what
+the pair does and does not yet close.</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts/the-stack.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts/why-yupana.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/tenancy-model.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -230,11 +259,11 @@ diagram and the proposed source layout.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts/the-stack.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts/why-yupana.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/tenancy-model.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

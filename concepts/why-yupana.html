@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Architecture - Yupana — Live Code Structure</title>
+        <title>Why Yupana - Yupana — Live Code Structure</title>
 
 
         <!-- Custom HTML head -->
@@ -147,7 +147,7 @@
                         <a href="https://github.com/scbrown/yupana" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/concepts/architecture.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/scbrown/yupana/edit/main/docs/book/src/concepts/why-yupana.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -181,46 +181,85 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Yupana is a peer of Bobbin and Quipu, not a feature of either. It quarantines the
-heavy language toolchains (tree-sitter grammars, LSP servers, any CPG/dataflow
-machinery), holds a hot structural graph, and feeds three consumers: Bobbin
-(fusion), Quipu (promotion on commit), and the Gas Town broker/Aegis (per-tenant
-blast radius as a trust boundary).</p>
-<pre><code class="language-text">   MCP (rmcp: stdio + HTTP/axum)  ·  CLI (clap)
-   (a parallel REST HTTP API is Phase 3 — FR-27)
-                    │
-              Query / Serve layer
-   refs · defs · callgraph · dataflow · blast-radius · verify
-   (resolve against base + tenant overlay, tier/freshness tagged)
-                    │
-              Tenancy layer
-   shared read-only base  +  per-tenant copy-on-write overlays
-                    │
-              Extraction layer
-   tree-sitter (breadth) · LSP (precision) · CPG/dataflow (Phase 2)
-                    │
-   file-watch (notify) · git baseline · overlay cache
-                    │
-   Promotion boundary → Quipu (SHACL-validated Turtle)
-</code></pre>
-<h2 id="the-routing-rule"><a class="header" href="#the-routing-rule">The routing rule</a></h2>
-<p>Bobbin is on the request path <strong>only when fusion or ranking adds value.</strong>
-Multi-signal retrieval goes through Bobbin. Single-signal, analysis-only queries
-— edit verification, blast radius, live structure lookups — go straight to Yupana,
-and policy consumers like the broker read Yupana directly.</p>
-<p>See the <a href="../design/specification.html">Specification</a> §7 for the full component
-diagram and the proposed source layout.</p>
+                        <h1 id="why-yupana-and-how-it-compares"><a class="header" href="#why-yupana-and-how-it-compares">Why Yupana, and how it compares</a></h1>
+<p>Structural code intelligence is not new, and the strongest tools each prove out
+one signal. Yupana takes the best idea from each, then adds what none of them
+have: <strong>a whole team editing at once, governance, and time.</strong></p>
+<h2 id="what-it-is-for"><a class="header" href="#what-it-is-for">What it is for</a></h2>
+<ul>
+<li>🧵 <strong>Correct while a team edits.</strong> A shared base graph plus a copy-on-write
+overlay per developer or agent keeps every view right while many of them edit
+the same code at once. See <a href="tenancy-model.html">The Tenancy Model</a>.</li>
+<li>🔀 <strong>Fusion, not one signal.</strong> Call and dataflow structure, plus historical
+co-change, plus embeddings. A coupling backed by a dataflow path is real; one
+without it is a refactoring smell, and only fusion tells them apart.</li>
+<li>🪢 <strong>Governed and time-travelable.</strong> Committed facts promote into
+<a href="https://github.com/scbrown/quipu">Quipu</a> as SHACL-validated, bitemporal RDF:
+a versioned source of truth, not a best-effort cache. See
+<a href="promotion.html">Promotion to Quipu</a>.</li>
+<li>💥 <strong>Blast radius as a primitive.</strong> "What will this change break" is one
+query, per tenant, and it doubles as the incremental-update engine.</li>
+<li>⚡ <strong>Two-tier freshness.</strong> Tree-sitter speed for breadth and LSP precision for
+depth, with every fact tagged by the tier that produced it so an agent knows
+what it is trusting. See <a href="tiers-and-freshness.html">Tiers and Freshness</a>.</li>
+<li>🛡️ <strong>Structure scopes the sandbox.</strong> Per-tenant blast radius bounds what an
+autonomous agent may touch, and can act as a guardrail on what it generates,
+not only as context.</li>
+<li>🪙 <strong>Token-cheap.</strong> Structural answers instead of whole files in context.</li>
+</ul>
+<h2 id="how-it-compares"><a class="header" href="#how-it-compares">How it compares</a></h2>
+<div class="table-wrapper"><table><thead><tr><th></th><th style="text-align: center"><strong>codebase-memory</strong></th><th style="text-align: center"><strong>Joern (CPG)</strong></th><th style="text-align: center"><strong>LSP / multilspy</strong></th><th style="text-align: center"><strong>Embeddings / co-change</strong></th><th style="text-align: center"><strong>Yupana</strong></th></tr></thead><tbody>
+<tr><td>Fast structural graph, low token cost</td><td style="text-align: center">✅</td><td style="text-align: center">⚠️</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td><td style="text-align: center">✅</td></tr>
+<tr><td>Call graph + <strong>dataflow / taint</strong></td><td style="text-align: center">⚠️</td><td style="text-align: center">✅</td><td style="text-align: center">⚠️</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td></tr>
+<tr><td>Precise LSP-grade types</td><td style="text-align: center">tiered</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td><td style="text-align: center">❌</td><td style="text-align: center">tiered</td></tr>
+<tr><td>Incremental freshness on edit</td><td style="text-align: center">✅</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td><td style="text-align: center">❌</td><td style="text-align: center">✅ <em>(frontier-bounded)</em></td></tr>
+<tr><td><strong>Correct while a team edits concurrently</strong></td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">✅ <em>(per-tenant overlays)</em></td></tr>
+<tr><td><strong>Governed, versioned, time-travel record</strong></td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">✅ <em>(→ Quipu)</em></td></tr>
+<tr><td>Blast radius scopes an <strong>agent trust boundary</strong></td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">❌</td><td style="text-align: center">✅</td></tr>
+</tbody></table>
+</div>
+<p>Each of these proves one piece. <a href="https://github.com/microsoft/multilspy">multilspy</a>
+shows that LSP facts can also guard what a model generates;
+<a href="https://joern.io">Joern</a> established the Code Property Graph and dataflow;
+codebase-memory is a lean standalone analyzer with content-hash incremental
+freshness. Yupana is closest in spirit to codebase-memory, extended with
+Joern-style dataflow, LSP precision, tenancy, and a governed projection into
+Quipu.</p>
+<blockquote>
+<p>The advantage is not any single signal. It is <strong>fusion, governance, time and
+tenancy</strong>, kept correct while a whole team edits.</p>
+</blockquote>
+<h2 id="what-is-built-today"><a class="header" href="#what-is-built-today">What is built today</a></h2>
+<ul>
+<li><strong>Structure:</strong> <code>analyze</code>, <code>refs</code>, <code>callers</code>, <code>impact</code> (with <code>--cochange</code>
+reconciliation), intra-procedural <code>dataflow</code>, and <code>verify</code>, which returns a
+verdict on a proposed edit buffer. See the <a href="../reference/cli.html">CLI reference</a>.</li>
+<li><strong>Serving:</strong> an MCP server (<code>yupana serve</code>) exposing the <code>yupana_*</code> tools, and
+a resident daemon (<code>yupana daemon</code>) that keeps the base graph and per-tenant
+overlays hot. See <a href="../reference/mcp-tools.html">MCP Tools</a> and
+<a href="../reference/daemon.html">Resident Daemon</a>.</li>
+<li><strong>Governance, around the graph:</strong> the pre-edit policy guard (scopes,
+structural and text rules, tripwires, and the work-item scope ladder), the
+record-only Bash action hook, session-start work-item briefings, the
+game-state harness, and the golden-path conformance guard. See
+<a href="../reference/policy-guard.html">Pre-Edit Policy Guard</a>.</li>
+</ul>
+<p>Rules that come from Quipu start at the advise tier: they warn, and they block
+only once their own enforcement gates are met. <code>yupana exemplar</code> drafts rule
+candidates from an example of what should have been caught, and
+<code>yupana verifier</code> prints the key that signs verdicts, for registering in Quipu.
+The full phasing is in the
+<a href="https://github.com/scbrown/yupana/blob/main/docs/yupana-spec.md#12-milestones--phasing">specification</a>.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts/the-stack.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../getting-started/harness-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/tenancy-model.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/the-stack.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -230,11 +269,11 @@ diagram and the proposed source layout.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts/the-stack.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../getting-started/harness-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/tenancy-model.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/the-stack.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
