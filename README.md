@@ -5,313 +5,182 @@
 <h1 align="center">yupana</h1>
 
 <p align="center">
-  <em>🧵 Live, per-tenant code structure and a change-time policy engine — the structural signal for the Bobbin × Quipu stack, evaluating Quipu-governed rules where the edit happens</em>
+  <em>🧮 Know what a change will break before you make it</em>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust 2021"/></a>
-  <a href="docs/book/src/SUMMARY.md"><img src="https://img.shields.io/badge/docs-mdbook-green.svg" alt="Documentation"/></a>
-  <a href="docs/yupana-spec.md"><img src="https://img.shields.io/badge/spec-v0.1-blueviolet.svg" alt="Specification"/></a>
+  <a href="docs/book/src/SUMMARY.md"><img src="https://img.shields.io/badge/docs-book-green.svg" alt="Documentation"/></a>
 </p>
 
-> *Bobbin holds the thread. Quipu ties the knots. **Yupana** does the counting — live, per-tenant, ready.* 🧮
+**Yupana reads a codebase and answers structural questions about it: what calls
+this function, what would changing it break, and where does this value flow.**
+It is for people and AI coding agents (Claude Code, Codex, Cursor) who are about
+to edit code they did not write and want the blast radius first. It runs as a
+command-line tool, as an MCP server an agent can call, and as editor hooks that
+warn at the moment of an edit.
 
-A [yupana](https://en.wikipedia.org/wiki/Yupana) is the Andean counting board that
-worked alongside the quipu: the quipu recorded, the yupana computed. **Yupana** plays
-the same role for a codebase's live structural graph: extracted once at a baseline,
-then layered with a lightweight
-per-developer overlay so a whole team of humans and agents can edit at the same
-time without corrupting each other's view. It answers the questions embeddings
-and git-history can't — *what calls this, what does this flow into, what will
-this change break* — and it answers them **per tenant**, correctly, while the
-code is still in flight.
+A [yupana](https://en.wikipedia.org/wiki/Yupana) is the Andean counting board
+that worked alongside the quipu: the quipu recorded, the yupana computed.
 
-The same graph is where architectural rules get enforced. Constraints are authored
-as ontology rules in [Quipu](https://github.com/scbrown/quipu) (SHACL over the code
-graph), and Yupana evaluates a proposed edit against them **before it lands**, warning
-or blocking, and emitting a signed verdict bound to what was actually checked. A new
-rule is a graph assertion rather than another bespoke linter, which is why the policy
-layer grows without the tooling growing with it.
+## Why you would want it
 
-## 🧮 See It In Action
+- **Blast radius in one command.** `yupana impact <symbol>` lists everything a
+  change reaches, hop by hop, instead of a text search that misses callers and
+  finds comments.
+- **Cheap for agents.** An agent asks for structure instead of reading whole
+  files into its context.
+- **Rules at edit time.** With [Quipu](https://github.com/scbrown/quipu), the
+  same graph checks a proposed edit against your team's rules before it lands.
 
-```text
-$ yupana analyze src
-analyzed 7 file(s), 47 symbol(s) [tree-sitter]
+More on the design, and how it compares with LSP, Joern and embedding search:
+[Why Yupana](docs/book/src/concepts/why-yupana.md).
 
-$ yupana refs authenticate src
-src/auth.rs:18 authenticate (Function) [TreeSitter]
+## Install
 
-$ yupana status
-yupana status
-  base ref  : main
-  tenant    : (single-tenant)
-  tiers     : treesitter
-  quipu     : enabled=false branch_model=named_graph
-```
-
-> **Status:** Phases 1–3 complete. `analyze`, `refs`, `status`, the
-> call-graph commands `callers`/`impact` (with `--cochange` reconciliation),
-> intra-procedural `dataflow`, and `verify` (the FR-23/FR-24 edit-buffer verdict)
-> do real work; an MCP server (`yupana serve`, `--features mcp`) exposes fifteen
-> `yupana_*` tools (`yupana_promote` writes to Quipu with the `quipu` feature);
-> and the resident daemon (`yupana daemon`) holds the base graph plus
-> per-tenant copy-on-write overlays hot, serving code-fact freshness on
-> tenant-scoped queries. Around the graph sit the governance planes: the
-> pre-edit policy guard (scopes, structural rules, tripwires, and the
-> work-item scope ladder), the record-only Bash action surface, session-start
-> work-item briefings, the game-state harness (`game-state`), and the
-> golden-path conformance guard (`golden-path`, FR-40..FR-42). Promotion lands
-> per the [phasing](docs/yupana-spec.md#12-milestones--phasing).
-
-The v0.6.4 installed surface includes both halves of that description. The
-structural half is `analyze` / `refs` / `callers` / `impact` / `dataflow` /
-`verify`. The change-time policy half is live in `yupana status`: the current
-fleet projection reports **7 Quipu-sourced text rules in `advise` mode**. Rules
-remain advisory until their own enforcement gates are satisfied. `yupana
-exemplar` drafts selector and predicate candidates from a denied example
-(policy-by-example); `yupana verifier` exposes the ed25519 public identity used
-to bind signed verdicts to the verifier registered in Quipu. Status also says
-when the projected rule digest is unsigned, so transport trust is never
-misreported as a signed resident cache.
-
-## 🤔 Why Yupana? — and how it's different
-
-Structural code intelligence isn't new; the strongest tools each prove out **one**
-signal class. Yupana deliberately takes the best idea from each — then adds the axes
-none of them have: **a whole team editing at once, governance, and time.**
-
-### Key selling points
-
-- 🧵 **Correct under concurrency** — the only structural engine that stays right
-  while a whole team of humans *and agents* edit the same base at once (shared base
-  graph + per-tenant copy-on-write overlays).
-- 🔀 **Fusion, not one signal** — call/dataflow structure *plus* historical
-  co-change *plus* embeddings. A coupling backed by a dataflow path is real; one
-  without is a refactoring smell — only fusion tells them apart.
-- 🪢 **Governed & time-travelable** — committed facts promote into
-  [Quipu](https://github.com/scbrown/quipu) as SHACL-validated, bitemporal RDF: a
-  versioned source of truth, not a best-effort cache.
-- 💥 **Blast radius as a primitive** — *"what will this change break,"* per tenant —
-  and it doubles as the incremental-update engine.
-- ⚡ **Two-tier freshness** — tree-sitter-fast breadth + LSP-precise depth, every
-  fact confidence-tagged so an agent knows what it's trusting.
-- 🛡️ **Structure scopes the sandbox** — per-tenant blast radius bounds what an
-  autonomous agent may touch, and can act as *generation guardrails*, not just context.
-- 🪙 **Token-cheap** — structural answers instead of dumping files into context.
-
-### How it compares
-
-| | **codebase-memory** | **Joern (CPG)** | **LSP / multilspy** | **Embeddings / co-change** | **Yupana** |
-|---|:--:|:--:|:--:|:--:|:--:|
-| Fast structural graph, low token cost | ✅ | ⚠️ | ❌ | ✅ | ✅ |
-| Call graph + **dataflow / taint** | ⚠️ | ✅ | ⚠️ | ❌ | ✅ |
-| Precise LSP-grade types | tiered | ❌ | ✅ | ❌ | tiered |
-| Incremental freshness on edit | ✅ | ❌ | ✅ | ❌ | ✅ *(frontier-bounded)* |
-| **Correct while a team edits concurrently** | ❌ | ❌ | ❌ | ❌ | ✅ *(per-tenant overlays)* |
-| **Governed, versioned, time-travel record** | ❌ | ❌ | ❌ | ❌ | ✅ *(→ Quipu)* |
-| Blast radius scopes an **agent trust boundary** | ❌ | ❌ | ❌ | ❌ | ✅ |
-
-Each proves one piece — **[multilspy](https://github.com/microsoft/multilspy)** that
-LSP facts can also be *generation guardrails*, **[Joern](https://joern.io)** the Code
-Property Graph and dataflow, **codebase-memory** a lean standalone analyzer with
-content-hash incremental freshness. Yupana is spiritually closest to codebase-memory,
-extended with Joern-style dataflow, LSP precision, **tenancy**, and a governed
-projection into Quipu.
-
-> The moat isn't any single signal — it's **fusion + governance + time + tenancy**,
-> kept correct while a whole team edits. No off-the-shelf tool does that.
-
-## 🧩 The Stack — three tools, one job each
-
-```text
-        edit / save / file-watch
-                 │
-                 ▼
-   ┌──────────────────────────┐   promote on commit/merge   ┌──────────┐
-   │           YUPANA           │ ───────────────────────────► │  QUIPU   │
-   │  base graph + overlays   │   (SHACL-validated Turtle)   │ EAVT log │
-   │  tree-sitter + LSP + CPG │ ◄─────────────────────────── │ SPARQL   │
-   └────────────┬─────────────┘   SPARQL over committed code └──────────┘
-                │ blast radius (per tenant)
-                ▼
-        ┌───────────────┐   broker/Aegis        ┌──────────┐
-        │ Bobbin fusion │◄──(trust boundary)────│  agents  │
-        │ + serving     │───────────────────────►│ (polecat)│
-        └───────────────┘   explained context   └──────────┘
-```
-
-- **[Yupana](https://github.com/scbrown/yupana)** (this repo) — extracts and serves
-  live per-tenant structure.
-- **[Quipu](https://github.com/scbrown/quipu)** — governs and versions the
-  committed record (bitemporal RDF / SPARQL / SHACL).
-- **[Bobbin](https://github.com/scbrown/bobbin)** — fuses everything with its
-  statistical and embedding signals and serves explained context over MCP.
-
-See [`docs/vision.md`](docs/vision.md) for the north star and
-[`docs/yupana-spec.md`](docs/yupana-spec.md) for the full build spec.
-
-## 🪢 Yupana + Quipu — what the pair unlocks
-
-Yupana holds the *live* structure; [Quipu](https://github.com/scbrown/quipu) governs
-the *committed* record (bitemporal RDF, SHACL-validated, SPARQL-queryable). Together
-they do things neither does alone:
-
-- **Governed SPARQL-over-code.** Query committed structure as typed, validated facts
-  — *"every public function with no test," "modules that violate the layering," "who
-  still calls this deprecated API"* — not a cache you hope is fresh.
-- **Impact over history.** Bitemporal facts answer *what did this change break, and
-  when did that coupling first appear* — blast radius that accounts for how the code
-  got here, replayable at any point in time.
-- **Ontology rules that block or influence changes.** Author architectural
-  constraints as ontology rules in Quipu (SHACL over the code graph); Yupana evaluates
-  a proposed edit against them **live and per tenant**, and warns or blocks a
-  violation *before it lands*. Policy-as-ontology — a new rule is a graph assertion,
-  not a new bespoke linter.
-- **Per-tenant parallel worlds.** A shared base plus copy-on-write overlays (Yupana)
-  map onto Quipu named graphs, so a whole team edits concurrently without corrupting
-  each other's view — over a single **source-of-truth root** that's always queryable.
-- **Agent trust boundaries.** Per-tenant blast radius scopes what an autonomous agent
-  may touch — structure *defines the sandbox* — via the Aegis/broker machinery.
-- **Code ↔ intent, linked.** Quipu provenance ties structural facts to the decisions
-  and work-items that produced them — *"which decision does this module implement,"
-  "what tickets co-occur with this code path."*
-- **A decidable audit.** Every enforcement decision emits a trace record derived
-  from the constraint set itself, plus an ed25519-signed verdict bound to what was
-  actually checked. `quipu audit <trace>` then decides `T ⊨ Σ` mechanically —
-  without access to the model, its prompts, or its developers. See
-  [The Enforcement Trace](docs/book/src/reference/enforcement-trace.md) for the
-  record, and [SARC Conformance](docs/book/src/design/sarc-conformance.md) for what
-  the pair does and does not yet close.
-
-## 🚀 Quick Start
-
-### Install
+**Linux x86_64: download the release.** No Rust toolchain needed.
 
 ```bash
-# From a published release — verifies its checksum and installs exact archive bytes
-just install-release 0.8.0
-
-# Developer build from this checkout (includes uncommitted source):
-just install
-# ~/.local/bin/yupana
-# ~/.local/bin/hank -> yupana
+V=$(curl -fsSL https://api.github.com/repos/scbrown/yupana/releases/latest \
+  | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+curl -fsSLO "https://github.com/scbrown/yupana/releases/download/v$V/yupana-v$V-x86_64-linux-gnu.tar.gz"
+curl -fsSLO "https://github.com/scbrown/yupana/releases/download/v$V/yupana-v$V-x86_64-linux-gnu.tar.gz.sha256"
+sha256sum -c "yupana-v$V-x86_64-linux-gnu.tar.gz.sha256"
+mkdir -p ~/.local/bin && tar -xzf "yupana-v$V-x86_64-linux-gnu.tar.gz" -C ~/.local/bin
+yupana --version
 ```
 
-Release installation downloads the versioned archive and its `.sha256` from
-GitHub. It verifies the checksum, version, and `exemplar`, `verifier`, and
-`verdicts` capabilities before atomic publication under the install lock.
-The installed binary must match the archive payload byte for byte. It requires
-Linux x86_64, curl, Python 3, `flock`, and the usual file utilities. To roll back,
-run `just install-release` with the previous release version.
+The archive also contains `hank`, the tool's former name, as a symlink.
 
-`just install` is a **source build**, not a release installer. It prints the
-checkout path, commit and dirty state before building, and refuses a dirty
-shared checkout with linked worktrees. Use your own worktree for development.
-Source installation uses a private, temporary Cargo target under the disk cache
-(`$XDG_CACHE_HOME/yupana/install-builds`, falling back to `~/.cache`). It builds
-all features and checks every command help surface, including nested verbs,
-against a checker compiled from the same source. The installer verifies the
-staged and installed bytes, publishes atomically under an install lock, and
-prints the installed SHA-256. Build outputs are removed on exit.
-
-The installer requires Python 3, `flock`, and the usual Linux file utilities.
-`YUPANA_INSTALL_ROOT` selects the install prefix; `YUPANA_INSTALL_BUILD_ROOT`
-can select another disk-backed build parent. The explicit Cargo `--target-dir`
-keeps installation isolated even when a wrapper overrides `CARGO_TARGET_DIR`.
-
-### Use
+**macOS, or any other platform: build from source** with a
+[Rust toolchain](https://rustup.rs):
 
 ```bash
-# Analyze a tree and list its structure
+cargo install --git https://github.com/scbrown/yupana --locked --features mcp,langs-extra
+yupana --version
+```
+
+`mcp` adds the agent server and `langs-extra` adds every language beyond Rust.
+If `yupana --version` prints an older version than you just installed, another
+copy earlier on your `PATH` is winning; `which -a yupana` lists them in order.
+
+## First success in three commands
+
+Make a tiny crate where `run` calls `load` and `load` calls `parse`:
+
+```bash
+mkdir -p demo/src && cd demo
+printf 'pub fn parse(input: &str) -> usize {\n    input.trim().len()\n}\n\npub fn load(path: &str) -> usize {\n    parse(path) + 1\n}\n\npub fn run() -> usize {\n    load("config.toml")\n}\n' > src/lib.rs
+```
+
+Then build the graph, ask who calls `parse`, and ask what changing it would
+break:
+
+```bash
 yupana analyze src
-yupana refs <symbol> src
-yupana status
-
-# Call graph: callers/callees and blast radius
-yupana callers <symbol> src
-yupana impact <symbol> src --hops 5
-
-# Data dependence within a function
-yupana dataflow <function> src --var <variable>
-# With a cpg-enabled build: bounded Rust flow across direct calls
-yupana dataflow <function> src --interprocedural --var <variable> --forward --hops 32 --json
-
-# Export the referential structure (code + docs) as governed RDF Turtle
-yupana export src --repo myrepo --format turtle
-# ...and on into a git-storable Quipu share bundle another store can import:
-# docs/book/src/reference/share-bundles.md (hash the canonical form, not this Turtle)
-
-# Serve over MCP (stdio) for an agent
-yupana serve
-
-# Hold the graph resident: base + per-tenant overlays, hot, over local HTTP —
-# what makes the sub-100ms guard budget reachable
-yupana daemon
-
-# Edit-reactive: wire `yupana hook post-edit` into a Claude Code PostToolUse hook
-# for synchronous blast-radius advisories on every edit, and `yupana hook pre-edit`
-# into PreToolUse to check an edit against the tenant's scope before it lands.
-# `yupana hook session-start` briefs the agent on its tracked work item up front,
-# and `yupana hook pre-bash` records (and can guard) the Bash action surface.
-
-# Governance (quipu feature): the verdict-signing identity, and the spool drain
-yupana verifier --key-path yupana-signing.pk8   # public key to register in quipu
-yupana verdicts --to http://localhost:7878    # promote signed verdicts
-
-# Shell completions
-yupana completions bash > yupana.bash
+yupana callers parse src
+yupana impact parse src
 ```
 
-Yupana shares the stack's `.bobbin/config.toml` under a `[yupana]` table — see the
-[configuration reference](docs/book/src/reference/config.md).
+```text
+analyzed 1 file(s), 3 symbol(s) [tree-sitter]
+callers of parse:
+  lib.rs:5 load
+callees of parse: (none)
+impact 2 symbol(s) affected by changing parse:
+  lib.rs:5 load (hop 1)
+  lib.rs:9 run (hop 2)
+```
 
-## 🌳 Supported Languages
+`run` never calls `parse` directly, yet changing `parse` can still break it.
+That second hop is what a text search for `parse(` does not show you.
 
-Tree-sitter structural extraction (symbols, intra-file call edges, import
-references — all tagged `TreeSitter`) is wired for Bobbin's full grammar set.
-**Rust** is always built; the rest land behind the `langs-extra` feature
-(`cargo build --features langs-extra`).
+## On your own code
 
-| Language       | Feature       | Extensions                                     |
-| -------------- | ------------- | ---------------------------------------------- |
-| Rust           | *(always on)* | `.rs`                                           |
-| TypeScript     | `langs-extra` | `.ts` `.mts` `.cts` `.js` `.mjs` `.cjs`         |
-| TSX / JSX      | `langs-extra` | `.tsx` `.jsx`                                   |
-| Python         | `langs-extra` | `.py` `.pyi`                                     |
-| Go             | `langs-extra` | `.go`                                           |
-| Java           | `langs-extra` | `.java`                                          |
-| C / C++        | `langs-extra` | `.c` `.h` `.cc` `.cpp` `.cxx` `.hpp` `.hh` `.hxx` |
+Run these from the root of any repository; each takes the path to analyze.
 
-Each grammar contributes a per-language `GrammarSpec` (grammar + node-kind →
-`SymbolKind` mapping + call/import extraction) to a shared, language-agnostic
-walker in `src/extract/`; `language_for_extension` selects the grammar by file
-extension. See [FR-1](docs/yupana-spec.md) for the extraction-tier contract.
+| question | command |
+|---|---|
+| what is in this tree? | `yupana analyze .` |
+| where is this symbol defined? | `yupana refs <symbol> .` |
+| who calls it, and what does it call? | `yupana callers <symbol> .` |
+| what would changing it break? | `yupana impact <symbol> . --hops 5` |
+| where does this variable flow inside a function? | `yupana dataflow <function> . --var <variable>` |
 
-## 🛠️ Development
+Every command has `--help`. The full list is in the
+[CLI reference](docs/book/src/reference/cli.md).
+
+## Wire it into your agent
+
+**As an MCP server.** `yupana serve` speaks MCP over stdio and analyzes the
+directory it starts in. For Claude Code, from your repository:
 
 ```bash
-just setup            # install pre-commit hooks
-just build            # cargo build
-just test             # cargo test
-just lint             # clippy -D warnings
-just check            # full pre-push gate (fmt, clippy, markdownlint, file size)
-just docs build       # build the mdBook
+claude mcp add yupana -- yupana serve
 ```
 
-Conventions live in [`AGENTS.md`](AGENTS.md); contribution guidance in
-[`CONTRIBUTING.md`](CONTRIBUTING.md). Always use `just`, never raw `cargo`.
+Any other MCP client takes the same command. The agent gets `yupana_*` tools
+for symbols, references, callers and impact; see the
+[MCP tools reference](docs/book/src/reference/mcp-tools.md).
 
-## 📚 Documentation
+**As an edit hook.** Add this to `.claude/settings.json` and, after each edit,
+the agent is told which other files call what it just changed:
 
-- [Specification](docs/yupana-spec.md) — the full PRD-style build spec.
-- [Vision](docs/vision.md) — Bobbin × Yupana × Quipu.
-- [mdBook](docs/book/src/SUMMARY.md) — guides, concepts, and reference.
-- [SARC Conformance](docs/book/src/design/sarc-conformance.md) — the governance
-  map across yupana × quipu: what each phase built, and what it did *not* close.
-- [The Enforcement Trace](docs/book/src/reference/enforcement-trace.md) — the
-  record schema, the attribution tuple and its environment, and the verdict spool.
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "yupana hook post-edit" }]
+      }
+    ]
+  }
+}
+```
+
+The pre-edit rule guard, the session-start briefing and the Bash action hook
+are in [Harness Integration](docs/book/src/getting-started/harness-integration.md).
+Rules that come from Quipu are covered in the
+[pre-edit policy guard](docs/book/src/reference/policy-guard.md).
+
+## Languages
+
+Rust is always built in. The `langs-extra` feature, included in the release
+build and the source command above, adds the rest.
+
+| language | extensions |
+|---|---|
+| Rust | `.rs` |
+| TypeScript / JavaScript | `.ts` `.mts` `.cts` `.js` `.mjs` `.cjs` |
+| TSX / JSX | `.tsx` `.jsx` |
+| Python | `.py` `.pyi` |
+| Go | `.go` |
+| Java | `.java` |
+| C / C++ | `.c` `.h` `.cc` `.cpp` `.cxx` `.hpp` `.hh` `.hxx` |
+
+## What's next
+
+- [The book](docs/book/src/SUMMARY.md): installation, configuration, concepts
+  and reference, in reading order.
+- [Map of all docs](docs/book/src/docs-map.md): where every design note,
+  spec and research document lives, and which ones are historical.
+- [The stack](docs/book/src/concepts/the-stack.md): how Yupana works with
+  [Quipu](https://github.com/scbrown/quipu) and
+  [Bobbin](https://github.com/scbrown/bobbin).
+
+## Contributing
+
+```bash
+just setup    # install the pre-commit hooks
+just check    # the full pre-push gate: fmt, clippy, markdown lint, links, file size
+just test
+```
+
+Use `just`, not raw `cargo`. Conventions are in [`AGENTS.md`](AGENTS.md) and
+[`CONTRIBUTING.md`](CONTRIBUTING.md); releases are described in
+[`docs/RELEASING.md`](docs/RELEASING.md).
 
 ## License
 
