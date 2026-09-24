@@ -35,15 +35,11 @@ use regex::Regex;
 /// reachable, and a ratchet that silently skips when its data source is absent
 /// is the failure it exists to prevent.
 fn patterns() -> Vec<(&'static str, Regex)> {
+    // Hostnames (.lan / .svc) and crew names are NOT here any more: Stiwi ruled
+    // 2026-09-24 that they are fine in public repos, while secrets and personal
+    // data are still scrubbed (quipu Directive
+    // public-repos-allow-hostnames-and-crew-names; aegis-0mhzqo).
     vec![
-        (
-            "internal hostname",
-            Regex::new(r"[a-z0-9_.-]+\.lan\b").unwrap(),
-        ),
-        (
-            "internal service host",
-            Regex::new(r"[a-z0-9_-]+\.svc\b").unwrap(),
-        ),
         (
             "private address",
             Regex::new(r"\b192\.168\.\d{1,3}\.\d{1,3}\b").unwrap(),
@@ -181,8 +177,6 @@ fn the_ratchet_catches_each_class() {
     // rule on everyone else.
     let pats = patterns();
     for (expect, sample) in [
-        ("internal hostname", "connect to db.lan now"),
-        ("internal service host", "http://thing.svc/knot"),
         ("private address", "addr 192.168.0.1"),
         // A NON-placeholder home, spelled so it is obviously not a real
         // operator here — the control must prove the class is caught without
@@ -320,4 +314,21 @@ fn the_ontology_namespace_allowance_is_still_needed_and_still_bounded() {
          file legitimately needs it, add it here. If the repointing decision has \
          landed, delete the allowance and this test together."
     );
+}
+
+/// The ruling is pinned, not just applied: hostnames and crew names pass
+/// (aegis-0mhzqo). If a hostname class comes back, this fails and says why.
+#[test]
+fn hostnames_and_crew_names_are_allowed() {
+    let pats = patterns();
+    for sample in [
+        "connect to db.lan now",
+        "http://thing.svc/knot",
+        "ask sattler or dearing",
+    ] {
+        let flagged = pats
+            .iter()
+            .any(|(label, rx)| rx.captures_iter(sample).any(|c| is_real_hit(label, &c)));
+        assert!(!flagged, "a hostname or crew name was flagged: {sample:?}");
+    }
 }
