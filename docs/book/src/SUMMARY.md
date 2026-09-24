@@ -1,6 +1,7 @@
 # Summary
 
 [Introduction](README.md)
+[Map of all docs](docs-map.md)
 
 # Getting Started
 
@@ -11,6 +12,8 @@
 
 # Concepts
 
+- [Why Yupana](concepts/why-yupana.md)
+- [The Stack](concepts/the-stack.md)
 - [Architecture](concepts/architecture.md)
 - [The Tenancy Model](concepts/tenancy-model.md)
 - [Tiers and Freshness](concepts/tiers-and-freshness.md)
