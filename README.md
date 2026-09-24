@@ -120,8 +120,8 @@ directory it starts in. For Claude Code, from your repository:
 claude mcp add yupana -- yupana serve
 ```
 
-Any other MCP client takes the same command. The agent gets `yupana_*` tools
-for symbols, references, callers and impact; see the
+Any other MCP client takes the same command. The agent gets fifteen `yupana_*`
+tools, for symbols, references, callers, impact and more; see the
 [MCP tools reference](docs/book/src/reference/mcp-tools.md).
 
 **As an edit hook.** Add this to `.claude/settings.json` and, after each edit,
