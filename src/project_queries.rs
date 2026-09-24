@@ -87,13 +87,15 @@ SELECT ?policy ?name ?language ?query ?pattern ?matchType ?gate ?effect
 pub const TEXT_POLICY_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?s ?label ?regex ?class ?tier ?exempt ?rationale WHERE {
+SELECT ?s ?label ?regex ?class ?tier ?exempt ?exemptRepo ?exemptLineMarker ?rationale WHERE {
   ?s a/rdfs:subClassOf* aegis:TextRule ;
      aegis:regex ?regex ;
      aegis:enforcementTier ?tier .
   OPTIONAL { ?s rdfs:label ?label }
   OPTIONAL { ?s aegis:identifierClass ?class }
   OPTIONAL { ?s (aegis:exemptPathRegex|aegis:exemptionSelector/aegis:exemptPathRegex) ?exempt }
+  OPTIONAL { ?s aegis:exemptRepo ?exemptRepo }
+  OPTIONAL { ?s aegis:exemptLineMarker ?exemptLineMarker }
   OPTIONAL { ?s rdfs:comment ?rationale }
 }";
 

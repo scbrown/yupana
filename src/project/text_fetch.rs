@@ -24,6 +24,8 @@ const FIELDS: &[(&str, &str, bool)] = &[
     ("label", "rdfs:label", false),
     ("class", "aegis:identifierClass", false),
     ("exempt", "aegis:exemptPathRegex", false),
+    ("exemptRepo", "aegis:exemptRepo", false),
+    ("exemptLineMarker", "aegis:exemptLineMarker", false),
     ("rationale", "rdfs:comment", false),
 ];
 

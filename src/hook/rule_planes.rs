@@ -306,8 +306,22 @@ pub(super) fn governed_check(
         (Some(file), Some(tr)) => relative(file, tr),
         _ => rel.to_string(),
     };
-    let text_violations =
-        crate::textrules::evaluate(registry.text_rules(), &introduced, &target_rel);
+    // The repo NAME is resolved up front only when a rule can be exempted by
+    // repo (aegis-40j2pq); otherwise it stays lazy, below, as before.
+    let exempt_by_repo = registry
+        .text_rules()
+        .iter()
+        .any(|r| !r.exempt_repos.is_empty());
+    let repo_name = target_root
+        .as_deref()
+        .filter(|_| exempt_by_repo)
+        .and_then(crate::git::origin_repo_name);
+    let text_violations = crate::textrules::evaluate_in(
+        registry.text_rules(),
+        &introduced,
+        &target_rel,
+        repo_name.as_deref(),
+    );
     // Carried onto the `governed` metrics line so the advise-mode soak is
     // ADJUDICABLE. `blocking` alone says an edit WOULD have been denied but not
     // whether that denial would have been right, and the spool records no path
@@ -322,9 +336,11 @@ pub(super) fn governed_check(
         // Exposure is resolved ONCE per edit, from the graph, via the governed
         // policy itself — so yupana and every other consumer of rule #1 share one
         // definition of "public". Any failure to ask IS the Unknown answer.
-        let repo = target_root
-            .as_deref()
-            .and_then(crate::git::origin_repo_name);
+        let repo = repo_name.or_else(|| {
+            target_root
+                .as_deref()
+                .and_then(crate::git::origin_repo_name)
+        });
         let exposure = match (&target_root, &repo) {
             (Some(_), Some(repo)) => {
                 let (exposure, source) =
