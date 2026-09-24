@@ -72,4 +72,3 @@ today.
 | document | what it records |
 |---|---|
 | [Rename: hank → yupana](https://github.com/scbrown/yupana/blob/main/docs/rename-from-hank.md) | the 2026-08-09 rename; `hank` survives only as a compatibility name |
-| [Patent filing record](https://github.com/scbrown/yupana/blob/main/docs/patents/filing-record.md) | which filing covers yupana's mechanisms (filed 2026-08-17) |
