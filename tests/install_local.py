@@ -82,7 +82,10 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('SHA256:', result.stdout)
         self.assertEqual(subprocess.check_output([str(self.old), '--proof'], text=True).strip(), 'new-source')
-        self.assertEqual((self.bin / 'hank').resolve(), self.old)
+        # .resolve() also normalizes /var -> /private/var (a macOS symlink);
+        # self.old must go through the same normalization or this compares a
+        # resolved path against an unresolved one on every macOS run.
+        self.assertEqual((self.bin / 'hank').resolve(), self.old.resolve())
         log = json.loads((self.root / 'build.log').read_text())
         self.assertNotEqual(log['target'], self.env['CARGO_TARGET_DIR'])
         self.assert_clean()
@@ -128,7 +131,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(set(targets)), 2)
         actual = subprocess.check_output([str(self.old), '--proof'], text=True).strip()
         self.assertIn(actual, ('source-a', 'source-b'))
-        self.assertEqual((self.bin / 'hank').resolve(), self.old)
+        self.assertEqual((self.bin / 'hank').resolve(), self.old.resolve())
         self.assert_clean()
 
 

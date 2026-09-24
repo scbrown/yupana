@@ -36,9 +36,11 @@ mkdir -p "$build_root" "$bin_dir"
 build_dir=$(mktemp -d "$build_root/build.XXXXXX")
 candidate=""
 alias_tmp=""
+lock_dir=""
 cleanup() {
     test -z "$candidate" || rm -f -- "$candidate"
     test -z "$alias_tmp" || rm -f -- "$alias_tmp"
+    test -z "$lock_dir" || rmdir -- "$lock_dir" 2>/dev/null || true
     rm -rf -- "$build_dir"
 }
 trap cleanup EXIT
@@ -56,8 +58,22 @@ contract=${artifacts[1]}
 
 # Serialize publication, not compilation. The lock covers both names and the
 # final readback, so another installer cannot replace them inside our check.
-exec 9> "$bin_dir/.yupana-install.lock"
-flock 9
+#
+# `mkdir` rather than `flock`: mkdir is atomic on every POSIX filesystem and
+# needs no external tool, where `flock` does not exist on macOS at all (it is
+# a util-linux program, never shipped by Darwin) — a stock Mac with no
+# additional packages could never pass this line.
+lock_candidate="$bin_dir/.yupana-install.lock.d"
+lock_tries=0
+until mkdir "$lock_candidate" 2>/dev/null; do
+    lock_tries=$((lock_tries + 1))
+    if ((lock_tries >= 600)); then
+        echo 'ERROR: could not acquire the install lock (held 60s+ by another installer)' >&2
+        exit 1
+    fi
+    sleep 0.1
+done
+lock_dir="$lock_candidate"
 test ! -d "$canonical" && test ! -d "$legacy" || {
     echo 'ERROR: an install destination is a directory' >&2; exit 1;
 }
@@ -71,9 +87,14 @@ sha=$(sha256sum "$candidate" | cut -d' ' -f1)
 alias_tmp=$(mktemp "$bin_dir/.hank-yupana.XXXXXX")
 rm -f -- "$alias_tmp"
 ln -s yupana "$alias_tmp"
-mv -Tf -- "$candidate" "$canonical"
+# `-T` (treat DEST as a plain file even if it looks like a directory) is a
+# GNU-only mv flag; BSD/macOS mv has no such option at all and refuses to
+# parse it. Plain `mv -f source dest` is equivalent here on both platforms:
+# the `test ! -d` check above already ruled out either destination being a
+# directory, which is the only case `-T` changes.
+mv -f -- "$candidate" "$canonical"
 candidate=""
-mv -Tf -- "$alias_tmp" "$legacy"
+mv -f -- "$alias_tmp" "$legacy"
 alias_tmp=""
 cmp -- "$source_bin" "$canonical"
 test "$(readlink "$legacy")" = yupana
