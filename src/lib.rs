@@ -143,6 +143,7 @@ pub mod quipu_label;
 pub mod reconcile;
 pub mod recurrence;
 mod render;
+pub mod rule_test;
 pub mod rules;
 /// Reading and verifying a Quipu share bundle before anything is sent anywhere.
 #[cfg(feature = "quipu")]

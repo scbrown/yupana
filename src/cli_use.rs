@@ -11,6 +11,10 @@ use super::Commands;
 pub(super) fn deliberate_use_name(cmd: &Commands) -> Option<&'static str> {
     Some(match cmd {
         Commands::Hook { .. } | Commands::Completions { .. } => return None,
+        // A readiness checker runs it from cron; counting that as agent use
+        // would inflate the leverage metric with a timer (aegis-l26g8x).
+        #[cfg(feature = "quipu")]
+        Commands::RuleTest(_) => return None,
         Commands::Serve { .. } => "serve",
         Commands::Daemon { .. } => "daemon",
         Commands::Analyze { .. } => "analyze",
@@ -112,6 +116,8 @@ pub(super) fn quipu_caller_kind(cmd: &Commands) -> Option<&'static str> {
         Commands::Dataflow { .. } => "yupana-cli:dataflow",
         Commands::Verify { .. } => "yupana-cli:verify",
         Commands::Exemplar { .. } => "yupana-cli:exemplar",
+        #[cfg(feature = "quipu")]
+        Commands::RuleTest(_) => "yupana-cli:rule-test",
         Commands::Changed { .. } => "yupana-cli:changed",
         Commands::Census { .. } => "yupana-cli:census",
         Commands::Export { .. } => "yupana-cli:export",
