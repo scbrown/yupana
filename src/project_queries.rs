@@ -176,15 +176,27 @@ SELECT ?parent WHERE {
 /// UNEVALUATED on every edit, so the shape of this query is load-bearing. The
 /// intersection keeps the join's exact semantics: an identifier counts only
 /// when its subject is a work item.
+///
+/// Both halves read the DEFAULT graph AND camayoc's trusted crew-records plane
+/// (`https://camayoc.local/plane/crew/records`), where observed work items are
+/// synced (aegis-jrobfn). Reading the default graph alone saw 1771 ids while the
+/// plane held the current beads, so a real bead cited today classed as a
+/// fabricated reference. Measured with the union: 2371 ids, 0.06 s per query.
 pub const GROUNDING_WORK_ITEMS_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
-SELECT ?w WHERE { ?w a aegis:WorkItem }";
+SELECT ?w WHERE {
+  { ?w a aegis:WorkItem }
+  UNION { GRAPH <https://camayoc.local/plane/crew/records> { ?w a aegis:WorkItem } }
+}";
 
 /// The identifier half of the grounding set: every `(subject, identifier)`
 /// pair. Filtered to work items by [`GROUNDING_WORK_ITEMS_QUERY`].
 pub const GROUNDING_IDENTIFIERS_QUERY: &str = "\
 PREFIX aegis: <http://aegis.gastown.local/ontology/>
-SELECT ?w ?id WHERE { ?w aegis:identifier ?id }";
+SELECT ?w ?id WHERE {
+  { ?w aegis:identifier ?id }
+  UNION { GRAPH <https://camayoc.local/plane/crew/records> { ?w aegis:identifier ?id } }
+}";
 
 /// The SPARQL SELECT that pulls quipu's TRIPWIRE policies — `boundary:"action"`
 /// policies whose whole condition is their `aegis:appliesTo` path scope (quipu
