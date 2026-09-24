@@ -359,16 +359,28 @@ pub(super) fn governed_check(
                     .into(),
             ),
         };
+        // A file outside any work tree is LABELLED `unversioned`, not `unknown`
+        // (aegis-l26g8x): 38 of the 43 distinct `unresolved` paths in the soak
+        // were agents' /tmp message bodies and memory notes, which no remote can
+        // carry, and "unknown" made every one read as a soak failure. The
+        // verdict itself is unchanged (still Unknown: warn, never block), since
+        // such text can still leave by another road, e.g. pasted into a bead.
         exposure_label = match exposure {
             RepoExposure::Public => "public",
             RepoExposure::Internal => "internal",
+            RepoExposure::Unknown(_) if target_root.is_none() => "unversioned",
             RepoExposure::Unknown(_) => "unknown",
         };
         // The other arms decided WITHOUT asking: answers, not failures.
         if exposure_source == "n/a" {
             exposure_source = "local";
         }
-        target_repo = repo;
+        let why = if target_root.is_some() {
+            "no-origin"
+        } else {
+            "no-worktree"
+        };
+        target_repo = repo.or_else(|| Some(why.to_string()));
         let (text_messages, text_blocks) = text_plane(&text_violations, &exposure, exposure_source);
         messages.extend(text_messages);
         any_blocking |= text_blocks;

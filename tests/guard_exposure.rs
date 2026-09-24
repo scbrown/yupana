@@ -91,7 +91,7 @@ impl Drop for ExposureServer {
 }
 
 fn probe(outcome: &'static str, expected: &str, mode: &str, matching: bool, origin: bool) {
-    probe_with(outcome, expected, mode, matching, origin, None);
+    probe_with(outcome, expected, mode, matching, origin, None, true);
 }
 
 /// `endpoint_override` points the guard at a REFUSED port, so "we never got an
@@ -105,18 +105,22 @@ fn probe_with(
     matching: bool,
     origin: bool,
     endpoint_override: Option<&str>,
+    worktree: bool,
 ) {
     let mut server = ExposureServer::new(outcome);
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let target = root.join("artifact");
     std::fs::create_dir(&target).unwrap();
-    assert!(Command::new("git")
-        .args(["init", "--quiet"])
-        .arg(&target)
-        .status()
-        .unwrap()
-        .success());
+    assert!(
+        !worktree
+            || Command::new("git")
+                .args(["init", "--quiet"])
+                .arg(&target)
+                .status()
+                .unwrap()
+                .success()
+    );
     if origin {
         assert!(Command::new("git")
             .current_dir(&target)
@@ -208,7 +212,11 @@ fn probe_with(
         assert_eq!(guard["exposure_source"], governed["exposure_source"]);
         assert_eq!(
             guard["repo"],
-            if origin { "artifact" } else { "unresolved" }
+            match (worktree, origin) {
+                (false, _) => "no-worktree",
+                (true, false) => "no-origin",
+                (true, true) => "artifact",
+            }
         );
         assert_eq!(guard["exposure"], governed["exposure"]);
         assert_eq!(guard["repo"], governed["repo"]);
@@ -280,5 +288,24 @@ fn an_UNREACHABLE_quipu_is_recorded_as_unreachable_not_as_a_plain_unknown() {
         true,
         true,
         Some("http://127.0.0.1:1"),
+        true,
+    );
+}
+
+/// A file in NO git work tree is labelled `unversioned` / `no-worktree`, not
+/// `unknown` / `unresolved` (aegis-l26g8x). 38 of the 43 distinct `unresolved`
+/// paths in the enforce-readiness soak were agents' /tmp message bodies and
+/// memory notes; as `unknown` every one read as a soak failure. The DECISION is
+/// unchanged: it still warns and never blocks, even at enforce tier.
+#[test]
+fn a_file_outside_any_work_tree_is_labelled_unversioned_and_still_only_warns() {
+    probe_with(
+        "satisfied",
+        "unversioned",
+        "enforce",
+        true,
+        false,
+        None,
+        false,
     );
 }
