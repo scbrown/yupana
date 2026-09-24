@@ -17,7 +17,7 @@
   [`../book/src/reference/enforcement-trace.md`](../book/src/reference/enforcement-trace.md)
   (the record), [`../book/src/concepts/game-state.md`](../book/src/concepts/game-state.md)
   (the second domain), [`../work-scoped-governance.md`](../work-scoped-governance.md)
-  (incidents + eval discipline), [`../patents/filing-record.md`](../patents/filing-record.md).
+  (incidents + eval discipline), the provisional filing (kept privately).
 
 ## 1. Intent and thesis
 
@@ -441,8 +441,8 @@ structural-extraction mandate is background here, not subject.
 
 ## 12. Patent interaction
 
-Mechanisms in this paper sit in **provisional D, `64/135,436`**, filed 2026-08-17.
-Full detail in [`../patents/filing-record.md`](../patents/filing-record.md).
+Mechanisms in this paper sit in **provisional D**, filed 2026-08-17.
+The filing detail is kept privately.
 **Publishing costs nothing:** US priority is locked at the filing date, D is
 planned to lapse 2027-08-17, and non-US rights were foreclosed by the public
 repository disclosures regardless. **No patent reason to delay, redact, or

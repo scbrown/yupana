@@ -3,8 +3,8 @@
 
 Stands up a real quipu-server on a seeded store, points a real yupana
 pre-edit guard at it, and drives the hallucination-prevention scenarios
-from the grounding cluster disclosure (camayoc
-docs/patents/provisional-grounding-cluster.md, aspects 19 and 23-26):
+from the grounding cluster disclosure (the provisional filing's
+aspects 19 and 23-26):
 
   S1  structural hallucination — an edit calling an identifier that exists
       nowhere in the composed graph is DENIED at a declared tier, with the
