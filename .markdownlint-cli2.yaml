@@ -16,4 +16,7 @@ globs:
   - "CONTRIBUTING.md"
 
 ignores:
+  # Vale style packages (write-good) are DOWNLOADED by `vale sync` during pre-commit and are
+  # third-party markdown; linting them failed every run from 2026-09-24 (MD040 in write-good README).
+  - ".vale/styles/**"
   - "docs/book/book/**"
