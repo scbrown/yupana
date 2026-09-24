@@ -83,7 +83,11 @@ impl Cli {
                 1,
                 "build with `--features mcp` to enable the MCP + HTTP surface",
             );
-            Ok(())
+            // Exit 2, never 0 (aegis-6h3ycl), matching `promote` without `quipu`.
+            // An MCP client sees only a closed connection, and an install
+            // wrapper checking the status would report a server that never ran
+            // as healthy.
+            std::process::exit(2);
         }
     }
 
@@ -106,7 +110,7 @@ impl Cli {
                 3,
                 "build with `--features mcp` to enable the resident HTTP surface",
             );
-            Ok(())
+            std::process::exit(2); // same reason as `serve` above (aegis-6h3ycl)
         }
     }
 }
