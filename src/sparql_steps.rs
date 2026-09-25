@@ -125,13 +125,17 @@ pub(crate) fn hop(
     to: &str,
 ) -> Result<Vec<(String, String)>> {
     let mut out = Vec::new();
-    let unique: Vec<String> = iris
-        .iter()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .take(MAX_WIDTH)
-        .cloned()
-        .collect();
+    let distinct: BTreeSet<&String> = iris.iter().collect();
+    if distinct.len() > MAX_WIDTH {
+        // Loud, because a truncated hop is an incomplete answer that reads as
+        // a complete one — the exact class of miss this module exists to end.
+        eprintln!(
+            "yupana: provenance hop `{pattern}` truncated to {MAX_WIDTH} of {} subjects; \
+             results past the cap are omitted",
+            distinct.len()
+        );
+    }
+    let unique: Vec<String> = distinct.into_iter().take(MAX_WIDTH).cloned().collect();
     for batch in unique.chunks(BATCH) {
         let union = bound_union(batch, from, pattern);
         if union.is_empty() {
