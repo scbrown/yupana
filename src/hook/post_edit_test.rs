@@ -43,6 +43,56 @@ mod tests {
         assert!(text.contains("b.rs"));
     }
 
+    /// An edit in ANOTHER repository, made from a session rooted elsewhere, is
+    /// answered from THAT repository's graph (aegis-r197pw). Both roots have a
+    /// caller of `leaf`; only the edited file's own repo may be named.
+    #[test]
+    fn an_edit_outside_the_session_root_uses_the_FILES_OWN_repo() {
+        let session = tempfile::tempdir().unwrap();
+        std::fs::write(session.path().join("def.rs"), "fn leaf() {}\n").unwrap();
+        std::fs::write(session.path().join("wrong.rs"), "fn w() { leaf(); }\n").unwrap();
+        let other = tempfile::tempdir().unwrap();
+        std::fs::create_dir(other.path().join(".git")).unwrap();
+        std::fs::create_dir(other.path().join("src")).unwrap();
+        std::fs::write(other.path().join("src/a.rs"), "fn leaf() {}\n").unwrap();
+        std::fs::write(other.path().join("src/right.rs"), "fn r() { leaf(); }\n").unwrap();
+
+        let payload = serde_json::json!({
+            "tool_name": "Edit",
+            "cwd": session.path().to_str().unwrap(),
+            "tool_input": { "file_path": other.path().join("src/a.rs").to_str().unwrap() },
+        })
+        .to_string();
+
+        let text = advisory_for(&payload, session.path(), None).expect("an advisory");
+        assert!(text.contains("right.rs"), "{text}");
+        assert!(!text.contains("wrong.rs"), "{text}");
+        // Reported relative to the file's own repo, not as an absolute path.
+        assert!(text.contains("src/a.rs") && !text.contains(other.path().to_str().unwrap()));
+    }
+
+    /// Outside the session root and in no repository: say nothing, rather
+    /// than match its names against a graph it does not belong to.
+    #[test]
+    fn an_edit_in_NO_repo_outside_the_session_root_is_not_advised() {
+        // The session root DEFINES and calls a same-named `leaf`: that is what
+        // made the wrong-repo match possible (another repo's `post`/`fetch`).
+        let session = tempfile::tempdir().unwrap();
+        std::fs::write(session.path().join("def.rs"), "fn leaf() {}\n").unwrap();
+        std::fs::write(session.path().join("b.rs"), "fn mid() { leaf(); }\n").unwrap();
+        let loose = tempfile::tempdir().unwrap();
+        std::fs::write(loose.path().join("a.rs"), "fn leaf() {}\n").unwrap();
+
+        let payload = serde_json::json!({
+            "tool_name": "Edit",
+            "cwd": session.path().to_str().unwrap(),
+            "tool_input": { "file_path": loose.path().join("a.rs").to_str().unwrap() },
+        })
+        .to_string();
+
+        assert_eq!(advisory_for(&payload, session.path(), None), None);
+    }
+
     #[test]
     fn scopes_advisory_to_the_edited_symbol() {
         // a.rs defines `leaf` (edited) and `other` (untouched), both called from b.rs.
