@@ -111,7 +111,7 @@ pub fn advisory_for(input_json: &str, default_root: &Path, tenant: Option<&str>)
         return None;
     }
 
-    let root = input.root(default_root);
+    let root = edit_root(&input.root(default_root), &file)?;
     let rel = file
         .strip_prefix(&root)
         .unwrap_or(&file)
@@ -164,6 +164,27 @@ pub fn advisory_for(input_json: &str, default_root: &Path, tenant: Option<&str>)
     }
 
     Some(render(&rel, &per_symbol, &files))
+}
+
+/// The root whose graph can answer for `file`: the session root when the file
+/// is inside it, otherwise the file's OWN repository (nearest ancestor holding
+/// a `.git` directory or worktree file). `None` when the file belongs to no
+/// repository: no advisory beats a wrong one.
+///
+/// The session root is the harness `cwd`, and an agent routinely edits a
+/// worktree of ANOTHER repo from there. Resolving that edit against the session
+/// root matched callers by bare name in the wrong repository — a Rust `fetch`
+/// edited in one repo was reported with ~98 "callers", all Python in another
+/// (aegis-r197pw). An advisory that names a hundred unrelated files is one
+/// agents learn to ignore.
+fn edit_root(session_root: &Path, file: &Path) -> Option<PathBuf> {
+    if file.starts_with(session_root) {
+        return Some(session_root.to_path_buf());
+    }
+    file.ancestors()
+        .skip(1)
+        .find(|dir| dir.join(".git").exists())
+        .map(Path::to_path_buf)
 }
 
 /// The 1-based inclusive line span(s) the edit changed, located in the POST-edit

@@ -35,7 +35,7 @@ const BATCH: usize = 64;
 /// Upper bound on IRIs carried into any one hop. A hub (a file every item
 /// touches) can have thousands of modifying commits; past this the hop keeps
 /// the first `MAX_WIDTH`, which is still far beyond any count a caller reads.
-const MAX_WIDTH: usize = 1024;
+pub(crate) const MAX_WIDTH: usize = 1024;
 
 /// Escape a string for a SPARQL double-quoted literal.
 pub(crate) fn literal(value: &str) -> String {
@@ -102,17 +102,23 @@ fn value(row: &serde_json::Value, var: &str) -> Option<String> {
     row[var]["value"].as_str().map(str::to_string)
 }
 
-/// The IRIs carrying `aegis:identifier "<id>"`.
-pub(crate) fn items_with_identifier(endpoint: &str, id: &str) -> Result<Vec<String>> {
+/// The subjects carrying `<predicate> "<value>"` — one bound pattern.
+/// `predicate` is a prefixed name in this module's `aegis:` namespace.
+pub(crate) fn subjects_with(endpoint: &str, predicate: &str, object: &str) -> Result<Vec<String>> {
     let sparql = format!(
-        "{} SELECT DISTINCT ?w WHERE {{ ?w aegis:identifier \"{}\" }}",
+        "{} SELECT DISTINCT ?s WHERE {{ ?s {predicate} \"{}\" }}",
         prefix(),
-        literal(id)
+        literal(object)
     );
     Ok(rows(&sparql, endpoint)?
         .iter()
-        .filter_map(|r| value(r, "w"))
+        .filter_map(|r| value(r, "s"))
         .collect())
+}
+
+/// The IRIs carrying `aegis:identifier "<id>"`.
+pub(crate) fn items_with_identifier(endpoint: &str, id: &str) -> Result<Vec<String>> {
+    subjects_with(endpoint, "aegis:identifier", id)
 }
 
 /// One hop: for each `?<from>` in `iris`, the `(from, to)` pairs matching the
