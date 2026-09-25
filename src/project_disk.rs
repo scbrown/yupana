@@ -134,6 +134,10 @@ pub fn fetch_samples(endpoint: &str, signature: &str, filesystem: &str) -> Resul
     let mut observations = subjects_with(endpoint, "aegis:commandSignature", signature)?;
     observations.sort_unstable_by(|a, b| b.cmp(a));
     observations.dedup();
+    // Cap HERE, newest first: every hop keeps only its first MAX_WIDTH in
+    // ASCENDING order, so an uncapped list would lose the newest observations
+    // and feed p90 the oldest ones.
+    observations.truncate(crate::sparql_steps::MAX_WIDTH);
     // The former BGP also required the type; keep that exact, so a future kind
     // of observation sharing `commandSignature` cannot leak into this history.
     let typed: std::collections::BTreeSet<String> =
@@ -199,9 +203,91 @@ pub fn decode_samples(body: &str) -> Result<Vec<DiskSample>> {
 }
 
 #[cfg(test)]
+// Test names shout the invariant they turn on, the repo's emphasis convention.
+#[allow(non_snake_case)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Past `MAX_WIDTH` observations the history is the NEWEST ones — the
+    /// former `ORDER BY DESC(?s) LIMIT 100` — never the oldest. `hop` keeps its
+    /// first `MAX_WIDTH` in ascending order, so the cap must land before it.
+    #[test]
+    fn past_the_width_cap_the_NEWEST_observations_are_kept() {
+        const N: usize = 1100;
+        let t = format!("{}CommandDiskImpactObservation", crate::export::ONTO);
+        // 1 signature + 16 type + 16 filesystem batches of 64, + 2 delta batches.
+        let (endpoint, server) = crate::test_stub::stub(35, move |index, request| {
+            let bound: Vec<String> = request["query"]
+                .as_str()
+                .unwrap_or_default()
+                .split("BIND(<")
+                .skip(1)
+                .filter_map(|s| s.split('>').next().map(str::to_string))
+                .collect();
+            let rows: Vec<serde_json::Value> = match index {
+                0 => (0..N)
+                    .map(|i| json!({"s":{"value":format!("urn:o{i:04}")}}))
+                    .collect(),
+                1..=16 => bound
+                    .iter()
+                    .map(|s| json!({"s":{"value":s},"t":{"value":t}}))
+                    .collect(),
+                17..=32 => bound
+                    .iter()
+                    .map(|s| json!({"s":{"value":s},"fs":{"value":"root:aa"}}))
+                    .collect(),
+                _ => bound
+                    .iter()
+                    .map(|s| json!({"s":{"value":s},"delta":{"value":"1"}}))
+                    .collect(),
+            };
+            (200, json!({"results":{"bindings": rows}}))
+        });
+        let samples = fetch_samples(&endpoint, "cargo:test|repo:r|cwd:root", "root:aa").unwrap();
+        assert_eq!(samples.len(), 100);
+        let requests = server.join().unwrap();
+        let asked: Vec<String> = requests[1..]
+            .iter()
+            .flat_map(|r| {
+                let q = r["query"].as_str().unwrap().to_string();
+                q.split("BIND(<")
+                    .skip(1)
+                    .filter_map(|s| s.split('>').next().map(str::to_string))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let oldest_kept = format!("urn:o{:04}", N - crate::sparql_steps::MAX_WIDTH);
+        assert!(
+            asked.iter().all(|s| *s >= oldest_kept),
+            "an old observation leaked in"
+        );
+        assert!(
+            asked.contains(&format!("urn:o{:04}", N - 1)),
+            "the newest was dropped"
+        );
+        // The delta step sees exactly the newest 100.
+        let delta_step: Vec<String> = requests[33..]
+            .iter()
+            .flat_map(|r| {
+                r["query"]
+                    .as_str()
+                    .unwrap()
+                    .split("BIND(<")
+                    .skip(1)
+                    .filter_map(|s| s.split('>').next().map(str::to_string))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let newest_100: std::collections::BTreeSet<String> =
+            (N - 100..N).map(|i| format!("urn:o{i:04}")).collect();
+        assert_eq!(
+            delta_step
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>(),
+            newest_100
+        );
+    }
 
     /// Samples are the deltas of observations with the signature ON the
     /// filesystem, greatest subject first — and every request is one bound

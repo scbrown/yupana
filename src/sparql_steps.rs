@@ -35,7 +35,7 @@ const BATCH: usize = 64;
 /// Upper bound on IRIs carried into any one hop. A hub (a file every item
 /// touches) can have thousands of modifying commits; past this the hop keeps
 /// the first `MAX_WIDTH`, which is still far beyond any count a caller reads.
-const MAX_WIDTH: usize = 1024;
+pub(crate) const MAX_WIDTH: usize = 1024;
 
 /// Escape a string for a SPARQL double-quoted literal.
 pub(crate) fn literal(value: &str) -> String {
