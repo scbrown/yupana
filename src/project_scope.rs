@@ -16,36 +16,29 @@
 
 use crate::policy::{WorkItemParents, WorkItemScopes};
 use crate::project::ProjectionRegistry;
-use crate::project_queries::{WORK_ITEM_PARENT_QUERY, WORK_ITEM_SCOPE_QUERY};
+use crate::sparql_steps::{entities_touched_by, hop_targets, items_with_identifier};
 
-fn binding_values(body: &str, name: &str) -> crate::errors::Result<Vec<String>> {
-    let value: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| crate::errors::Error::Projection(format!("results are not JSON: {e}")))?;
-    let rows = value
-        .get("results")
-        .and_then(|v| v.get("bindings"))
-        .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| crate::errors::Error::Projection("missing results.bindings".into()))?;
-    Ok(rows
-        .iter()
-        .filter_map(|row| row.get(name)?.get("value")?.as_str().map(str::to_owned))
-        .collect())
+/// The paths prior work on `item` touched, walked one bound pattern per hop.
+/// The same chain as [`crate::project_queries::WORK_ITEM_SCOPE_QUERY`], which
+/// as ONE four-pattern join hits quipu's 10 s deadline on the live store
+/// (aegis-h9c0no, measured 2026-09-25) — so the observed rung was never
+/// projected at all, and said so only on stderr.
+fn scope_paths(endpoint: &str, item: &str) -> crate::errors::Result<Vec<String>> {
+    let entities = entities_touched_by(endpoint, item)?;
+    hop_targets(endpoint, &entities, "e", "?e aegis:filePath ?path", "path")
 }
 
-fn sparql_string(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
-        .replace('\r', "\\r")
-}
-
-fn scope_query(item: &str) -> String {
-    WORK_ITEM_SCOPE_QUERY.replace("$ITEM", &sparql_string(item))
-}
-
-fn parent_query(item: &str) -> String {
-    WORK_ITEM_PARENT_QUERY.replace("$ITEM", &sparql_string(item))
+/// The identifiers of the items that `aegis:contains` `item`.
+fn parent_ids(endpoint: &str, item: &str) -> crate::errors::Result<Vec<String>> {
+    let items = items_with_identifier(endpoint, item)?;
+    let parents = hop_targets(endpoint, &items, "w", "?p aegis:contains ?w", "p")?;
+    hop_targets(
+        endpoint,
+        &parents,
+        "p",
+        "?p aegis:identifier ?parent",
+        "parent",
+    )
 }
 
 /// Fetch the current item's observed scope (plus direct-parent ground), or
@@ -88,9 +81,7 @@ fn fetch_work_item_context_for(
 
     let mut rows = Vec::new();
     for id in ids {
-        let projected = crate::project::query(endpoint, &scope_query(id))
-            .and_then(|body| binding_values(&body, "path"));
-        match projected {
+        match scope_paths(endpoint, id) {
             Ok(found) => rows.extend(found.into_iter().map(|path| (id.to_string(), path))),
             Err(e) => {
                 eprintln!(
@@ -122,9 +113,7 @@ pub fn fetch_work_item_parents(endpoint: &str) -> Option<WorkItemParents> {
 }
 
 fn fetch_work_item_parents_for(endpoint: &str, item: &str) -> Option<WorkItemParents> {
-    match crate::project::query(endpoint, &parent_query(item))
-        .and_then(|body| binding_values(&body, "parent"))
-    {
+    match parent_ids(endpoint, item) {
         Ok(parents) => Some(WorkItemParents::from_rows(
             parents.into_iter().map(|parent| (item.to_string(), parent)),
         )),
@@ -166,28 +155,96 @@ impl ProjectionRegistry {
 // Test names shout the invariant they turn on, the repo's emphasis convention.
 #[allow(non_snake_case)]
 mod tests {
-    use super::{parent_query, scope_query};
+    use super::{parent_ids, scope_paths};
     use crate::policy::WorkItemScopes;
+    use crate::test_stub::stub;
+    use serde_json::json;
 
-    #[test]
-    fn scope_projection_is_bound_to_one_exact_item() {
-        let query = scope_query("aegis-1");
-        assert!(query.contains("aegis:identifier \"aegis-1\""));
-        assert!(!query.contains("aegis:identifier ?id"));
-        assert!(query.contains("SELECT ?path"));
+    const O: &str = crate::export::ONTO;
+
+    /// Every request to the store must be ONE triple pattern per branch (a
+    /// UNION of subject-bound branches is fine): a multi-pattern BGP is what
+    /// hit quipu's 10 s deadline and left this rung unprojected (aegis-h9c0no).
+    fn assert_single_pattern(query: &str) {
+        let body = query.split("WHERE {").nth(1).expect("a WHERE clause");
+        assert_eq!(body.matches(" . ").count(), 0, "joined patterns: {query}");
+        assert!(!body.contains(';'), "joined patterns: {query}");
+        assert!(!body.contains("VALUES"), "unbound VALUES scan: {query}");
     }
 
     #[test]
-    fn parent_projection_is_bound_to_one_exact_item() {
-        let query = parent_query("aegis-1");
-        assert!(query.contains("aegis:identifier \"aegis-1\""));
-        assert!(!query.contains("?w aegis:identifier ?id"));
-        assert!(query.contains("SELECT ?parent"));
+    fn scope_walks_the_chain_one_bound_pattern_per_hop() {
+        let (endpoint, server) = stub(4, |index, _| {
+            let body = match index {
+                0 => json!({"results":{"bindings":[{"w":{"value":format!("{O}aegis-1.2")}}]}}),
+                1 => json!({"results":{"bindings":[
+                    {"w":{"value":format!("{O}aegis-1.2")},"c":{"value":format!("{O}c1")}}]}}),
+                2 => json!({"results":{"bindings":[
+                    {"c":{"value":format!("{O}c1")},"e":{"value":format!("{O}e1")}}]}}),
+                _ => json!({"results":{"bindings":[
+                    {"e":{"value":format!("{O}e1")},"path":{"value":"src/a.rs"}}]}}),
+            };
+            (200, body)
+        });
+        let paths = scope_paths(&endpoint, "aegis-1.2").expect("projected");
+        assert_eq!(paths, vec!["src/a.rs"]);
+        let requests = server.join().unwrap();
+        let queries: Vec<&str> = requests
+            .iter()
+            .map(|r| r["query"].as_str().unwrap())
+            .collect();
+        // The dotted child id rides into the literal intact.
+        assert!(queries[0].contains("aegis:identifier \"aegis-1.2\""));
+        assert!(queries[1].contains(&format!("<{O}aegis-1.2>")));
+        for query in &queries {
+            assert_single_pattern(query);
+        }
+    }
+
+    #[test]
+    fn parent_walks_contains_then_identifier() {
+        let (endpoint, server) = stub(3, |index, _| {
+            let body = match index {
+                0 => json!({"results":{"bindings":[{"w":{"value":format!("{O}child")}}]}}),
+                1 => json!({"results":{"bindings":[
+                    {"w":{"value":format!("{O}child")},"p":{"value":format!("{O}epic")}}]}}),
+                _ => json!({"results":{"bindings":[
+                    {"p":{"value":format!("{O}epic")},"parent":{"value":"aegis-epic"}}]}}),
+            };
+            (200, body)
+        });
+        assert_eq!(
+            parent_ids(&endpoint, "aegis-epic.1").unwrap(),
+            vec!["aegis-epic"]
+        );
+        for request in server.join().unwrap() {
+            assert_single_pattern(request["query"].as_str().unwrap());
+        }
+    }
+
+    #[test]
+    fn a_failed_hop_is_an_error_not_an_empty_scope() {
+        let (endpoint, server) = stub(2, |index, _| match index {
+            0 => (
+                200,
+                json!({"results":{"bindings":[{"w":{"value":format!("{O}w")}}]}}),
+            ),
+            _ => (408, json!({"error":"query deadline"})),
+        });
+        assert!(scope_paths(&endpoint, "aegis-1").is_err());
+        server.join().unwrap();
     }
 
     #[test]
     fn item_ids_cannot_break_out_of_the_sparql_literal() {
-        let query = scope_query("x\" . ?s ?p ?o . #");
+        let (endpoint, server) = stub(1, |_, _| (200, json!({"results":{"bindings":[]}})));
+        assert!(scope_paths(&endpoint, "x\" . ?s ?p ?o . #")
+            .unwrap()
+            .is_empty());
+        let query = server.join().unwrap()[0]["query"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(query.contains("x\\\" . ?s ?p ?o . #"));
     }
 

@@ -157,11 +157,17 @@ pub mod share_pull;
 /// Publishing a graph back out as a share, naming its parent when it has one.
 #[cfg(feature = "quipu")]
 mod share_reshare;
+/// Single-pattern provenance steps joined client-side: quipu answers one bound
+/// pattern in milliseconds and a multi-pattern BGP at its deadline (aegis-h9c0no).
+#[cfg(feature = "quipu")]
+pub mod sparql_steps;
 /// The game-state harness (FR-35..FR-39): a generic in-memory fact graph, a
 /// `graph-pattern` policy plane over it, and `(game, faction)` tenancy. Gated so
 /// a build that cannot ingest a board does not advertise the tier.
 #[cfg(feature = "game-state")]
 pub mod state;
+#[cfg(all(test, feature = "quipu"))]
+mod test_stub;
 pub mod textrules;
 pub mod throttle;
 pub mod trace;
