@@ -18,40 +18,59 @@ pub(super) fn fetch<'a>(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
-    let mut identities = HashMap::new();
-    for batch in iris.chunks(BATCH_SIZE) {
-        let candidates = batch
-            .iter()
-            .map(|iri| format!("<{iri}>"))
-            .collect::<Vec<_>>()
-            .join(" ");
-        let query = super::IDENTITY_QUERY.replace("$CANDIDATES", &candidates);
-        let Ok(body) = crate::project::query(endpoint, &query) else {
-            continue;
-        };
-        let Ok(response) = serde_json::from_str::<serde_json::Value>(&body) else {
-            continue;
-        };
-        let Some(rows) = response["results"]["bindings"].as_array() else {
-            continue;
-        };
-        for row in rows {
-            let value = |key: &str| row[key]["value"].as_str().map(str::to_string);
-            let (Some(entity), Some(id)) = (value("entity"), value("id")) else {
-                continue;
-            };
-            if !batch.contains(&entity.as_str()) {
-                continue;
+    // `/search` and `/context` name entities by PREFIXED name (`aegis:x`).
+    // Sent as `<aegis:x>` that is a different, nonexistent IRI, so every
+    // candidate matched nothing (aegis-h9c0no, measured: 0 rows vs 1 for the
+    // full IRI). Ask about the full IRI; key the answer by the caller's own
+    // spelling, because that is what the caller looks up.
+    let by_full: HashMap<String, &str> = iris
+        .iter()
+        .map(|iri| (crate::sparql_steps::full_iri(iri), *iri))
+        .collect();
+    // Sorted, so batch composition is deterministic rather than hash order.
+    let full: Vec<String> = by_full
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    // One bound pattern per field. The previous single query (identifier plus
+    // two OPTIONALs over a VALUES block) took ~4 s on the live store, against
+    // ~10 ms per single pattern; a missing batch is simply a candidate with no
+    // identity, as before.
+    let field = |pattern: &str, var: &str| -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for batch in full.chunks(BATCH_SIZE) {
+            if let Ok(pairs) = crate::sparql_steps::hop(endpoint, batch, "entity", pattern, var) {
+                out.extend(pairs);
             }
-            let entry = identities.entry(entity).or_insert((id, None, None));
-            // Match the old decoder's first available value for each field,
-            // independent of result ordering between different subjects.
-            if entry.1.is_none() {
-                entry.1 = value("outcome");
-            }
-            if entry.2.is_none() {
-                entry.2 = value("label");
-            }
+        }
+        out
+    };
+    let mut identities: HashMap<String, Identity> = HashMap::new();
+    for (entity, id) in field("?entity aegis:identifier ?id", "id") {
+        if let Some(requested) = by_full.get(&entity) {
+            identities
+                .entry((*requested).to_string())
+                .or_insert((id, None, None));
+        }
+    }
+    let first_value = |pairs: Vec<(String, String)>| -> HashMap<String, String> {
+        let mut first = HashMap::new();
+        for (entity, v) in pairs {
+            first.entry(entity).or_insert(v);
+        }
+        first
+    };
+    let outcomes = first_value(field("?entity aegis:outcome ?outcome", "outcome"));
+    let labels = first_value(field(
+        "?entity <http://www.w3.org/2000/01/rdf-schema#label> ?label",
+        "label",
+    ));
+    for (full_iri, requested) in &by_full {
+        if let Some(entry) = identities.get_mut(*requested) {
+            entry.1 = outcomes.get(full_iri).cloned();
+            entry.2 = labels.get(full_iri).cloned();
         }
     }
     identities

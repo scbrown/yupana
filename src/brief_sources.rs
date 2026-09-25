@@ -18,10 +18,13 @@ use crate::config::YupanaConfig;
 #[path = "brief_identity.rs"]
 mod identity;
 
-/// Only ids shaped like tracker ids ride into SPARQL literals.
+/// Only ids shaped like tracker ids ride into SPARQL literals. The dot is part
+/// of that shape: a child item is `aegis-4hhqoe.3`, and dropping it asked for
+/// `aegis-4hhqoe3`, which matches nothing — every dotted item's briefing came
+/// back empty, indistinguishable from an item with no history (aegis-h9c0no).
 fn sanitized(item: &str) -> String {
     item.chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         .collect()
 }
 
@@ -43,6 +46,9 @@ fn post(endpoint: &str, route: &str, body: &serde_json::Value) -> Option<serde_j
     let text = ureq::post(&format!("{}{route}", endpoint.trim_end_matches('/')))
         .timeout(crate::projection_budget::http_timeout())
         .set("Content-Type", "application/json")
+        // Without it these calls land in quipu's unattributed bucket, which is
+        // how a `/context` 408 hid from the per-client accounting (aegis-h9c0no).
+        .set("X-Quipu-Client", crate::quipu_label::current())
         .send_string(&body.to_string())
         .ok()?
         .into_string()
@@ -84,21 +90,10 @@ pub(crate) fn related_items(endpoint: &str, item: &str) -> Vec<String> {
     let id = sanitized(item);
     // `(entity, other)` pairs, SELF ROWS INCLUDED, so the per-entity degree
     // count sees every tapper — a hub is a hub whether or not we're one of
-    // its five hundred visitors.
-    let query = format!(
-        "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
-         SELECT ?e ?other WHERE {{ \
-         ?c1 aegis:implements ?w ; aegis:modifies ?e . \
-         ?w aegis:identifier \"{id}\" . \
-         ?c2 aegis:modifies ?e ; aegis:implements ?o . \
-         ?o aegis:identifier ?other }}"
-    );
-    let body = crate::project::query(endpoint, &query).unwrap_or_default();
-    let mut per_entity: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
-        std::collections::BTreeMap::new();
-    for (entity, other) in pair_values(&body, "e", "other") {
-        per_entity.entry(entity).or_default().insert(other);
-    }
+    // its five hundred visitors. Walked one bound pattern per hop: the same
+    // chain as ONE five-pattern join hit quipu's 10 s deadline on every call
+    // (aegis-h9c0no), so this section had silently never been populated.
+    let per_entity = co_touching_items(endpoint, &id).unwrap_or_default();
     let mut related: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for items in per_entity.into_values() {
         if items.len() <= HUB_DEGREE_CAP {
@@ -110,36 +105,46 @@ pub(crate) fn related_items(endpoint: &str, item: &str) -> Vec<String> {
     related
 }
 
-/// Decode a two-variable SELECT into its value pairs; partial rows dropped.
-fn pair_values(sparql_json: &str, a: &str, b: &str) -> Vec<(String, String)> {
-    serde_json::from_str::<serde_json::Value>(sparql_json)
-        .ok()
-        .and_then(|v| v["results"]["bindings"].as_array().cloned())
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|row| {
-            Some((
-                row[a]["value"].as_str()?.to_string(),
-                row[b]["value"].as_str()?.to_string(),
-            ))
-        })
-        .collect()
+type ItemsPerEntity = std::collections::BTreeMap<String, std::collections::BTreeSet<String>>;
+
+/// For every entity `id`'s commits modified, the identifiers of ALL items whose
+/// commits modified it (self included): entity -> modifying commit -> the item
+/// it implements -> that item's identifier, one bound pattern per hop.
+fn co_touching_items(endpoint: &str, id: &str) -> crate::errors::Result<ItemsPerEntity> {
+    use crate::sparql_steps::{entities_touched_by, hop};
+    let entities = entities_touched_by(endpoint, id)?;
+    let entity_commits = hop(endpoint, &entities, "e", "?c aegis:modifies ?e", "c")?;
+    let commits: Vec<String> = entity_commits.iter().map(|(_, c)| c.clone()).collect();
+    let commit_items = hop(endpoint, &commits, "c", "?c aegis:implements ?o", "o")?;
+    let items: Vec<String> = commit_items.iter().map(|(_, o)| o.clone()).collect();
+    let item_ids: std::collections::HashMap<String, String> =
+        hop(endpoint, &items, "o", "?o aegis:identifier ?other", "other")?
+            .into_iter()
+            .collect();
+    let mut items_of_commit: std::collections::HashMap<&str, Vec<&str>> =
+        std::collections::HashMap::new();
+    for (commit, item) in &commit_items {
+        if let Some(other) = item_ids.get(item) {
+            items_of_commit.entry(commit).or_default().push(other);
+        }
+    }
+    let mut per_entity = ItemsPerEntity::new();
+    for (entity, commit) in &entity_commits {
+        for other in items_of_commit.get(commit.as_str()).into_iter().flatten() {
+            per_entity
+                .entry(entity.clone())
+                .or_default()
+                .insert((*other).to_string());
+        }
+    }
+    Ok(per_entity)
 }
 
 /// The IRIs of entities the item's prior commits modified — the pagerank
 /// seeds for "central around THIS work", and honest ones: they come from the
 /// same provenance chain as the observed scope.
 fn ground_entity_iris(endpoint: &str, item: &str) -> Vec<String> {
-    let query = format!(
-        "PREFIX aegis: <http://aegis.gastown.local/ontology/> \
-         SELECT DISTINCT ?e WHERE {{ ?c aegis:implements ?w ; aegis:modifies ?e . \
-         ?w aegis:identifier \"{}\" }}",
-        sanitized(item)
-    );
-    values(
-        &crate::project::query(endpoint, &query).unwrap_or_default(),
-        "e",
-    )
+    crate::sparql_steps::entities_touched_by(endpoint, &sanitized(item)).unwrap_or_default()
 }
 
 /// SIMILAR work items, via quipu's `/context` pipeline — the same
@@ -297,16 +302,6 @@ fn probes(query_text: &str, with_terms: bool) -> Vec<String> {
     probes.extend(terms.into_iter().take(3).map(str::to_string));
     probes
 }
-
-/// Candidate identities share one query shape. The namespace belongs to the
-/// same deployed work-item vocabulary as the other briefing queries here.
-const IDENTITY_QUERY: &str = "\
-    PREFIX aegis: <http://aegis.gastown.local/ontology/> \
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \
-    SELECT ?entity ?id ?outcome ?label WHERE { VALUES ?entity { $CANDIDATES } \
-    ?entity aegis:identifier ?id . \
-    OPTIONAL { ?entity aegis:outcome ?outcome } \
-    OPTIONAL { ?entity rdfs:label ?label } }";
 
 /// The semantic scale is QUERY-RELATIVE, not absolute: on quipu's `/search`
 /// surface (bare query label against entity text with type/provenance
