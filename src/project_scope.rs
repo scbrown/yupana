@@ -176,7 +176,7 @@ mod tests {
     fn scope_walks_the_chain_one_bound_pattern_per_hop() {
         let (endpoint, server) = stub(4, |index, _| {
             let body = match index {
-                0 => json!({"results":{"bindings":[{"w":{"value":format!("{O}aegis-1.2")}}]}}),
+                0 => json!({"results":{"bindings":[{"s":{"value":format!("{O}aegis-1.2")}}]}}),
                 1 => json!({"results":{"bindings":[
                     {"w":{"value":format!("{O}aegis-1.2")},"c":{"value":format!("{O}c1")}}]}}),
                 2 => json!({"results":{"bindings":[
@@ -205,7 +205,7 @@ mod tests {
     fn parent_walks_contains_then_identifier() {
         let (endpoint, server) = stub(3, |index, _| {
             let body = match index {
-                0 => json!({"results":{"bindings":[{"w":{"value":format!("{O}child")}}]}}),
+                0 => json!({"results":{"bindings":[{"s":{"value":format!("{O}child")}}]}}),
                 1 => json!({"results":{"bindings":[
                     {"w":{"value":format!("{O}child")},"p":{"value":format!("{O}epic")}}]}}),
                 _ => json!({"results":{"bindings":[
@@ -227,7 +227,7 @@ mod tests {
         let (endpoint, server) = stub(2, |index, _| match index {
             0 => (
                 200,
-                json!({"results":{"bindings":[{"w":{"value":format!("{O}w")}}]}}),
+                json!({"results":{"bindings":[{"s":{"value":format!("{O}w")}}]}}),
             ),
             _ => (408, json!({"error":"query deadline"})),
         });

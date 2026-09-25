@@ -117,21 +117,66 @@ pub fn p90(samples: &[DiskSample]) -> Option<i64> {
     values.get(rank).copied()
 }
 
-/// Fetch recent samples for one normalized command/filesystem pair.
-pub fn fetch_samples(endpoint: &str, signature: &str, filesystem: &str) -> Result<Vec<DiskSample>> {
-    let sparql = format!(
-        "PREFIX aegis: <http://aegis.gastown.local/ontology/>\n\
-         SELECT ?delta WHERE {{ ?s a aegis:CommandDiskImpactObservation ; \
-         aegis:commandSignature {} ; aegis:filesystemIdentity {} ; \
-         aegis:diskDeltaBytes ?delta . }} ORDER BY DESC(?s) LIMIT 100",
-        sparql_string(signature),
-        sparql_string(filesystem)
-    );
-    decode_samples(&crate::project::query(endpoint, &sparql)?)
-}
+/// Most recent observations kept per command/filesystem pair.
+const SAMPLE_LIMIT: usize = 100;
 
-fn sparql_string(value: &str) -> String {
-    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into())
+/// Fetch recent samples for one normalized command/filesystem pair.
+///
+/// Walked as single bound patterns and joined here: the same question as one
+/// four-pattern BGP took ~3 s on an idle store (0.05 s for the signature step
+/// alone), and on the pre-bash path of every heavy command a multi-pattern BGP
+/// is what runs into quipu's 10 s deadline under load (aegis-h9c0no). Same
+/// answer: observations with this signature, on this filesystem, the
+/// `SAMPLE_LIMIT` greatest subject IRIs first (the former `ORDER BY DESC(?s)`),
+/// every delta each carries.
+pub fn fetch_samples(endpoint: &str, signature: &str, filesystem: &str) -> Result<Vec<DiskSample>> {
+    use crate::sparql_steps::{hop, subjects_with};
+    let mut observations = subjects_with(endpoint, "aegis:commandSignature", signature)?;
+    observations.sort_unstable_by(|a, b| b.cmp(a));
+    observations.dedup();
+    // The former BGP also required the type; keep that exact, so a future kind
+    // of observation sharing `commandSignature` cannot leak into this history.
+    let typed: std::collections::BTreeSet<String> =
+        hop(endpoint, &observations, "s", "?s a ?t", "t")?
+            .into_iter()
+            .filter(|(_, t)| t.ends_with("/ontology/CommandDiskImpactObservation"))
+            .map(|(s, _)| s)
+            .collect();
+    observations.retain(|s| typed.contains(s));
+    let on_filesystem: std::collections::BTreeSet<String> = hop(
+        endpoint,
+        &observations,
+        "s",
+        "?s aegis:filesystemIdentity ?fs",
+        "fs",
+    )?
+    .into_iter()
+    .filter(|(_, fs)| fs == filesystem)
+    .map(|(s, _)| s)
+    .collect();
+    let kept: Vec<String> = observations
+        .into_iter()
+        .filter(|s| on_filesystem.contains(s))
+        .take(SAMPLE_LIMIT)
+        .collect();
+    let mut deltas = hop(
+        endpoint,
+        &kept,
+        "s",
+        "?s aegis:diskDeltaBytes ?delta",
+        "delta",
+    )?;
+    deltas.sort_by(|a, b| b.0.cmp(&a.0));
+    deltas
+        .into_iter()
+        .enumerate()
+        .map(|(i, (_, value))| {
+            let delta_bytes = value.parse::<i64>().map_err(|e| {
+                Error::Projection(format!("disk-history row {i}: invalid `delta`: {e}"))
+            })?;
+            Ok(DiskSample { delta_bytes })
+        })
+        .collect()
 }
 
 /// Decode Quipu's W3C SPARQL result envelope.
@@ -156,6 +201,60 @@ pub fn decode_samples(body: &str) -> Result<Vec<DiskSample>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    /// Samples are the deltas of observations with the signature ON the
+    /// filesystem, greatest subject first — and every request is one bound
+    /// pattern, never the four-pattern BGP that ran into quipu's deadline.
+    #[test]
+    fn samples_are_walked_in_single_bound_patterns_and_filtered_by_filesystem() {
+        let t = format!("{}CommandDiskImpactObservation", crate::export::ONTO);
+        let (endpoint, server) = crate::test_stub::stub(4, move |index, _| {
+            let rows = match index {
+                0 => {
+                    json!([{"s":{"value":"urn:o1"}},{"s":{"value":"urn:o2"}},{"s":{"value":"urn:o3"}},{"s":{"value":"urn:other"}}])
+                }
+                // `urn:other` shares the signature but is another KIND of observation.
+                1 => json!([
+                    {"s":{"value":"urn:o1"},"t":{"value":t}},
+                    {"s":{"value":"urn:o2"},"t":{"value":t}},
+                    {"s":{"value":"urn:o3"},"t":{"value":t}},
+                    {"s":{"value":"urn:other"},"t":{"value":"urn:SomethingElse"}}]),
+                2 => json!([
+                    {"s":{"value":"urn:o1"},"fs":{"value":"root:aa"}},
+                    {"s":{"value":"urn:o2"},"fs":{"value":"tmpfs:bb"}},
+                    {"s":{"value":"urn:o3"},"fs":{"value":"root:aa"}}]),
+                _ => json!([
+                    {"s":{"value":"urn:o1"},"delta":{"value":"10"}},
+                    {"s":{"value":"urn:o3"},"delta":{"value":"30"}},
+                    {"s":{"value":"urn:o3"},"delta":{"value":"31"}}]),
+            };
+            (200, json!({"results":{"bindings": rows}}))
+        });
+        let samples = fetch_samples(&endpoint, "cargo:test|repo:r|cwd:root", "root:aa").unwrap();
+        let mut got: Vec<i64> = samples.iter().map(|s| s.delta_bytes).collect();
+        // o3's two deltas come before o1's; within o3 the order is the store's.
+        assert_eq!(got.pop(), Some(10));
+        got.sort_unstable();
+        assert_eq!(got, vec![30, 31]);
+        let requests = server.join().unwrap();
+        let queries: Vec<&str> = requests
+            .iter()
+            .map(|r| r["query"].as_str().unwrap())
+            .collect();
+        assert!(queries[0].contains("aegis:commandSignature \"cargo:test|repo:r|cwd:root\""));
+        // Neither the other-kind nor the tmpfs observation reaches the delta step.
+        assert!(!queries[2].contains("<urn:other>"));
+        assert!(queries[3].contains("<urn:o1>") && queries[3].contains("<urn:o3>"));
+        assert!(!queries[3].contains("<urn:o2>") && !queries[3].contains("<urn:other>"));
+        for query in &queries {
+            let body = query.split("WHERE {").nth(1).unwrap();
+            assert!(
+                !body.contains(';') && !body.contains(" . "),
+                "joined: {query}"
+            );
+        }
+    }
 
     #[test]
     fn signature_omits_flags_paths_and_raw_argv() {
