@@ -35,7 +35,7 @@ that worked alongside the quipu: the quipu recorded, the yupana computed.
   same graph checks a proposed edit against your team's rules before it lands.
 
 More on the design, and how it compares with LSP, Joern and embedding search:
-[Why Yupana](docs/book/src/concepts/why-yupana.md).
+[Why Yupana](https://scbrown.github.io/yupana/concepts/why-yupana.html).
 
 ## Install
 
@@ -109,7 +109,7 @@ Run these from the root of any repository; each takes the path to analyze.
 | where does this variable flow inside a function? | `yupana dataflow <function> . --var <variable>` |
 
 Every command has `--help`. The full list is in the
-[CLI reference](docs/book/src/reference/cli.md).
+[CLI reference](https://scbrown.github.io/yupana/reference/cli.html).
 
 ## Wire it into your agent
 
@@ -122,7 +122,7 @@ claude mcp add yupana -- yupana serve
 
 Any other MCP client takes the same command. The agent gets fifteen `yupana_*`
 tools, for symbols, references, callers, impact and more; see the
-[MCP tools reference](docs/book/src/reference/mcp-tools.md).
+[MCP tools reference](https://scbrown.github.io/yupana/reference/mcp-tools.html).
 
 **As an edit hook.** Add this to `.claude/settings.json` and, after each edit,
 the agent is told which other files call what it just changed:
@@ -141,9 +141,9 @@ the agent is told which other files call what it just changed:
 ```
 
 The pre-edit rule guard, the session-start briefing and the Bash action hook
-are in [Harness Integration](docs/book/src/getting-started/harness-integration.md).
+are in [Harness Integration](https://scbrown.github.io/yupana/getting-started/harness-integration.html).
 Rules that come from Quipu are covered in the
-[pre-edit policy guard](docs/book/src/reference/policy-guard.md).
+[pre-edit policy guard](https://scbrown.github.io/yupana/reference/policy-guard.html).
 
 ## Before you start
 
@@ -165,12 +165,12 @@ the release and in the source command above, adds the rest.
 
 ## What's next
 
-- [The book](docs/book/src/SUMMARY.md): installation, configuration, concepts
+- [The book](https://scbrown.github.io/yupana/): installation, configuration, concepts
   and reference, in reading order.
-- [Map of all docs](docs/book/src/docs-map.md): where every design note,
+- [Map of all docs](https://scbrown.github.io/yupana/docs-map.html): where every design note,
   spec and research document lives, and which ones are historical.
-- [Why Yupana](docs/book/src/concepts/why-yupana.md) and
-  [how it works with Quipu and Bobbin](docs/book/src/concepts/the-stack.md).
+- [Why Yupana](https://scbrown.github.io/yupana/concepts/why-yupana.html) and
+  [how it works with Quipu and Bobbin](https://scbrown.github.io/yupana/concepts/the-stack.html).
 
 ## 🧺 The stack
 
