@@ -113,8 +113,8 @@ fn two_agents_landing_the_same_command_in_one_second_get_DIFFERENT_record_ids() 
     // second, ONE row in the spool and exit 0 from both invocations.
     let cmd = "gh pr merge 230 --repo scbrown/quipu --merge";
     assert_ne!(
-        landing_record_id(1_789_528_644, "wu", cmd),
-        landing_record_id(1_789_528_644, "grant", cmd),
+        landing_record_id(1_789_528_644, "wu", "refuse", cmd),
+        landing_record_id(1_789_528_644, "grant", "refuse", cmd),
         "same command, same second, different agents MUST NOT share a key"
     );
     // The test that stood here before checked `md5_ish` alone and passed
@@ -132,8 +132,25 @@ fn the_SAME_agent_retrying_the_same_command_in_one_second_keeps_ONE_record_id() 
     // inflate the very denominator the soak divides by.
     let cmd = "gh pr merge 230 --repo scbrown/quipu --merge";
     assert_eq!(
-        landing_record_id(1_789_528_644, "wu", cmd),
-        landing_record_id(1_789_528_644, "wu", cmd)
+        landing_record_id(1_789_528_644, "wu", "refuse", cmd),
+        landing_record_id(1_789_528_644, "wu", "refuse", cmd)
+    );
+}
+
+#[test]
+fn the_SAME_agent_retrying_with_a_DIFFERENT_outcome_in_one_second_gets_a_NEW_record_id() {
+    // aegis-djxl44: refuse, arm an override, retry. an6v8i's agent field cannot
+    // separate these, because the agent and command are the same; only the outcome
+    // differs. Before this, the ALLOW was refused by `append` and lost, keeping the
+    // REFUSE: a manufactured false positive inside the soak.
+    let cmd = "gh pr merge 241 --repo scbrown/quipu";
+    let refused = landing_record_id(1_789_528_644, "wu", &landing_outcome("refuse", false), cmd);
+    let allowed = landing_record_id(1_789_528_644, "wu", &landing_outcome("allow", true), cmd);
+    assert_ne!(refused, allowed);
+    // An override that did not change the verdict is still a different event.
+    assert_ne!(
+        landing_record_id(1_789_528_644, "wu", &landing_outcome("refuse", false), cmd),
+        landing_record_id(1_789_528_644, "wu", &landing_outcome("refuse", true), cmd)
     );
 }
 
@@ -142,12 +159,12 @@ fn the_record_id_still_varies_by_second_and_by_command() {
     // Guard the two properties the agent field must not have cost us.
     let cmd = "gh pr merge 230 --repo scbrown/quipu --merge";
     assert_ne!(
-        landing_record_id(1_789_528_644, "wu", cmd),
-        landing_record_id(1_789_528_645, "wu", cmd)
+        landing_record_id(1_789_528_644, "wu", "refuse", cmd),
+        landing_record_id(1_789_528_645, "wu", "refuse", cmd)
     );
     assert_ne!(
-        landing_record_id(1_789_528_644, "wu", cmd),
-        landing_record_id(1_789_528_644, "wu", "git push origin main")
+        landing_record_id(1_789_528_644, "wu", "refuse", cmd),
+        landing_record_id(1_789_528_644, "wu", "refuse", "git push origin main")
     );
 }
 
@@ -158,5 +175,7 @@ fn the_record_id_keeps_the_landing_prefix_every_consumer_filters_on() {
     // host adapter's rows start `quipu-writer-`. Inserting the agent must not
     // disturb that, or the soak silently stops seeing governed evaluations and
     // reports a corpus of zero as an honest answer.
-    assert!(landing_record_id(1_789_528_644, "wu", "gh pr merge 3").starts_with("landing-"));
+    assert!(
+        landing_record_id(1_789_528_644, "wu", "allow", "gh pr merge 3").starts_with("landing-")
+    );
 }
