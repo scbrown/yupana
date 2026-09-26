@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.10.5] - 2026-09-26
 
+### Documentation
+
+- *(readme)* Point book links at the live Pages book, not markdown source([738dcff](https://github.com/scbrown/yupana/commit/738dcff04fb59e330acfe2a66e459942b22aebb7))
+
 ### Fixed
 
 - *(landing)* Key the record id on the outcome, so a same-agent retry is not lost([b95bdd6](https://github.com/scbrown/yupana/commit/b95bdd67d85a26f3cadf972872b47a248bf44248))
