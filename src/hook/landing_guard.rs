@@ -355,7 +355,12 @@ fn record(
     }];
     let agent = request.agent.clone().unwrap_or_else(|| "unknown".into());
     let input = crate::action_certification::ActionInput {
-        record_id: landing_record_id(ts, &agent, &landing.evidence),
+        record_id: landing_record_id(
+            ts,
+            &agent,
+            &landing_outcome(decision.as_str(), request.override_grant.is_some()),
+            &landing.evidence,
+        ),
         correlation_id: session.clone(),
         session,
         ts,
@@ -422,15 +427,33 @@ fn record(
 /// retry being 13 seconds later. Keeping the REFUSE and dropping the ALLOW
 /// manufactures a false positive inside the soak that gates the block-tier flip.
 ///
-/// A byte-identical retry by the same agent still dedupes: the id matches AND the
-/// signed payload hash matches, which is the branch `append` treats as an
-/// idempotent re-send. That property is load-bearing and is asserted in the tests.
+/// The agent alone did not close that shape (aegis-djxl44): the retry is the SAME
+/// agent and the SAME command, so only the OUTCOME differs, and the second row was
+/// still refused as a colliding id. Measured through pr-risk's governed consult:
+/// wu REFUSE then wu override-ALLOW, back to back, ONE row; 1.2s apart, two. So the
+/// outcome (the decision plus whether an override was granted) is hashed with the
+/// command.
+///
+/// A byte-identical retry by the same agent still dedupes: same outcome, so the id
+/// matches AND the signed payload hash matches, which is the branch `append` treats
+/// as an idempotent re-send. That property is load-bearing and is asserted in the
+/// tests.
 #[cfg(feature = "quipu")]
-fn landing_record_id(ts: u64, agent: &str, evidence: &str) -> String {
+fn landing_record_id(ts: u64, agent: &str, outcome: &str, evidence: &str) -> String {
     format!(
         "landing-{ts}-{agent}-{}",
-        &format!("{:x}", md5_ish(evidence))[..8]
+        &format!("{:x}", md5_ish(&format!("{outcome}\0{evidence}")))[..8]
     )
+}
+
+/// The part of a verdict a same-second retry can change.
+#[cfg(feature = "quipu")]
+fn landing_outcome(result: &str, override_granted: bool) -> String {
+    if override_granted {
+        format!("{result}+override")
+    } else {
+        result.to_string()
+    }
 }
 
 /// A tiny non-cryptographic digest, used ONLY to give a record a stable id per
