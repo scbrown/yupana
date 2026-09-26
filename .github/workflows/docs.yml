@@ -25,7 +25,7 @@ jobs:
     outputs:
       changed: ${{ steps.paths.outputs.changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - id: paths
@@ -45,10 +45,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # An exact version, not a range: "^0.4" re-resolved at every run, so the
+      # binary that ran with this job's write token could change without a
+      # commit here. --locked builds from mdbook's published Cargo.lock, and
+      # cargo checks every crate against the registry index checksum. Bump the
+      # version in a reviewed change.
       - name: Install mdbook
         if: needs.relevant-changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
-        run: cargo install mdbook --version "^0.4" --locked
+        run: cargo install mdbook --version "=0.4.52" --locked
       - name: Build book
         if: needs.relevant-changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: mdbook build docs/book
@@ -56,7 +61,7 @@ jobs:
         if: >-
           (github.event_name == 'push' && needs.relevant-changes.outputs.changed == 'true') ||
           github.event_name == 'workflow_dispatch'
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/book/book

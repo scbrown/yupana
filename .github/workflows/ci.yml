@@ -256,9 +256,11 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/mdbook
-          key: ${{ runner.os }}-mdbook-0.4
+          # The key names the EXACT version, so a binary cached from another
+          # version (or the old "^0.4" range) is never picked up.
+          key: ${{ runner.os }}-mdbook-0.4.52
       - name: Install mdbook
-        run: command -v mdbook || cargo install mdbook --version "^0.4" --locked
+        run: command -v mdbook || cargo install mdbook --version "=0.4.52" --locked
       - run: mdbook build docs/book
 
   lint-markdown:
