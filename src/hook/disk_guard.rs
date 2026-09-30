@@ -152,7 +152,7 @@ fn read_disk(path: &Path) -> Result<DiskReading, String> {
 
 fn finish_previous(session: &str, now: &DiskReading, endpoint: &str) -> Option<String> {
     let path = state_path(session)?;
-    let pending: Pending = serde_json::from_slice(&std::fs::read(&path).ok()?).ok()?;
+    let pending = claim_pending(&path)?;
     if pending.filesystem != now.filesystem {
         return Some("previous command crossed filesystems; no delta recorded".into());
     }
@@ -178,9 +178,45 @@ fn arm(session: &str, signature: &str, reading: &DiskReading) -> Result<(), Stri
         available_bytes: reading.available_bytes,
         observed_at: chrono::Utc::now().to_rfc3339(),
     };
-    let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
-    serde_json::to_writer(&mut file, &pending).map_err(|e| e.to_string())?;
-    file.flush().map_err(|e| e.to_string())
+    write_pending_at(&path, &pending)
+}
+
+/// Write-then-rename so a concurrent claimer never reads a half-written file.
+fn write_pending_at(path: &Path, pending: &Pending) -> Result<(), String> {
+    let tmp = unique_sibling(path, "arming");
+    let mut file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+    serde_json::to_writer(&mut file, pending).map_err(|e| e.to_string())?;
+    file.flush().map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+/// Take exclusive ownership of the pending sample, or `None` if another hook
+/// invocation already took it. The old read-and-leave let every parallel tool
+/// call in one session consume the SAME pending sample: each posted the same
+/// sample id with its own delta, so one observation carried two or three
+/// different `diskDeltaBytes` (4,024 maxCount violations, aegis-6bh4g4).
+/// `rename` is atomic on one filesystem, so exactly one claimer wins.
+fn claim_pending(path: &Path) -> Option<Pending> {
+    let claim = unique_sibling(path, "claim");
+    std::fs::rename(path, &claim).ok()?;
+    let pending = std::fs::read(&claim)
+        .ok()
+        .and_then(|raw| serde_json::from_slice(&raw).ok());
+    let _ = std::fs::remove_file(&claim);
+    pending
+}
+
+fn unique_sibling(path: &Path, tag: &str) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    path.with_extension(format!(
+        "{tag}-{}-{nanos}-{}",
+        std::process::id(),
+        SEQ.fetch_add(1, Ordering::Relaxed)
+    ))
 }
 
 fn state_path(session: &str) -> Option<PathBuf> {
@@ -290,5 +326,67 @@ mod tests {
         assert!(might_consume_disk("fallocate -l 1G image"));
         assert!(!might_consume_disk("true"));
         assert!(!might_consume_disk("git status"));
+    }
+
+    fn sample() -> Pending {
+        Pending {
+            signature: "cargo:build".into(),
+            filesystem: "root:test".into(),
+            available_bytes: 1_000,
+            observed_at: "2026-09-29T00:00:00+00:00".into(),
+        }
+    }
+
+    fn write_pending(path: &Path) {
+        std::fs::write(path, serde_json::to_vec(&sample()).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_pending_sample_is_consumed_exactly_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.json");
+        write_pending(&path);
+        assert_eq!(claim_pending(&path).unwrap().available_bytes, 1_000);
+        assert!(
+            claim_pending(&path).is_none(),
+            "second claim must not re-read"
+        );
+        assert_eq!(
+            std::fs::read_dir(dir.path()).unwrap().count(),
+            0,
+            "no claim debris"
+        );
+    }
+
+    #[test]
+    fn concurrent_claimers_get_one_winner() {
+        for _ in 0..50 {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("s.json");
+            write_pending(&path);
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+            let wins: usize = (0..8)
+                .map(|_| {
+                    let (p, b) = (path.clone(), barrier.clone());
+                    std::thread::spawn(move || {
+                        b.wait();
+                        usize::from(claim_pending(&p).is_some())
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .sum();
+            assert_eq!(wins, 1);
+        }
+    }
+
+    #[test]
+    fn arm_then_claim_round_trips_without_debris() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.json");
+        write_pending_at(&path, &sample()).unwrap();
+        assert_eq!(claim_pending(&path).unwrap().signature, "cargo:build");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
     }
 }
