@@ -438,6 +438,25 @@ pub fn resolve_all(cmd: &str) -> Vec<Landing> {
                 }
             }
             landing.parse_incomplete = parsed.incomplete;
+            // Runtime expansion and xargs replacement are unknown values, not
+            // literal topic-ref names that could escape applicability checks.
+            if let RefTarget::Named(name) = &landing.git_ref {
+                if command.dynamic_words.iter().any(|word| {
+                    word == name
+                        || (word.rsplit(':').next() == Some(name.as_str())
+                            && (name.contains('$') || name.contains('`')))
+                }) {
+                    landing.git_ref = RefTarget::Unstated;
+                }
+            }
+            match &landing.repo {
+                RepoRef::Url(name) | RepoRef::Remote(name) | RepoRef::Slug(name)
+                    if command.dynamic_words.iter().any(|word| word.contains(name)) =>
+                {
+                    landing.repo = RepoRef::Cwd;
+                }
+                _ => {}
+            }
             landings.push(landing);
         }
     }

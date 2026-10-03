@@ -64,6 +64,7 @@ fn route(mut command: Command, out: &mut Parsed, depth: usize) {
                     out.commands.push(Command {
                         text: command.text.clone(),
                         words: vec!["cd".into(), directory],
+                        dynamic_words: command.dynamic_words.clone(),
                         scope: command.scope.clone(),
                     });
                     at += 1;
@@ -96,10 +97,23 @@ fn route(mut command: Command, out: &mut Parsed, depth: usize) {
                         out.commands.push(Command {
                             text: command.text.clone(),
                             words: vec!["cd".into(), directory.clone()],
+                            dynamic_words: command.dynamic_words.clone(),
                             scope: command.scope.clone(),
                         });
                         at += 2;
                         continue;
+                    }
+                }
+                if program == "xargs" {
+                    if matches!(word.as_str(), "-I" | "--replace") {
+                        if let Some(value) = command.words.get(at + 1) {
+                            command.dynamic_words.push(value.clone());
+                        }
+                    } else if let Some(value) = word
+                        .strip_prefix("-I")
+                        .or_else(|| word.strip_prefix("--replace="))
+                    {
+                        command.dynamic_words.push(value.to_string());
                     }
                 }
                 let takes_value = match program.as_str() {

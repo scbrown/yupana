@@ -10,6 +10,7 @@ use tree_sitter::{Node, Parser};
 pub(crate) struct Command {
     pub text: String,
     pub words: Vec<String>,
+    pub dynamic_words: Vec<String>,
     /// Nested execution environments; directory changes do not escape them.
     pub scope: Vec<usize>,
 }
@@ -70,9 +71,21 @@ fn visit(node: Node<'_>, bytes: &[u8], scope: &[usize], result: &mut Parsed) {
         for arg in node.children_by_field_name("argument", &mut cursor) {
             decode_word(arg, bytes, &mut words, &mut result.incomplete);
         }
+        let mut cursor = node.walk();
+        let dynamic_words = node
+            .child_by_field_name("name")
+            .into_iter()
+            .chain(node.children_by_field_name("argument", &mut cursor))
+            .filter(|node| dynamic(*node))
+            .flat_map(|node| {
+                let text = node.utf8_text(bytes).unwrap_or_default();
+                shell_words::split(text).unwrap_or_else(|_| vec![text.to_string()])
+            })
+            .collect();
         let command = Command {
             text: node.utf8_text(bytes).unwrap_or_default().to_string(),
             words,
+            dynamic_words,
             scope: nested.clone(),
         };
         if node.child_by_field_name("name").is_some_and(dynamic) {

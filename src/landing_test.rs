@@ -420,3 +420,20 @@ fn attached_chdir_and_nonexecuting_shell_modes() {
         assert!(resolve(command).is_none(), "{command}");
     }
 }
+
+#[test]
+fn expanded_and_input_supplied_refs_are_not_known_topic_refs() {
+    for command in [
+        "git push origin \"$TARGET\"",
+        "xargs -I {} git push origin {}",
+        "xargs -I{} git push origin {}",
+    ] {
+        let landing = resolve(command).unwrap();
+        assert!(landing.parse_incomplete);
+        assert_eq!(landing.git_ref, RefTarget::Unstated, "{command}");
+    }
+    assert_eq!(
+        resolve("git push origin '$TARGET'").unwrap().git_ref,
+        RefTarget::Named("$TARGET".into())
+    );
+}
