@@ -10,7 +10,7 @@ use super::Commands;
 /// silently under-count a surface that grew.
 pub(super) fn deliberate_use_name(cmd: &Commands) -> Option<&'static str> {
     Some(match cmd {
-        Commands::Hook { .. } | Commands::Completions { .. } => return None,
+        Commands::Hook { .. } | Commands::Completions { .. } | Commands::AuditRule => return None,
         // A readiness checker runs it from cron; counting that as agent use
         // would inflate the leverage metric with a timer (aegis-l26g8x).
         #[cfg(feature = "quipu")]
@@ -98,7 +98,7 @@ pub(super) fn declare_quipu_caller(_cmd: &Commands) {}
 #[cfg(feature = "quipu")]
 pub(super) fn quipu_caller_kind(cmd: &Commands) -> Option<&'static str> {
     Some(match cmd {
-        Commands::Hook { .. } | Commands::Daemon { .. } => return None,
+        Commands::Hook { .. } | Commands::Daemon { .. } | Commands::AuditRule => return None,
         // The resident MCP server is not a one-shot verb: long-lived, answering
         // tool calls, a different load shape and a different owner. Folding it
         // under `cli:` would repeat this bead's own mistake one level down.
