@@ -39,23 +39,6 @@ fn values(sparql_json: &str, var: &str) -> Vec<String> {
         .collect()
 }
 
-/// POST a JSON body to a quipu endpoint, returning the parsed response.
-/// Every caller treats `None` as "this section stays empty" — a briefing
-/// source failing must never fail the briefing.
-fn post(endpoint: &str, route: &str, body: &serde_json::Value) -> Option<serde_json::Value> {
-    let text = ureq::post(&format!("{}{route}", endpoint.trim_end_matches('/')))
-        .timeout(crate::projection_budget::http_timeout())
-        .set("Content-Type", "application/json")
-        // Without it these calls land in quipu's unattributed bucket, which is
-        // how a `/context` 408 hid from the per-client accounting (aegis-h9c0no).
-        .set("X-Quipu-Client", crate::quipu_label::current())
-        .send_string(&body.to_string())
-        .ok()?
-        .into_string()
-        .ok()?;
-    serde_json::from_str(&text).ok()
-}
-
 /// The item's `rdfs:label`, if the graph has one.
 pub(crate) fn label_of(endpoint: &str, item: &str) -> Option<String> {
     let query = format!(
@@ -182,7 +165,7 @@ pub(crate) fn similar_items(
     let mut order: Vec<String> = Vec::new();
     let mut votes: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     for (index, probe) in probes(query_text, hits.is_empty()).iter().enumerate() {
-        let Some(response) = post(
+        let Some(response) = crate::brief_http::post(
             endpoint,
             "/context",
             &serde_json::json!({ "query": probe, "max_entities": 12, "expand_links": true }),
@@ -338,7 +321,7 @@ fn semantic_hits(endpoint: &str, query_text: &str) -> Vec<(String, f64)> {
     if ablated("semantic") {
         return Vec::new();
     }
-    let Some(response) = post(
+    let Some(response) = crate::brief_http::post(
         endpoint,
         "/search",
         &serde_json::json!({ "query": query_text, "limit": 10 }),
@@ -371,7 +354,7 @@ pub(crate) fn central_entities(endpoint: &str, item: &str) -> Vec<(String, f64)>
     if seeds.is_empty() {
         return Vec::new();
     }
-    let Some(response) = post(
+    let Some(response) = crate::brief_http::post(
         endpoint,
         "/project",
         &serde_json::json!({ "algorithm": "pagerank", "seeds": seeds, "limit": 5 }),
@@ -468,17 +451,21 @@ pub fn gather(config: &YupanaConfig, root: &Path) -> Option<Brief> {
     let query_text = label.clone().unwrap_or_else(|| item.clone());
 
     let related = related_items(&endpoint, &item);
+    let central = central_entities(&endpoint, &item);
+    // `/context` LAST (aegis-drywac): it is the slowest source (~12s measured),
+    // so under a spent budget it is the one skipped, not the cheap ones after it.
+    let similar = similar_items(
+        &endpoint,
+        &item,
+        &query_text,
+        registry.work_item_scopes(),
+        &related,
+    );
     Some(Brief {
         ground: ground_of(root, &paths),
-        similar: similar_items(
-            &endpoint,
-            &item,
-            &query_text,
-            registry.work_item_scopes(),
-            &related,
-        ),
+        similar,
         related,
-        central: central_entities(&endpoint, &item),
+        central,
         rules: crate::brief::rules_in_force(&registry),
         posture: crate::brief::posture_line(config),
         item,

@@ -16,6 +16,7 @@ pub mod action;
 pub mod action_certification;
 pub mod attribution;
 pub mod audit;
+pub mod audit_rule;
 /// The work-item briefing — the CONTEXT consumer of the scope ladder. Gated
 /// with the projection it reads.
 #[cfg(feature = "quipu")]
@@ -25,6 +26,9 @@ pub mod brief;
 /// `brief_sources`. Gated with the projection it reads.
 #[cfg(feature = "quipu")]
 pub mod brief_deviation;
+/// The briefing's HTTP calls to quipu, bounded by the hook budget.
+#[cfg(feature = "quipu")]
+mod brief_http;
 /// The L0 half of that briefing: the small push, plus a census of what it held
 /// back. Gated with `brief`, whose `Brief` it renders.
 #[cfg(feature = "quipu")]

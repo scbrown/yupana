@@ -41,6 +41,24 @@ pub struct Capture {
 /// - [`Error::Parse`] — the query itself does not compile, or the source could
 ///   not be parsed.
 pub fn run_query(source: &str, language: &str, query_src: &str) -> Result<Vec<Capture>> {
+    run_query_inner(source, language, query_src, false)
+}
+
+/// Evaluate an audit selector, refusing trees with syntax errors or missing nodes.
+/// Unlike interactive extraction, an incomplete parse cannot establish compliance.
+///
+/// # Errors
+/// Returns an error for unsupported grammars, invalid queries, or invalid source.
+pub fn run_query_strict(source: &str, language: &str, query_src: &str) -> Result<Vec<Capture>> {
+    run_query_inner(source, language, query_src, true)
+}
+
+fn run_query_inner(
+    source: &str,
+    language: &str,
+    query_src: &str,
+    strict: bool,
+) -> Result<Vec<Capture>> {
     let spec =
         grammar_spec(language).ok_or_else(|| Error::UnsupportedLanguage(language.to_string()))?;
     let lang = (spec.language)();
@@ -55,6 +73,12 @@ pub fn run_query(source: &str, language: &str, query_src: &str) -> Result<Vec<Ca
     let tree = parser
         .parse(source, None)
         .ok_or_else(|| Error::Parse("tree-sitter produced no tree".to_string()))?;
+
+    if strict && tree.root_node().has_error() {
+        return Err(Error::Parse(
+            "source contains syntax errors or missing nodes".into(),
+        ));
+    }
 
     let bytes = source.as_bytes();
     let names = query.capture_names();

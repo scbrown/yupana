@@ -227,6 +227,8 @@ enum Commands {
     /// with no side effects (aegis-l26g8x).
     #[cfg(feature = "quipu")]
     RuleTest(crate::rule_test::RuleTestArgs),
+    /// Evaluate one explicit structural rule and source from stdin, without side effects.
+    AuditRule,
     /// Draft policy raw material from an exemplar: Selector + tiered
     /// predicate candidates (policy-by-example, step 2). Output is JSON for
     /// quipu's drafting scaffold; the placement check remains the refusal
@@ -414,6 +416,7 @@ impl Cli {
             }
             #[cfg(feature = "quipu")]
             Commands::RuleTest(args) => args.run(),
+            Commands::AuditRule => crate::audit_rule::run(),
             Commands::Exemplar {
                 text,
                 file,

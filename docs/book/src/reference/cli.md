@@ -16,6 +16,7 @@ COMMANDS:
     export      Emit the referential structure as Turtle (bobbin: ontology)
     hook        Harness hook adapter (post-edit advisory / pre-edit guard)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
+    audit-rule  Replay an explicit structural rule on supplied source, offline
     rule-test   Run governed text rules on sample cases, no side effects [quipu feature]
     promote     Promote a commit's structural facts into Quipu    [Phase 4]
     verifier    Show the verdict-signing public key to register  [quipu feature]
@@ -442,6 +443,32 @@ such a rule. `unknown` is never a pass.
 
 Exit codes: `0` all cases pass · `1` any case fails · `2` nothing failed but
 something is unknown, or there were no cases.
+
+## `yupana audit-rule`
+
+Reads one JSON object from stdin: `rule`, `path` (repository relative), and
+`source` (the full file text). `rule` uses the structural rule fields below.
+An auditor supplies the blob from the exact commit it is checking; this command
+never reads the working tree or chooses a policy from the local projection.
+
+```bash
+printf '%s\n' '{"rule":{"name":"todo-ticket","language":"rust","query":"(line_comment) @c","match_type":"must-match","pattern":"[A-Z]+-[0-9]+","gate":"TODO"},"path":"src/example.rs","source":"// TODO fix this\nfn f() {}"}' | yupana audit-rule
+```
+
+The JSON response has `schema_version: 1`, the supplied `rule` name and `path`,
+`verdict`, `violations`, and `errors`. Exit codes are `0` for `satisfied`, `1` for
+`unsatisfied`, and `2` for `unknown`. Unsupported grammars, malformed selectors,
+regexes or globs, invalid source syntax, out-of-scope paths, and invalid input
+are unknown. A path outside the rule's language returns `not_applicable` and
+exit `0`, using Yupana's existing path-to-language classifier. Requests are limited to 16 MiB. An empty selector result follows
+the existing structural semantics: `must-exist` fails, while `must-match` and
+`must-not-match` are satisfied.
+
+Replay calls the existing tree-sitter rule evaluator after strict validation.
+It does not alter interactive hooks' best-effort behavior. This command writes
+no state, metrics, cache, or verdict spool and makes no network calls. It does
+not authenticate policy provenance, commit identity, or signed exceptions;
+those remain the auditor's responsibility.
 
 ## Rust CPG dataflow (`cpg` feature)
 
