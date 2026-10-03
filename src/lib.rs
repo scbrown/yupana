@@ -161,6 +161,7 @@ pub mod share_pull;
 /// Publishing a graph back out as a share, naming its parent when it has one.
 #[cfg(feature = "quipu")]
 mod share_reshare;
+pub(crate) mod shell_command;
 /// Single-pattern provenance steps joined client-side: quipu answers one bound
 /// pattern in milliseconds and a multi-pattern BGP at its deadline (aegis-h9c0no).
 #[cfg(feature = "quipu")]
