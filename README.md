@@ -39,21 +39,30 @@ More on the design, and how it compares with LSP, Joern and embedding search:
 
 ## Install
 
-**Linux x86_64: download the release.** No Rust toolchain needed.
+**Linux x86_64 and macOS (Apple Silicon or Intel): download the release.**
+No Rust toolchain needed. Mac archives are available starting with the first
+release containing the native macOS build workflow.
 
 ```bash
 V=$(curl -fsSL https://api.github.com/repos/scbrown/yupana/releases/latest \
   | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
-curl -fsSLO "https://github.com/scbrown/yupana/releases/download/v$V/yupana-v$V-x86_64-linux-gnu.tar.gz"
-curl -fsSLO "https://github.com/scbrown/yupana/releases/download/v$V/yupana-v$V-x86_64-linux-gnu.tar.gz.sha256"
-sha256sum -c "yupana-v$V-x86_64-linux-gnu.tar.gz.sha256"
-mkdir -p ~/.local/bin && tar -xzf "yupana-v$V-x86_64-linux-gnu.tar.gz" -C ~/.local/bin
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) PLATFORM=x86_64-linux-gnu ;;
+  Darwin-arm64) PLATFORM=aarch64-apple-darwin ;;
+  Darwin-x86_64) PLATFORM=x86_64-apple-darwin ;;
+  *) echo 'Build from source on this platform'; exit 1 ;;
+esac
+ARCHIVE="yupana-v$V-$PLATFORM.tar.gz"
+curl -fsSLO "https://github.com/scbrown/yupana/releases/download/v$V/$ARCHIVE"
+curl -fsSLO "https://github.com/scbrown/yupana/releases/download/v$V/$ARCHIVE.sha256"
+shasum -a 256 -c "$ARCHIVE.sha256"
+mkdir -p ~/.local/bin && tar -xzf "$ARCHIVE" -C ~/.local/bin
 yupana --version
 ```
 
 The archive also contains `hank`, the tool's former name, as a symlink.
 
-**macOS, or any other platform: build from source** with a
+**Other platforms, or releases without your platform archive: build from source** with a
 [Rust toolchain](https://rustup.rs):
 
 ```bash

@@ -1,0 +1,146 @@
+name: Build release archives
+
+# One native build/package path for PR validation and actual publication.
+on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+      tag:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  binary:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            asset: x86_64-linux-gnu
+            runner: ubuntu-22.04
+          - target: aarch64-apple-darwin
+            asset: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-apple-darwin
+            asset: x86_64-apple-darwin
+            runner: macos-15-intel
+    name: Release binary (${{ matrix.asset }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      # fetch-depth: 0 so the tag this run is about is present locally — on the
+      # release-merge path the ref is `main`, not the tag, and the checkout has
+      # to be moved onto the tag before anything is built from it.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Toolchain BEFORE the resolve step: it shells out to `cargo metadata`, and
+      # depending on a runner image happening to preinstall cargo is the kind of
+      # assumption that breaks on an image bump and looks like a tagging bug.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Resolve the tag this run is about
+        id: tag
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            workflow_dispatch) TAG="$REQUESTED_TAG" ;;
+            *)
+              if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+                TAG="${GITHUB_REF_NAME}"
+              else
+                # release-plz has already bumped and committed Cargo.toml in the
+                # commit this run is building, and tags it v<version>. Deriving
+                # the tag from the manifest avoids depending on the shape of the
+                # action's undocumented `releases` JSON output.
+                TAG="v$(cargo metadata --no-deps --format-version 1 \
+                  | jq -r '.packages[] | select(.name == "yupana") | .version')"
+              fi ;;
+          esac
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: ${TAG}"
+
+      # Build FROM THE TAG, not from whatever the trigger ref happened to be. A
+      # binary labelled v0.5.0 that was built from a later main is a mislabelled
+      # artifact, which is worse than a missing one.
+      - name: Check out the tag
+        if: inputs.release
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: git checkout --detach "refs/tags/${TAG}"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.target }}-cargo-release-
+
+      # mcp + langs-extra = the useful runtime set (`yupana serve` + all grammars);
+      # quipu added 2026-07-23 (aegis-ucoh): the promote seam shipped feature-less,
+      # so the DEPLOYED `yupana promote` was a stub — and its exit-0 made the
+      # quipu-ingest cron advance its marker past a commit that was never
+      # promoted. All arms pass in ci.yml (quipu + mcp,quipu arms), so this
+      # remains a proven build.
+      # golden-path added 2026-09-23 (aegis-vwvjwl) for the same reason as quipu:
+      # the FR-40..42 guard (src/goldenpath/, `yupana_path_check`, `POST
+      # /path/check`) was built, documented as BUILT, and absent from every
+      # installed binary. `just install` builds --all-features, so a local
+      # install had it and the release asset did not: two install paths
+      # quietly shipping different tools.
+      - name: Build release binary
+        run: cargo build --locked --release --target "${{ matrix.target }}" --features mcp,langs-extra,quipu,golden-path
+
+      - name: Package
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          set -euo pipefail
+          bin="target/$TARGET/release/yupana"
+          test -x "$bin" || { echo "no binary at $bin"; exit 1; }
+          "$bin" --version
+          # `hank` is the legacy command name still used by deployed hooks and
+          # scripts. Ship one build under both names: a relative symlink keeps
+          # the archive relocatable and makes feature/version drift impossible.
+          ln -sfn yupana "target/$TARGET/release/hank"
+          test "$(readlink "target/$TARGET/release/hank")" = yupana
+          tarball="yupana-${TAG}-${ASSET}.tar.gz"
+          tar -czf "$tarball" -C "target/$TARGET/release" yupana hank
+          shasum -a 256 "$tarball" | tee "$tarball.sha256"
+          # Exercise the unpacked archive on its native runner, including alias.
+          stage=$(mktemp -d)
+          tar -xzf "$tarball" -C "$stage"
+          test "$(readlink "$stage/hank")" = yupana
+          test "$("$stage/yupana" --version)" = "yupana ${TAG#v}"
+          test "$("$stage/hank" --version)" = "yupana ${TAG#v}"
+          for capability in exemplar verifier verdicts; do
+            "$stage/yupana" "$capability" --help >/dev/null
+          done
+          rm -rf "$stage"
+          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.asset }}
+          path: |
+            *.tar.gz
+            *.tar.gz.sha256
+          if-no-files-found: error

@@ -1,8 +1,36 @@
 # Releasing yupana
 
 Releases are cut by `release-plz` from conventional commits on `main`. The
-`Release` workflow then builds the binary, attaches it to the GitHub release,
-and — since aegis-pz5crt — publishes the crate.
+`Release` workflow builds and attaches the platform archives to the GitHub
+release. The crates.io lane remains separately gated as described below.
+
+## Binary archives
+
+The shared `release-binaries.yml` workflow builds natively on three runners:
+
+| Archive platform suffix | Rust target | Runner |
+|---|---|---|
+| `x86_64-linux-gnu` | `x86_64-unknown-linux-gnu` | `ubuntu-22.04` |
+| `aarch64-apple-darwin` | `aarch64-apple-darwin` | `macos-14` |
+| `x86_64-apple-darwin` | `x86_64-apple-darwin` | `macos-15-intel` |
+
+Each `yupana-v<VERSION>-<PLATFORM>.tar.gz` contains the executable `yupana`
+and a relative `hank -> yupana` symlink. The Linux suffix retains its historical
+spelling for existing installers. Each archive has a `.sha256` sidecar, and
+`SHA256SUMS` covers all three archives. The build preserves the release feature
+set: `mcp,langs-extra,quipu,golden-path`.
+
+Pull requests build and unpack all three archives using that same workflow,
+then execute both command names and check the exemplar/verifier/verdicts CLI
+surfaces on the native runner. They upload CI artifacts without publishing a
+release. Release runs check out the resolved version tag before building; a
+single publishing job verifies the complete set and checksums before upload.
+The crates.io lane waits for successful archive publication as well as its
+existing first-publish gate.
+
+Older releases may contain only the Linux archive. The standalone
+`scripts/install-release.sh` remains Linux-only; on macOS use the archive
+instructions in the README or a platform-aware package manager.
 
 ## The crates.io lane
 
