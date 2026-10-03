@@ -21,11 +21,11 @@ env:
   CARGO_TERM_COLOR: always
 
 permissions:
-  contents: write # create the GitHub release + upload the asset
+  contents: read
 
 jobs:
   binary:
-    name: Release binary (x86_64-linux-gnu)
+    name: Build release archives
     needs: release-plz
     # ⚠ A TAG PUSH IS NOT ENOUGH, AND THAT IS NOT A BUG IN THIS FILE.
     #
@@ -51,92 +51,52 @@ jobs:
     # dynamically-linked binary built here runs on all of them (build on the
     # OLDEST glibc you must support; forward-compat only). Static musl is a
     # follow-up once the C-dep toolchain (musl-tools) is wired in.
+    uses: ./.github/workflows/release-binaries.yml
+    with:
+      release: true
+      tag: ${{ inputs.tag || '' }}
+
+  publish:
+    name: Publish release assets
+    needs: binary
+    if: always() && needs.binary.result == 'success'
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
-      # fetch-depth: 0 so the tag this run is about is present locally — on the
-      # release-merge path the ref is `main`, not the tag, and the checkout has
-      # to be moved onto the tag before anything is built from it.
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
-
-      # Toolchain BEFORE the resolve step: it shells out to `cargo metadata`, and
-      # depending on a runner image happening to preinstall cargo is the kind of
-      # assumption that breaks on an image bump and looks like a tagging bug.
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Resolve the tag this run is about
+          pattern: binary-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify complete archive set and checksums
         id: tag
+        working-directory: release-assets
         run: |
           set -euo pipefail
-          case "${{ github.event_name }}" in
-            workflow_dispatch) TAG="${{ inputs.tag }}" ;;
-            *)
-              if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-                TAG="${GITHUB_REF_NAME}"
-              else
-                # release-plz has already bumped and committed Cargo.toml in the
-                # commit this run is building, and tags it v<version>. Deriving
-                # the tag from the manifest avoids depending on the shape of the
-                # action's undocumented `releases` JSON output.
-                TAG="v$(cargo metadata --no-deps --format-version 1 \
-                  | jq -r '.packages[] | select(.name == "yupana") | .version')"
-              fi ;;
-          esac
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag: ${TAG}"
+          # Infer the common tag from built assets, then require exactly one of
+          # each platform. Never publish a partial successful matrix.
+          archives=(yupana-*-x86_64-linux-gnu.tar.gz)
+          test "${#archives[@]}" = 1
+          tag=${archives[0]#yupana-}
+          tag=${tag%-x86_64-linux-gnu.tar.gz}
+          expected=()
+          for platform in x86_64-linux-gnu aarch64-apple-darwin x86_64-apple-darwin; do
+            archive="yupana-${tag}-${platform}.tar.gz"
+            test -f "$archive"
+            test -f "$archive.sha256"
+            expected+=("$archive")
+          done
+          actual=(*.tar.gz)
+          test "${#actual[@]}" = "${#expected[@]}"
+          cat -- *.tar.gz.sha256 > SHA256SUMS
+          test "$(wc -l < SHA256SUMS)" -eq 3
+          sha256sum --check --strict SHA256SUMS
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      # Build FROM THE TAG, not from whatever the trigger ref happened to be. A
-      # binary labelled v0.5.0 that was built from a later main is a mislabelled
-      # artifact, which is worse than a missing one.
-      - name: Check out the tag
-        run: git checkout --detach "refs/tags/${{ steps.tag.outputs.tag }}"
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-release-
-            ${{ runner.os }}-cargo-
-
-      # mcp + langs-extra = the useful runtime set (`yupana serve` + all grammars);
-      # quipu added 2026-07-23 (aegis-ucoh): the promote seam shipped feature-less,
-      # so the DEPLOYED `yupana promote` was a stub — and its exit-0 made the
-      # quipu-ingest cron advance its marker past a commit that was never
-      # promoted. All arms pass in ci.yml (quipu + mcp,quipu arms), so this
-      # remains a proven build.
-      # golden-path added 2026-09-23 (aegis-vwvjwl) for the same reason as quipu:
-      # the FR-40..42 guard (src/goldenpath/, `yupana_path_check`, `POST
-      # /path/check`) was built, documented as BUILT, and absent from every
-      # installed binary. `just install` builds --all-features, so a local
-      # install had it and the release asset did not: two install paths
-      # quietly shipping different tools.
-      - name: Build release binary
-        run: cargo build --release --features mcp,langs-extra,quipu,golden-path
-
-      - name: Package
-        env:
-          TAG: ${{ steps.tag.outputs.tag }}
-        run: |
-          set -euo pipefail
-          bin=target/release/yupana
-          test -x "$bin" || { echo "no binary at $bin"; exit 1; }
-          "$bin" --version
-          # `hank` is the legacy command name still used by deployed hooks and
-          # scripts. Ship one build under both names: a relative symlink keeps
-          # the archive relocatable and makes feature/version drift impossible.
-          ln -sfn yupana target/release/hank
-          test "$(readlink target/release/hank)" = yupana
-          tarball="yupana-${TAG}-x86_64-linux-gnu.tar.gz"
-          tar -czf "$tarball" -C target/release yupana hank
-          sha256sum "$tarball" | tee "$tarball.sha256"
-          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
-
-      - name: Publish release + asset
+      - name: Publish release + assets
+        working-directory: release-assets
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
@@ -175,11 +135,13 @@ jobs:
               --title "${TAG}" --generate-notes
           fi
           retry gh release upload "${TAG}" \
-            "${TARBALL}" "${TARBALL}.sha256" --clobber
+            *.tar.gz *.sha256 SHA256SUMS --clobber
           # Assert the effect, not the exit code: the asset must actually be listed.
-          gh release view "${TAG}" --json assets \
-            --jq '.assets[].name' | grep -q "${TARBALL}"
-          echo "published ${TARBALL} on ${TAG}"
+          gh release view "${TAG}" --json assets --jq '.assets[].name' > listed-assets
+          for asset in *.tar.gz *.sha256 SHA256SUMS; do
+            grep -Fx "$asset" listed-assets
+          done
+          echo "published all platform archives on ${TAG}"
 
   # Open/refresh the release PR on every main push; merging it tags + releases.
   # This job is WHY releases happen at all: release-plz.toml existed here for
@@ -374,12 +336,12 @@ jobs:
     name: Publish to crates.io
     # AFTER the binary. A release whose artifact failed to build should not be
     # announced to the registry, and a crates.io version is permanent.
-    needs: [release-plz, binary]
+    needs: [release-plz, publish]
     if: >-
       always() &&
       startsWith(github.ref, 'refs/heads/') &&
       needs.release-plz.outputs.releases_created == 'true' &&
-      needs.binary.result == 'success'
+      needs.publish.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

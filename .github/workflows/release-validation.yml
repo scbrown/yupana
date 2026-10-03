@@ -1,0 +1,11 @@
+name: Release archive validation
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  archives:
+    uses: ./.github/workflows/release-binaries.yml
