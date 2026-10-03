@@ -207,7 +207,11 @@ for the repository owner; explicitly known topic refs and ungoverned repositorie
 remain outside the policy. An unresolved execution target is checked against the
 current repository with an assumed ref only when literal landing-shaped argv
 evidence exists, and is recorded as incomplete. Dynamic editor/interpreter
-commands without landing evidence abstain. This does
+commands without landing evidence abstain. A dynamic program word containing a
+`git` or `gh` token (case insensitive), followed by the matching landing arguments,
+is treated as that program with incomplete evidence: `$GIT push origin main` and
+`"$(command -v git)" push origin main` cannot certify a protected landing. This
+uses only the program word, never an editor's data arguments, and does
 not prove the identity of a repository computed dynamically outside that scope.
 
 The signed record carries `parse_incomplete` in scope provenance and the stable

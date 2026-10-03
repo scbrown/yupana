@@ -420,7 +420,8 @@ pub fn resolve_all(cmd: &str) -> Vec<Landing> {
     // parser retains uncertainty rather than reporting an empty successful parse.
     let mut directories: std::collections::BTreeMap<Vec<usize>, String> =
         std::collections::BTreeMap::new();
-    for command in parsed.commands {
+    for mut command in parsed.commands {
+        evidence::normalize_dynamic_program(&mut command);
         let words: Vec<&str> = command.words.iter().map(String::as_str).collect();
         if let Some(dir) = cd_target(&words) {
             directories.insert(command.scope, dir);

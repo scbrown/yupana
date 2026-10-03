@@ -475,3 +475,49 @@ fn dynamic_programs_without_landing_evidence_do_not_synthesize_pushes() {
             .parse_incomplete
     );
 }
+
+#[test]
+fn dynamic_git_and_gh_names_retain_incomplete_landing_evidence() {
+    for command in [
+        "$GIT push origin main",
+        "${git} push origin main",
+        "\"$(command -v git)\" push origin main",
+        "$(which git) push origin main",
+        "env $GIT push origin main",
+        "bash -c '$GIT push origin main'",
+    ] {
+        let landing = resolve(command).unwrap_or_else(|| panic!("missed {command}"));
+        assert_eq!(landing.verb, LandingVerb::Push, "{command}");
+        assert_eq!(
+            landing.git_ref,
+            RefTarget::Named("main".into()),
+            "{command}"
+        );
+        assert!(landing.parse_incomplete, "{command}");
+    }
+    for command in ["$GH pr merge 42", "\"$(command -v gh)\" pr merge 42"] {
+        let landing = resolve(command).unwrap_or_else(|| panic!("missed {command}"));
+        assert_eq!(landing.verb, LandingVerb::Merge, "{command}");
+        assert!(landing.parse_incomplete, "{command}");
+    }
+    for command in [
+        "$GIT status",
+        "$GH issue list",
+        "$DIGITAL push origin main",
+        "$EDITOR git push origin main",
+        "$PYTHON x.py",
+        "'$GIT' push origin main",
+    ] {
+        assert!(resolve_all(command).is_empty(), "false landing: {command}");
+    }
+}
+
+#[test]
+fn dynamic_programs_keep_their_execution_order_and_directory() {
+    let selected =
+        resolve_all("cd first && $GIT push origin main; cd second; git push origin topic");
+    assert_eq!(selected.len(), 2);
+    assert_eq!(selected[0].cwd_hint.as_deref(), Some("first"));
+    assert_eq!(selected[1].cwd_hint.as_deref(), Some("second"));
+    assert!(selected[0].parse_incomplete);
+}
