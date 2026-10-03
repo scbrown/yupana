@@ -58,6 +58,8 @@ anyhow = "1"
 # Tree-sitter (fast structural extraction — always-on breadth)
 tree-sitter = "0.25"
 tree-sitter-rust = "0.24"
+tree-sitter-bash = "0.25.1"
+shell-words = "1.1"
 # StreamingIterator drives tree-sitter 0.25's QueryCursor::matches (used by the
 # structural-rule matcher in src/extract/query.rs — the crate's one .scm consumer).
 streaming-iterator = "0.1"

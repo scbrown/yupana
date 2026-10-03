@@ -262,3 +262,28 @@ fn a_forgejo_merge_after_a_cd_still_carries_the_cd() {
     assert_eq!(l.verb, LandingVerb::Merge);
     assert_eq!(l.cwd_hint.as_deref(), Some("/srv/work/widget"));
 }
+
+#[test]
+fn quoted_heredoc_marker_cannot_hide_a_push() {
+    let landing = r("echo 'text << EOF'\ngit push origin main").unwrap();
+    assert_eq!(landing.git_ref, RefTarget::Named("main".into()));
+}
+
+#[test]
+fn quoted_command_prose_is_not_a_landing() {
+    assert!(r("echo 'text; git push origin main'").is_none());
+}
+
+#[test]
+fn quoted_directory_keeps_spaces() {
+    let landing = r("cd 'a b' && git push origin main").unwrap();
+    assert_eq!(landing.cwd_hint.as_deref(), Some("a b"));
+}
+
+#[test]
+fn a_subshell_cd_does_not_change_the_parent_repository() {
+    let landing = r("cd parent; (cd elsewhere); git push origin main").unwrap();
+    assert_eq!(landing.cwd_hint.as_deref(), Some("parent"));
+    let landing = r("cd parent; (cd child; git push origin main)").unwrap();
+    assert_eq!(landing.cwd_hint.as_deref(), Some("child"));
+}
