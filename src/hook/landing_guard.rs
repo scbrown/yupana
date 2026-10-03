@@ -34,21 +34,23 @@ pub(super) fn check(_payload: &str, _command: &str) -> Outcome {
     Outcome::Allow
 }
 
-/// A cheap routing superset, never the decision: an unrelated shell command
-/// must not pay for a projection it will not consult.
+/// Evaluate every selected landing, retaining the first advisory and never
+/// allowing an earlier harmless command to erase a later refusal.
 #[cfg(feature = "quipu")]
-fn might_be_a_landing(command: &str) -> bool {
-    command.contains("push") || command.contains("merge")
+pub(super) fn check(payload: &str, command: &str) -> Outcome {
+    let mut outcome = Outcome::Allow;
+    for landing in crate::landing::resolve_all(command) {
+        match check_landing(payload, &landing) {
+            deny @ Outcome::Deny(_) => return deny,
+            note @ Outcome::Notify(_) if matches!(outcome, Outcome::Allow) => outcome = note,
+            _ => {}
+        }
+    }
+    outcome
 }
 
 #[cfg(feature = "quipu")]
-pub(super) fn check(payload: &str, command: &str) -> Outcome {
-    if !might_be_a_landing(command) {
-        return Outcome::Allow;
-    }
-    let Some(landing) = crate::landing::resolve(command) else {
-        return Outcome::Allow;
-    };
+fn check_landing(payload: &str, landing: &Landing) -> Outcome {
     let Some(input) = super::HookInput::parse(payload) else {
         return Outcome::Allow;
     };
@@ -70,10 +72,10 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
 
     // Identify the target BEFORE projecting: a landing we cannot even name is
     // not something a catalogue lookup can help with.
-    let Some(repo) = resolve_repo(&landing, &root) else {
+    let Some(repo) = resolve_repo(landing, &root) else {
         return Outcome::Allow;
     };
-    let (git_ref, ref_assumed) = resolve_ref(&landing, &root);
+    let (git_ref, ref_assumed) = resolve_ref(landing, &root);
 
     let mut registry = crate::project::ProjectionRegistry::new(&config.quipu.endpoint);
     // THE DAEMON FIRST (aegis-kjz0hg). This was the last hook path measured
@@ -101,6 +103,7 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
         repo,
         git_ref,
         ref_assumed,
+        parse_incomplete: landing.parse_incomplete,
         agent: acting_agent(),
         work_item_readable: plate.is_some(),
         bead: plate.flatten(),
@@ -112,7 +115,7 @@ pub(super) fn check(payload: &str, command: &str) -> Outcome {
     // is exactly the gap moving attestation to the gate was meant to close.
     // Fail-silent, like every other piece of bookkeeping about enforcement.
     if !matches!(decision, Decision::NotApplicable { .. }) {
-        record(&config, &request, &decision, &landing);
+        record(&config, &request, &decision, landing);
     }
 
     match decision {
@@ -211,6 +214,9 @@ fn resolve_repo(landing: &Landing, root: &std::path::Path) -> Option<String> {
 #[cfg(feature = "quipu")]
 fn resolve_ref(landing: &Landing, root: &std::path::Path) -> (String, bool) {
     let root = &effective_root(landing, root);
+    if landing.parse_incomplete && matches!(landing.git_ref, RefTarget::Unstated) {
+        return (crate::project_landing::DEFAULT_PROTECTED_REF.into(), true);
+    }
     match &landing.git_ref {
         RefTarget::Named(r) => (r.clone(), false),
         RefTarget::Unstated => match landing.verb {
@@ -376,6 +382,7 @@ fn record(
         git_ref: request.git_ref.clone(),
         remote_authority: String::new(),
         scope_provenance: serde_json::json!({
+            "parse_incomplete": request.parse_incomplete,
             "as_of": ts,
             "query_id": "landing-policy",
             // How the ref was obtained. A refusal on a ref the command never

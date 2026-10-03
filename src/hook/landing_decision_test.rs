@@ -36,6 +36,7 @@ fn req(agent: Option<&str>, bead: Option<&str>, git_ref: &str) -> LandingRequest
         repo: "quipu".into(),
         git_ref: git_ref.into(),
         ref_assumed: false,
+        parse_incomplete: false,
         agent: agent.map(str::to_string),
         bead: bead.map(str::to_string),
         work_item_readable: true,
@@ -355,4 +356,29 @@ fn unknown_plate_fails_open_without_bypassing_ownership() {
         panic!("ownership must still refuse")
     };
     assert_eq!(codes, ["agent_is_not_repo_owner"]);
+}
+
+#[test]
+fn incomplete_parse_is_unknown_for_protected_refs_even_for_owner() {
+    let authority = repo(LandingRule::SingleWriter, Some("malcolm"));
+    let mut request = req(Some("malcolm"), Some("work-1"), "main");
+    request.parse_incomplete = true;
+    assert!(
+        matches!(decide(&authority, &request), Decision::Refuse { codes, .. } if codes == ["landing_parse_unknown"])
+    );
+    request.git_ref = "topic/work".into();
+    assert!(matches!(
+        decide(&authority, &request),
+        Decision::NotApplicable { .. }
+    ));
+    request.git_ref = "main".into();
+    assert!(matches!(
+        decide(
+            &LandingAuthority::Ungoverned {
+                name: "example".into()
+            },
+            &request
+        ),
+        Decision::NotApplicable { .. }
+    ));
 }

@@ -6,10 +6,11 @@
 
 use tree_sitter::{Node, Parser};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Command {
     pub text: String,
     pub words: Vec<String>,
+    pub dynamic_words: Vec<String>,
     /// Nested execution environments; directory changes do not escape them.
     pub scope: Vec<usize>,
 }
@@ -19,9 +20,15 @@ pub(crate) struct Parsed {
     pub commands: Vec<Command>,
     /// A partial tree is evidence of uncertainty, never a successful full parse.
     pub incomplete: bool,
+    /// Execution indirection exceeded the literal resolver; keep its context.
+    pub unresolved: Vec<Command>,
 }
 
 pub(crate) fn parse(source: &str) -> Parsed {
+    parse_at_depth(source, 0)
+}
+
+fn parse_at_depth(source: &str, depth: usize) -> Parsed {
     let mut parser = Parser::new();
     if parser
         .set_language(&tree_sitter_bash::LANGUAGE.into())
@@ -43,6 +50,7 @@ pub(crate) fn parse(source: &str) -> Parsed {
         ..Parsed::default()
     };
     visit(tree.root_node(), source.as_bytes(), &[], &mut result);
+    wrappers::expand(&mut result, depth);
     result
 }
 
@@ -63,11 +71,28 @@ fn visit(node: Node<'_>, bytes: &[u8], scope: &[usize], result: &mut Parsed) {
         for arg in node.children_by_field_name("argument", &mut cursor) {
             decode_word(arg, bytes, &mut words, &mut result.incomplete);
         }
-        result.commands.push(Command {
+        let mut cursor = node.walk();
+        let dynamic_words = node
+            .child_by_field_name("name")
+            .into_iter()
+            .chain(node.children_by_field_name("argument", &mut cursor))
+            .filter(|node| dynamic(*node))
+            .flat_map(|node| {
+                let text = node.utf8_text(bytes).unwrap_or_default();
+                shell_words::split(text).unwrap_or_else(|_| vec![text.to_string()])
+            })
+            .collect();
+        let command = Command {
             text: node.utf8_text(bytes).unwrap_or_default().to_string(),
             words,
+            dynamic_words,
             scope: nested.clone(),
-        });
+        };
+        if node.child_by_field_name("name").is_some_and(dynamic) {
+            result.unresolved.push(command);
+        } else {
+            result.commands.push(command);
+        }
     }
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
@@ -118,3 +143,6 @@ fn dynamic(node: Node<'_>) -> bool {
 #[cfg(test)]
 #[path = "shell_command_test.rs"]
 mod tests;
+
+#[path = "shell_command_wrappers.rs"]
+mod wrappers;
