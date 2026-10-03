@@ -10,6 +10,9 @@ use super::*;
 /// of an `Edit`/`MultiEdit` joined by newlines. `None` when the payload adds no
 /// text (e.g. a pure deletion), in which case there is nothing for a rule to see.
 pub(super) fn introduced_text(input: &HookInput) -> Option<String> {
+    if input.tool_name.as_deref() == Some("apply_patch") {
+        return input.tool_input.new_string.clone();
+    }
     if let Some(content) = &input.tool_input.content {
         return Some(content.clone());
     }

@@ -49,16 +49,72 @@ pub fn run_pre_edit(tenant: Option<&str>, config_override: Option<&Path>) -> any
     std::io::stdin().lock().read_to_string(&mut buf).ok();
     let root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-    match guard(&buf, &root, tenant, config_override) {
+    match guard_payload(&buf, &root, tenant, config_override) {
         Outcome::Allow => {}
         Outcome::Deny(reason) => println!("{}", deny_envelope(&reason)),
         Outcome::Notify(message) => {
             if let Some(message) = super::advisory_for_session(&buf, message) {
-                println!("{}", system_message(&message));
+                println!("{}", advisory_envelope(&buf, &message));
             }
         }
     }
     Ok(())
+}
+
+/// Codex delivers `PreToolUse` context through the event-specific envelope.
+/// Its `systemMessage` field alone is not delivered to the model.
+fn advisory_envelope(input: &str, message: &str) -> String {
+    if HookInput::parse(input).is_some_and(|i| i.tool_name.as_deref() == Some("apply_patch")) {
+        serde_json::json!({"hookSpecificOutput": {
+            "hookEventName":"PreToolUse", "additionalContext":message
+        }})
+        .to_string()
+    } else {
+        system_message(message)
+    }
+}
+
+/// Native patches can touch several files. Evaluate every target before choosing
+/// the strongest outcome; an early allow must never hide a later denial.
+fn guard_payload(buf: &str, root: &Path, tenant: Option<&str>, config: Option<&Path>) -> Outcome {
+    let value = serde_json::from_str::<serde_json::Value>(buf).ok();
+    let Some(value) = value.filter(|v| v["tool_name"] == "apply_patch") else {
+        return guard(buf, root, tenant, config);
+    };
+    let patch_root = value["cwd"]
+        .as_str()
+        .map_or_else(|| root.to_path_buf(), PathBuf::from);
+    let inputs = match super::codex_patch::inputs(&value, &patch_root) {
+        Ok(inputs) => inputs,
+        Err(reason) => {
+            let input = HookInput::parse(buf).unwrap_or_default();
+            crate::metrics::emit(
+                "guard",
+                &[
+                    ("tool", "apply_patch".into()),
+                    ("parsed", false.into()),
+                    ("result", "unknown".into()),
+                    (
+                        "session",
+                        input.session_id.clone().unwrap_or_default().into(),
+                    ),
+                ],
+            );
+            return fail_open(&input, "codex_patch", reason);
+        }
+    };
+    let mut outcome = Outcome::Allow;
+    for input in inputs {
+        let next = guard(&input, root, tenant, config);
+        outcome = match (outcome, next) {
+            (Outcome::Deny(a), Outcome::Deny(b)) => Outcome::Deny(format!("{a}\n{b}")),
+            (deny @ Outcome::Deny(_), _) | (_, deny @ Outcome::Deny(_)) => deny,
+            (Outcome::Notify(a), Outcome::Notify(b)) => Outcome::Notify(format!("{a}\n{b}")),
+            (note @ Outcome::Notify(_), _) | (_, note @ Outcome::Notify(_)) => note,
+            _ => Outcome::Allow,
+        };
+    }
+    outcome
 }
 
 /// Decide an edit, and SPOOL the decision (aegis-0nng): one `guard` metrics

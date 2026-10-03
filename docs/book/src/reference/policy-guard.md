@@ -520,3 +520,24 @@ Two states are reported **loudly** rather than left to silence:
 
 `--json` emits the full `policy` object (mode, `scope_configured`, ceilings) and
 the `signed_rule_set` state for `st doctor` and other tooling to gate on.
+
+## Native Codex edits
+
+Register `yupana hook pre-edit` on `PreToolUse` with matcher `apply_patch`.
+Native Codex sends a patch in `tool_input.command`, potentially covering several
+files. Yupana evaluates each file, preserves the session and tool-call IDs, and
+returns the strongest outcome across the patch. Native patch advisories use
+`hookSpecificOutput.additionalContext` so Codex delivers them to the model.
+Moves check both source and
+destination scopes. No files are written by the guard.
+
+The parser reconstructs exact-context patches for verification while passing only
+added lines to introduced-text rules. Unchanged context is not newly introduced
+text. Missing or ambiguous anchors, fuzzy matches and unsupported patch syntax
+produce an explicit UNKNOWN metric and fail-open advisory, not a clean allow.
+This preserves the hook's existing availability contract; it does not certify
+coverage for edits performed through arbitrary shell commands.
+
+`guard` records in the metrics spool measure edit evaluations. Signed
+`landing-*` certifications measure push/merge evaluations: the two populations
+must not be combined when assessing a landing-policy soak.
