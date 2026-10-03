@@ -79,7 +79,10 @@ fn visit(node: Node<'_>, bytes: &[u8], scope: &[usize], result: &mut Parsed) {
             .filter(|node| dynamic(*node))
             .flat_map(|node| {
                 let text = node.utf8_text(bytes).unwrap_or_default();
-                shell_words::split(text).unwrap_or_else(|_| vec![text.to_string()])
+                match shell_words::split(text) {
+                    Ok(words) if words.len() == 1 => words,
+                    _ => vec![text.to_string()],
+                }
             })
             .collect();
         let command = Command {
@@ -88,11 +91,9 @@ fn visit(node: Node<'_>, bytes: &[u8], scope: &[usize], result: &mut Parsed) {
             dynamic_words,
             scope: nested.clone(),
         };
-        if node.child_by_field_name("name").is_some_and(dynamic) {
-            result.unresolved.push(command);
-        } else {
-            result.commands.push(command);
-        }
+        // Keep dynamic names in execution order as opaque words. Consumers may
+        // recognize evidence without claiming to know their expanded value.
+        result.commands.push(command);
     }
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {

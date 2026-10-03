@@ -36,3 +36,30 @@ pub(super) fn unresolved_landing_evidence(words: &[String]) -> bool {
         false
     })
 }
+
+// Dynamic program syntax is not its runtime value. A git/gh token in that
+// syntax is nevertheless landing evidence when followed by the matching verb.
+// Only command-position words participate: editor data arguments cannot opt in.
+pub(super) fn normalize_dynamic_program(command: &mut crate::shell_command::Command) -> bool {
+    let Some(raw) = command.words.first() else {
+        return false;
+    };
+    if !command.dynamic_words.contains(raw) {
+        return false;
+    }
+    for program in ["git", "gh"] {
+        if !raw
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .any(|token| token.eq_ignore_ascii_case(program))
+        {
+            continue;
+        }
+        let mut argv: Vec<&str> = command.words.iter().map(String::as_str).collect();
+        argv[0] = program;
+        if resolve_segment(&command.text, &argv).is_some() {
+            command.words[0] = program.to_owned();
+            return true;
+        }
+    }
+    false
+}
