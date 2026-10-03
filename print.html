@@ -1182,6 +1182,7 @@ COMMANDS:
     export      Emit the referential structure as Turtle (bobbin: ontology)
     hook        Harness hook adapter (post-edit advisory / pre-edit guard)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
+    audit-rule  Replay an explicit structural rule on supplied source, offline
     rule-test   Run governed text rules on sample cases, no side effects [quipu feature]
     promote     Promote a commit's structural facts into Quipu    [Phase 4]
     verifier    Show the verdict-signing public key to register  [quipu feature]
@@ -1515,6 +1516,26 @@ absent from the projection or does not compile, because the guard fails open on
 such a rule. <code>unknown</code> is never a pass.</p>
 <p>Exit codes: <code>0</code> all cases pass · <code>1</code> any case fails · <code>2</code> nothing failed but
 something is unknown, or there were no cases.</p>
+<h2 id="yupana-audit-rule"><a class="header" href="#yupana-audit-rule"><code>yupana audit-rule</code></a></h2>
+<p>Reads one JSON object from stdin: <code>rule</code>, <code>path</code> (repository relative), and
+<code>source</code> (the full file text). <code>rule</code> uses the structural rule fields below.
+An auditor supplies the blob from the exact commit it is checking; this command
+never reads the working tree or chooses a policy from the local projection.</p>
+<pre><code class="language-bash">printf '%s\n' '{"rule":{"name":"todo-ticket","language":"rust","query":"(line_comment) @c","match_type":"must-match","pattern":"[A-Z]+-[0-9]+","gate":"TODO"},"path":"src/example.rs","source":"// TODO fix this\nfn f() {}"}' | yupana audit-rule
+</code></pre>
+<p>The JSON response has <code>schema_version: 1</code>, the supplied <code>rule</code> name and <code>path</code>,
+<code>verdict</code>, <code>violations</code>, and <code>errors</code>. Exit codes are <code>0</code> for <code>satisfied</code>, <code>1</code> for
+<code>unsatisfied</code>, and <code>2</code> for <code>unknown</code>. Unsupported grammars, malformed selectors,
+regexes or globs, invalid source syntax, out-of-scope paths, and invalid input
+are unknown. A path outside the rule's language returns <code>not_applicable</code> and
+exit <code>0</code>, using Yupana's existing path-to-language classifier. Requests are limited to 16 MiB. An empty selector result follows
+the existing structural semantics: <code>must-exist</code> fails, while <code>must-match</code> and
+<code>must-not-match</code> are satisfied.</p>
+<p>Replay calls the existing tree-sitter rule evaluator after strict validation.
+It does not alter interactive hooks' best-effort behavior. This command writes
+no state, metrics, cache, or verdict spool and makes no network calls. It does
+not authenticate policy provenance, commit identity, or signed exceptions;
+those remain the auditor's responsibility.</p>
 <h2 id="rust-cpg-dataflow-cpg-feature"><a class="header" href="#rust-cpg-dataflow-cpg-feature">Rust CPG dataflow (<code>cpg</code> feature)</a></h2>
 <p>Build with <code>just build --features cpg</code>. The ordinary <code>dataflow</code> command keeps its
 intra-procedural, <code>treesitter</code> result in every build. Opt in explicitly:</p>
