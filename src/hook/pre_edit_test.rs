@@ -1451,3 +1451,46 @@ fn a_payload_without_a_tool_call_id_omits_the_field() {
         "omitted, never blanked"
     );
 }
+
+#[test]
+fn native_patch_checks_later_files_without_rechecking_unchanged_context() {
+    let dir = wide_repo();
+    write_policy(dir.path(), NO_TICKET_RULE);
+    std::fs::write(
+        dir.path().join("leaf.rs"),
+        "// legacy ABC-123\nfn leaf() {}\n",
+    )
+    .unwrap();
+    let payload = |tail: &str| {
+        serde_json::json!({
+        "cwd":dir.path(), "tool_name":"apply_patch", "session_id":"native-control",
+        "tool_input":{"command":format!("*** Begin Patch\n*** Update File: leaf.rs\n@@\n // legacy ABC-123\n-fn leaf() {{}}\n+fn leaf() {{ /* clean */ }}\n{tail}*** End Patch")}
+    }).to_string()
+    };
+    assert_eq!(
+        guard_payload(&payload(""), dir.path(), None, None),
+        Outcome::Allow
+    );
+    let violating = payload("*** Add File: second.rs\n+fn second() {} // ABC-123\n");
+    assert!(matches!(
+        guard_payload(&violating, dir.path(), None, None),
+        Outcome::Deny(_)
+    ));
+    write_policy(dir.path(), &NO_TICKET_RULE.replace("enforce", "advise"));
+    assert!(matches!(
+        guard_payload(&violating, dir.path(), None, None),
+        Outcome::Notify(_)
+    ));
+}
+
+#[test]
+fn malformed_native_patch_is_loud_unknown_not_silent_allow() {
+    let dir = wide_repo();
+    write_policy(dir.path(), NO_TICKET_RULE);
+    let input = serde_json::json!({"tool_name":"apply_patch", "tool_input":{"command":"invalid"}})
+        .to_string();
+    let Outcome::Notify(message) = guard_payload(&input, dir.path(), None, None) else {
+        panic!("expected fail-open notice");
+    };
+    assert!(message.contains("UNGUARDED"));
+}
