@@ -18,7 +18,7 @@
 //! feeds a GUARD, where the same choice has the opposite consequence: abstaining
 //! on `cd repo && git push origin main` does not produce a cautious non-answer,
 //! it produces a bypass, and a one-character bypass is not a guard. So this
-//! module splits the line into shell segments and inspects each one.
+//! module uses the shared shell grammar to inspect command positions.
 //!
 //! What it does NOT do is guess the *target*. Every field is either something
 //! the command literally said, or an explicit "the command did not say"
@@ -27,7 +27,7 @@
 //!
 //! ## Heredoc bodies are data
 //!
-//! Stripped before matching, for the reason the sibling host guards strip them:
+//! Excluded by the shared grammar, rather than a textual delimiter heuristic:
 //! the documented safe way to write "never run `gh pr merge`" into a work item
 //! is a heredoc. A guard that fires inside one blocks the act of documenting the
 //! hazard, is recognised as broken, and gets removed — leaving no guard.
@@ -116,56 +116,6 @@ pub struct Landing {
     pub cwd_hint: Option<String>,
 }
 
-/// Strip heredoc bodies. See the module note: bodies are data, not command
-/// position.
-fn strip_heredocs(cmd: &str) -> String {
-    let mut out = Vec::new();
-    let mut delim: Option<String> = None;
-    for line in cmd.lines() {
-        if let Some(d) = &delim {
-            if line.trim() == d {
-                delim = None;
-            }
-            continue;
-        }
-        if let Some(found) = heredoc_delimiter(line) {
-            delim = Some(found);
-        }
-        out.push(line);
-    }
-    out.join("\n")
-}
-
-/// The delimiter word of a `<<WORD` / `<<-'WORD'` redirect, if the line opens one.
-fn heredoc_delimiter(line: &str) -> Option<String> {
-    let at = line.find("<<")?;
-    let rest = line[at + 2..].trim_start_matches('-').trim_start();
-    let rest = rest.trim_start_matches(['\'', '"']);
-    let word: String = rest
-        .chars()
-        .take_while(|c| c.is_alphanumeric() || *c == '_')
-        .collect();
-    if word.is_empty() || !word.starts_with(|c: char| c.is_alphabetic() || c == '_') {
-        return None;
-    }
-    Some(word)
-}
-
-/// Split into candidate command positions on shell operators.
-fn segments(cmd: &str) -> Vec<&str> {
-    cmd.split([';', '|', '&', '\n', '(', ')'])
-        .filter(|s| !s.trim().is_empty())
-        .collect()
-}
-
-/// Bare words, with simple surrounding quotes stripped.
-fn words(seg: &str) -> Vec<&str> {
-    seg.split_whitespace()
-        .map(|w| w.trim_matches(|c| c == '"' || c == '\''))
-        .filter(|w| !w.is_empty())
-        .collect()
-}
-
 /// Drop leading `VAR=value` assignments and shell keywords, then return the
 /// program name without the path it was invoked by. `/usr/bin/gh` is `gh`.
 fn program(w: &[&str]) -> Option<(usize, String)> {
@@ -202,9 +152,8 @@ fn looks_like_url(word: &str) -> bool {
 /// A bare `cd`, `cd -` and `cd ~`-with-no-path are deliberately NOT tracked:
 /// they name a directory this function cannot know, and guessing one would put
 /// a fabricated path into a refusal.
-fn cd_target(seg: &str) -> Option<String> {
-    let w = words(seg);
-    let (start, prog) = program(&w)?;
+fn cd_target(w: &[&str]) -> Option<String> {
+    let (start, prog) = program(w)?;
     if prog != "cd" {
         return None;
     }
@@ -216,9 +165,8 @@ fn cd_target(seg: &str) -> Option<String> {
 }
 
 /// Resolve one segment, or abstain.
-fn resolve_segment(seg: &str) -> Option<Landing> {
-    let w = words(seg);
-    let (start, prog) = program(&w)?;
+fn resolve_segment(seg: &str, w: &[&str]) -> Option<Landing> {
+    let (start, prog) = program(w)?;
     let rest = &w[start + 1..];
     match prog.as_str() {
         "git" => resolve_git_push(rest, seg),
@@ -454,15 +402,28 @@ fn api_merge_slug(word: &str) -> Option<String> {
 /// expressed as a guess.
 #[must_use]
 pub fn resolve(cmd: &str) -> Option<Landing> {
-    let stripped = strip_heredocs(cmd);
-    let mut cwd_hint: Option<String> = None;
-    for seg in segments(&stripped) {
-        if let Some(dir) = cd_target(seg) {
-            cwd_hint = Some(dir);
+    let parsed = crate::shell_command::parse(cmd);
+    // A malformed sibling does not erase a positively parsed landing. The
+    // parser retains uncertainty rather than reporting an empty successful parse.
+    let mut directories: std::collections::BTreeMap<Vec<usize>, String> =
+        std::collections::BTreeMap::new();
+    for command in parsed.commands {
+        let words: Vec<&str> = command.words.iter().map(String::as_str).collect();
+        if let Some(dir) = cd_target(&words) {
+            directories.insert(command.scope, dir);
             continue;
         }
-        if let Some(mut landing) = resolve_segment(seg) {
-            landing.cwd_hint = cwd_hint;
+        if let Some(mut landing) = resolve_segment(&command.text, &words) {
+            let mut scope = command.scope;
+            loop {
+                if let Some(dir) = directories.get(&scope) {
+                    landing.cwd_hint = Some(dir.clone());
+                    break;
+                }
+                if scope.pop().is_none() {
+                    break;
+                }
+            }
             return Some(landing);
         }
     }

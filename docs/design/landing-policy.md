@@ -36,6 +36,20 @@ bypasses — which is the defect above, rebuilt one layer up.
 
 ## The vocabulary
 
+### Shared command syntax
+
+The landing selector uses `shell_command`, the shared Bash grammar adapter for
+command policies. It selects command nodes before decoding argument boundaries;
+quoted prose and literal heredoc bodies are data. A quoted `<<` marker cannot
+hide a subsequent push. Directory hints retain quoted spaces and stay within
+their subshell, substitution or pipeline scope.
+
+This is syntax evidence, not shell execution. Expansions are not evaluated,
+function calls are not interpreted, and malformed input is marked incomplete.
+A positively parsed landing is retained even when a sibling command is malformed.
+The existing repository-authority decision remains responsible for unresolved
+targets. Adding this parser does not activate a policy or change its mode.
+
 Nothing here mints a new `rdf:type`. `Policy`, `Selector`, `Predicate` and
 `GitRepo` are already governed classes, and `aegis:targets` carries a string
 literal, so the target name costs no schema change.
