@@ -23,6 +23,8 @@ pub struct LandingRequest {
     /// Carried into the record so a false positive in the advise soak can be
     /// told apart from a true one without re-deriving anything.
     pub ref_assumed: bool,
+    /// Syntax evidence is incomplete; a protected landing cannot be certified.
+    pub parse_incomplete: bool,
     /// The acting agent, self-reported by the session environment. `None` when
     /// the session does not report one — which is a REFUSAL on a governed
     /// protected ref, because an unattributable landing is the thing the rule
@@ -130,9 +132,15 @@ pub fn decide(authority: &LandingAuthority, req: &LandingRequest) -> Decision {
         }
 
         LandingAuthority::Governed(repo) => {
-            if !repo.protects(&req.git_ref) {
+            if !repo.protects(&req.git_ref) && !(req.parse_incomplete && req.ref_assumed) {
                 return Decision::NotApplicable {
                     reason: format!("`{}` is not a protected ref of `{}`", req.git_ref, req.repo),
+                };
+            }
+            if req.parse_incomplete {
+                return Decision::Refuse {
+                    reason: format!("REFUSED: {} onto protected ref `{}` of `{}`. Shell parse is UNKNOWN; incomplete syntax or wrapper evidence cannot certify a protected landing.", req.verb, req.git_ref, req.repo),
+                    codes: vec!["landing_parse_unknown".into()],
                 };
             }
             let mut codes = Vec::new();

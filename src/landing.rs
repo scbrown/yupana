@@ -114,6 +114,8 @@ pub struct Landing {
     /// `None` means no `cd` was seen and the caller should use the payload cwd,
     /// which is the pre-existing behaviour and correct for a plain command.
     pub cwd_hint: Option<String>,
+    /// Shell syntax or wrapper evidence could not be fully resolved.
+    pub parse_incomplete: bool,
 }
 
 /// Drop leading `VAR=value` assignments and shell keywords, then return the
@@ -249,6 +251,7 @@ fn resolve_git_push(rest: &[&str], seg: &str) -> Option<Landing> {
         git_ref,
         evidence: seg.trim().to_string(),
         cwd_hint: None,
+        parse_incomplete: false,
     })
 }
 
@@ -296,6 +299,7 @@ fn resolve_gh(rest: &[&str], seg: &str) -> Option<Landing> {
         git_ref: RefTarget::Unstated,
         evidence: seg.trim().to_string(),
         cwd_hint: None,
+        parse_incomplete: false,
     })
 }
 
@@ -333,6 +337,7 @@ fn resolve_curl(rest: &[&str], seg: &str) -> Option<Landing> {
         git_ref: RefTarget::Unstated,
         evidence: seg.trim().to_string(),
         cwd_hint: None,
+        parse_incomplete: false,
     })
 }
 
@@ -402,7 +407,15 @@ fn api_merge_slug(word: &str) -> Option<String> {
 /// expressed as a guess.
 #[must_use]
 pub fn resolve(cmd: &str) -> Option<Landing> {
+    resolve_all(cmd).into_iter().next()
+}
+
+/// Resolve every landing in execution order; an earlier topic push cannot hide
+/// a subsequent protected push in the same shell invocation.
+#[must_use]
+pub fn resolve_all(cmd: &str) -> Vec<Landing> {
     let parsed = crate::shell_command::parse(cmd);
+    let mut landings = Vec::new();
     // A malformed sibling does not erase a positively parsed landing. The
     // parser retains uncertainty rather than reporting an empty successful parse.
     let mut directories: std::collections::BTreeMap<Vec<usize>, String> =
@@ -424,10 +437,21 @@ pub fn resolve(cmd: &str) -> Option<Landing> {
                     break;
                 }
             }
-            return Some(landing);
+            landing.parse_incomplete = parsed.incomplete;
+            landings.push(landing);
         }
     }
-    None
+    for command in parsed.unresolved {
+        landings.push(Landing {
+            verb: LandingVerb::Push,
+            repo: RepoRef::Cwd,
+            git_ref: RefTarget::Unstated,
+            evidence: command.text,
+            cwd_hint: directories.get(&command.scope).cloned(),
+            parse_incomplete: true,
+        });
+    }
+    landings
 }
 
 #[cfg(test)]

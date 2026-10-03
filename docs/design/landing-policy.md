@@ -190,3 +190,25 @@ binary is missing" is not a reason to permit an unattributed landing.
   log lines needs an extractor that does not exist yet; the policy below was
   authored against the memory-headroom policy's proven shape instead. Recorded
   because the gap is real work, not an oversight.
+
+### Wrapper and uncertainty evidence
+
+The shared parser follows literal `env`, `sudo`, `command`, `timeout`, and
+`xargs` command operands. It re-parses literal `bash -c`, `sh -c`, and `eval`
+strings through the same Bash grammar. A shell's directory changes stay local;
+`eval` changes the current scope. Quoted prose and literal heredoc bodies remain
+data. Every selected landing is evaluated, so an earlier topic-branch push
+cannot hide a later protected push.
+
+This is static evidence, not shell execution. Input-fed xargs arguments,
+unsupported wrapper options, dynamic command names, and the recursion limit
+retain UNKNOWN evidence. Protected landings with incomplete syntax refuse even
+for the repository owner; explicitly known topic refs and ungoverned repositories
+remain outside the policy. An unresolved execution target is checked against the
+current repository with an assumed ref, and is recorded as incomplete. This does
+not prove the identity of a repository computed dynamically outside that scope.
+
+The signed record carries `parse_incomplete` in scope provenance and the stable
+`landing_parse_unknown` refusal code. The deployment mode still caps the result:
+ADVISE emits the refusal as an advisory. No parser change promotes enforcement;
+paired and unpaired observations must be adjudicated before that separate step.

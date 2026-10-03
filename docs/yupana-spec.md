@@ -1429,7 +1429,7 @@ than degrading to the qualifier.)
 ## Appendix D: Implementation Status
 
 A snapshot of what is actually built, reconciled against the source tree
-2026-09-07. The body of this spec (§§1–11) is the *design*; this appendix is
+2026-10-03. The body of this spec (§§1–11) is the *design*; this appendix is
 the *state*. Source files, lines and test attributes are recomputed from the
 current tree, never carried forward from the previous revision.
 
@@ -1456,11 +1456,11 @@ drops landed outside the phase numbering entirely — the game-state harness
 (FR-35..FR-39) and the golden-path guard (FR-40..FR-42) — each behind its own
 Cargo feature and its own addendum.
 
-**Source layout (`src/`, 229 `.rs` files, ~59,148 lines):** the 400-line soft
-cap is a warn-not-fail target and 30 non-test files currently exceed it, led by
-`promote.rs` (625), `export.rs` (605) and `hook/rule_planes.rs` (555). Those
+**Source layout (`src/`, 252 `.rs` files, ~64,230 lines):** the 400-line soft
+cap is a warn-not-fail target and 35 non-test files currently exceed it, led by
+`export.rs` (605), `hook/rule_planes.rs` (561) and `promote.rs` (526). Those
 three are the only entries in `scripts/file-size-baseline.txt`: the ratchet
-freezes them **at exactly their current size** — they may shrink but never grow
+freezes their recorded upper bounds — they may shrink but never grow
 — while any file not listed must stay under the hard limit outright. Tests are
 exempt from the check (`*_test.rs`, `*tests.rs`, `tests/`).
 
@@ -1526,7 +1526,7 @@ hand-built without the flag.
 `cpg` and `lsp` now gate real engines, with tier advertisement and independent
 CI arms. The former empty flags were removed before these implementations landed.
 
-**Tests: 1,092** source test attributes across `src/` and `tests/`, measured
+**Tests: 1,219** source test attributes across `src/` and `tests/`, measured
 2026-09-07 by counting `#[test]` and `#[tokio::test]`. This is a source count;
 compiled counts vary with Cargo features and macro expansion. Appendix D's drift
 guard checks these measurements within its documented tolerance. Python replay,

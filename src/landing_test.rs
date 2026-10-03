@@ -287,3 +287,136 @@ fn a_subshell_cd_does_not_change_the_parent_repository() {
     let landing = r("cd parent; (cd child; git push origin main)").unwrap();
     assert_eq!(landing.cwd_hint.as_deref(), Some("child"));
 }
+
+#[test]
+fn execution_wrappers_retain_landing_evidence() {
+    for command in [
+        "env X=1 git push origin main",
+        "env -u TOKEN sudo -u builder command -- timeout -k 5s 30s git push origin main",
+        "xargs -0 -n 1 git push origin main",
+        "bash -lc 'git push origin main'",
+        "sh -c 'gh pr merge 3 -R owner/repo'",
+        "eval 'git push origin main'",
+        "bash -c \"eval 'git push origin main'\"",
+        "git p'u'sh origin main",
+    ] {
+        let landing = resolve(command).unwrap_or_else(|| panic!("missed {command}"));
+        assert_eq!(
+            landing.git_ref,
+            if command.contains("gh pr") {
+                RefTarget::Unstated
+            } else {
+                RefTarget::Named("main".into())
+            }
+        );
+    }
+    for command in [
+        "echo 'bash -c git push origin main'",
+        "command -v git",
+        "bash -c \"echo 'git push origin main'\"",
+        "sudo --list git push origin main",
+    ] {
+        assert!(resolve(command).is_none(), "false landing: {command}");
+    }
+}
+
+#[test]
+fn parser_uncertainty_reaches_landing_evidence() {
+    assert!(
+        resolve("git push origin main; echo '")
+            .unwrap()
+            .parse_incomplete
+    );
+    assert!(
+        resolve("xargs git push origin main")
+            .unwrap()
+            .parse_incomplete
+    );
+    assert!(
+        !resolve("bash -c 'git push origin main'")
+            .unwrap()
+            .parse_incomplete
+    );
+}
+
+#[test]
+fn nested_shell_cd_is_local_but_eval_cd_affects_caller() {
+    assert_eq!(
+        resolve("bash -c 'cd inner; git push origin main'")
+            .unwrap()
+            .cwd_hint
+            .as_deref(),
+        Some("inner")
+    );
+    assert_eq!(
+        resolve("bash -c 'cd inner'; git push origin main")
+            .unwrap()
+            .cwd_hint,
+        None
+    );
+    assert_eq!(
+        resolve("eval 'cd inner'; git push origin main")
+            .unwrap()
+            .cwd_hint
+            .as_deref(),
+        Some("inner")
+    );
+}
+
+#[test]
+fn every_landing_is_selected_and_reparse_is_bounded() {
+    let selected = resolve_all("git push origin topic; bash -c 'git push origin main'");
+    assert_eq!(selected.len(), 2);
+    assert_eq!(selected[1].git_ref, RefTarget::Named("main".into()));
+    let command = format!("{}git push origin main", "command ".repeat(32));
+    assert!(crate::shell_command::parse(&command).incomplete);
+    assert!(resolve(&command).unwrap().parse_incomplete);
+}
+
+#[test]
+fn wrapper_directory_and_split_string_evidence_is_preserved() {
+    assert_eq!(
+        resolve("env -C project git push origin main")
+            .unwrap()
+            .cwd_hint
+            .as_deref(),
+        Some("project")
+    );
+    assert_eq!(
+        resolve("sudo -D project git push origin main")
+            .unwrap()
+            .cwd_hint
+            .as_deref(),
+        Some("project")
+    );
+    assert_eq!(
+        resolve("env -S 'git push origin main'").unwrap().git_ref,
+        RefTarget::Named("main".into())
+    );
+    assert!(resolve("bash -c '$ACTION'").unwrap().parse_incomplete);
+    assert!(
+        resolve("env --split-string=\"git push origin main\"")
+            .unwrap()
+            .parse_incomplete
+    );
+}
+
+#[test]
+fn attached_chdir_and_nonexecuting_shell_modes() {
+    for command in [
+        "env --chdir=project git push origin main",
+        "sudo -Dproject git push origin main",
+    ] {
+        assert_eq!(
+            resolve(command).unwrap().cwd_hint.as_deref(),
+            Some("project")
+        );
+    }
+    for command in [
+        "command -pv git",
+        "bash -nc 'git push origin main'",
+        "sh --help",
+    ] {
+        assert!(resolve(command).is_none(), "{command}");
+    }
+}

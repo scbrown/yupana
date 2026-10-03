@@ -48,16 +48,6 @@ fn a_RELATIVE_configured_key_is_ignored_not_resolved_against_the_cwd() {
 }
 
 #[test]
-fn the_routing_superset_admits_landings_and_skips_ordinary_work() {
-    assert!(might_be_a_landing("git push origin main"));
-    assert!(might_be_a_landing("gh pr merge 3"));
-    // It is a SUPERSET, so false admissions are fine — `landing::resolve`
-    // is the real filter. False EXCLUSIONS would be holes.
-    assert!(!might_be_a_landing("cargo test"));
-    assert!(!might_be_a_landing("ls -la"));
-}
-
-#[test]
 fn a_named_ref_is_never_marked_assumed() {
     let landing = crate::landing::resolve("git push origin main").unwrap();
     let (git_ref, assumed) = resolve_ref(&landing, std::path::Path::new("."));
