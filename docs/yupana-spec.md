@@ -1456,7 +1456,7 @@ drops landed outside the phase numbering entirely — the game-state harness
 (FR-35..FR-39) and the golden-path guard (FR-40..FR-42) — each behind its own
 Cargo feature and its own addendum.
 
-**Source layout (`src/`, 252 `.rs` files, ~64,230 lines):** the 400-line soft
+**Source layout (`src/`, 253 `.rs` files, ~64,373 lines):** the 400-line soft
 cap is a warn-not-fail target and 35 non-test files currently exceed it, led by
 `export.rs` (605), `hook/rule_planes.rs` (561) and `promote.rs` (526). Those
 three are the only entries in `scripts/file-size-baseline.txt`: the ratchet
@@ -1526,7 +1526,7 @@ hand-built without the flag.
 `cpg` and `lsp` now gate real engines, with tier advertisement and independent
 CI arms. The former empty flags were removed before these implementations landed.
 
-**Tests: 1,219** source test attributes across `src/` and `tests/`, measured
+**Tests: 1,222** source test attributes across `src/` and `tests/`, measured
 2026-09-07 by counting `#[test]` and `#[tokio::test]`. This is a source count;
 compiled counts vary with Cargo features and macro expansion. Appendix D's drift
 guard checks these measurements within its documented tolerance. Python replay,

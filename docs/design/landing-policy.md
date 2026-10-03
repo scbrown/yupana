@@ -205,7 +205,9 @@ unsupported wrapper options, dynamic command names, and the recursion limit
 retain UNKNOWN evidence. Protected landings with incomplete syntax refuse even
 for the repository owner; explicitly known topic refs and ungoverned repositories
 remain outside the policy. An unresolved execution target is checked against the
-current repository with an assumed ref, and is recorded as incomplete. This does
+current repository with an assumed ref only when literal landing-shaped argv
+evidence exists, and is recorded as incomplete. Dynamic editor/interpreter
+commands without landing evidence abstain. This does
 not prove the identity of a repository computed dynamically outside that scope.
 
 The signed record carries `parse_incomplete` in scope provenance and the stable

@@ -393,7 +393,7 @@ fn wrapper_directory_and_split_string_evidence_is_preserved() {
         resolve("env -S 'git push origin main'").unwrap().git_ref,
         RefTarget::Named("main".into())
     );
-    assert!(resolve("bash -c '$ACTION'").unwrap().parse_incomplete);
+    assert!(resolve("bash -c '$ACTION'").is_none());
     assert!(
         resolve("env --split-string=\"git push origin main\"")
             .unwrap()
@@ -435,5 +435,43 @@ fn expanded_and_input_supplied_refs_are_not_known_topic_refs() {
     assert_eq!(
         resolve("git push origin '$TARGET'").unwrap().git_ref,
         RefTarget::Named("$TARGET".into())
+    );
+}
+
+#[test]
+fn wrapper_option_meanings_are_program_specific() {
+    for command in [
+        "env -i git push origin main",
+        "timeout -s TERM 30s git push origin main",
+        "sudo -S VAR=value git push origin main",
+    ] {
+        let selected = resolve_all(command);
+        assert_eq!(selected.len(), 1, "{command}");
+        assert!(!selected[0].parse_incomplete, "{command}");
+    }
+}
+
+#[test]
+fn dynamic_programs_without_landing_evidence_do_not_synthesize_pushes() {
+    for command in [
+        "$PYTHON x.py",
+        "\"$EDITOR\" f",
+        "bash -c '$PYTHON x.py'",
+        "eval '$EDITOR f'",
+        "$EDITOR 'git push origin main'",
+        "$EDITOR merge",
+        "$EDITOR git push origin main",
+    ] {
+        assert!(
+            resolve_all(command).is_empty(),
+            "false protected action: {command}"
+        );
+    }
+    let wrapped = format!("{}git push origin main", "command ".repeat(32));
+    assert!(resolve(&wrapped).unwrap().parse_incomplete);
+    assert!(
+        resolve("env --unknown git push origin main")
+            .unwrap()
+            .parse_incomplete
     );
 }

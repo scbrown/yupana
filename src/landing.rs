@@ -461,6 +461,9 @@ pub fn resolve_all(cmd: &str) -> Vec<Landing> {
         }
     }
     for command in parsed.unresolved {
+        if !evidence::unresolved_landing_evidence(&command.words) {
+            continue;
+        }
         landings.push(Landing {
             verb: LandingVerb::Push,
             repo: RepoRef::Cwd,
@@ -472,6 +475,9 @@ pub fn resolve_all(cmd: &str) -> Vec<Landing> {
     }
     landings
 }
+
+#[path = "landing_evidence.rs"]
+mod evidence;
 
 #[cfg(test)]
 #[path = "landing_test.rs"]

@@ -31,7 +31,10 @@ fn route(mut command: Command, out: &mut Parsed, depth: usize) {
                     at += 1;
                     break;
                 }
-                if program == "env" && word.contains('=') && !word.starts_with('-') {
+                if matches!(program.as_str(), "env" | "sudo")
+                    && word.contains('=')
+                    && !word.starts_with('-')
+                {
                     at += 1;
                     continue;
                 }
@@ -189,19 +192,14 @@ fn route(mut command: Command, out: &mut Parsed, depth: usize) {
                     out.incomplete = true;
                     out.unresolved.push(command.clone());
                 }
-                // Options that alter cwd or interpret another command string
-                // are uncertain until their semantics have been resolved.
-                if matches!(
-                    word.as_str(),
-                    "-C" | "--chdir"
-                        | "-D"
-                        | "-R"
-                        | "--chroot"
-                        | "-S"
-                        | "--split-string"
-                        | "-s"
-                        | "-i"
-                ) {
+                // sudo's shell/login/chroot modes change execution context;
+                // a same-spelled option on timeout/env has different semantics.
+                if program == "sudo"
+                    && matches!(
+                        word.as_str(),
+                        "-s" | "--shell" | "-i" | "--login" | "-R" | "--chroot"
+                    )
+                {
                     out.incomplete = true;
                     out.unresolved.push(command.clone());
                 }
