@@ -54,11 +54,24 @@ pub fn run_pre_edit(tenant: Option<&str>, config_override: Option<&Path>) -> any
         Outcome::Deny(reason) => println!("{}", deny_envelope(&reason)),
         Outcome::Notify(message) => {
             if let Some(message) = super::advisory_for_session(&buf, message) {
-                println!("{}", system_message(&message));
+                println!("{}", advisory_envelope(&buf, &message));
             }
         }
     }
     Ok(())
+}
+
+/// Codex delivers `PreToolUse` context through the event-specific envelope.
+/// Its `systemMessage` field alone is not delivered to the model.
+fn advisory_envelope(input: &str, message: &str) -> String {
+    if HookInput::parse(input).is_some_and(|i| i.tool_name.as_deref() == Some("apply_patch")) {
+        serde_json::json!({"hookSpecificOutput": {
+            "hookEventName":"PreToolUse", "additionalContext":message
+        }})
+        .to_string()
+    } else {
+        system_message(message)
+    }
 }
 
 /// Native patches can touch several files. Evaluate every target before choosing

@@ -526,7 +526,9 @@ the `signed_rule_set` state for `st doctor` and other tooling to gate on.
 Register `yupana hook pre-edit` on `PreToolUse` with matcher `apply_patch`.
 Native Codex sends a patch in `tool_input.command`, potentially covering several
 files. Yupana evaluates each file, preserves the session and tool-call IDs, and
-returns the strongest outcome across the patch. Moves check both source and
+returns the strongest outcome across the patch. Native patch advisories use
+`hookSpecificOutput.additionalContext` so Codex delivers them to the model.
+Moves check both source and
 destination scopes. No files are written by the guard.
 
 The parser reconstructs exact-context patches for verification while passing only

@@ -1494,3 +1494,18 @@ fn malformed_native_patch_is_loud_unknown_not_silent_allow() {
     };
     assert!(message.contains("UNGUARDED"));
 }
+
+#[test]
+fn codex_advisory_uses_context_envelope_while_existing_harness_keeps_system_message() {
+    let native = serde_json::json!({"tool_name":"apply_patch"}).to_string();
+    let output: serde_json::Value =
+        serde_json::from_str(&advisory_envelope(&native, "notice")).unwrap();
+    assert_eq!(output["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+    assert_eq!(output["hookSpecificOutput"]["additionalContext"], "notice");
+    assert!(output.get("systemMessage").is_none());
+    let existing = serde_json::json!({"tool_name":"Edit"}).to_string();
+    assert_eq!(
+        advisory_envelope(&existing, "notice"),
+        system_message("notice")
+    );
+}
