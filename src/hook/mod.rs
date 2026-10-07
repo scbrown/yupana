@@ -223,12 +223,16 @@ pub fn system_message(message: &str) -> String {
 /// "could not tell" stays measurable rather than lost. Only a verdict speaks:
 /// a governed warning, a refusal, or a guard that could not be EVALUATED at
 /// all (its own config or projection broken), which stays loud by design.
+// Every caller is in a `quipu` build (disk_guard, ci_shift, landing_guard's
+// projection path), so the helper is too; ungated it is dead code elsewhere.
+#[cfg(feature = "quipu")]
 pub(crate) fn unknown_quietly(kind: &str, reason: impl Into<String>) -> Outcome {
     unknown_quietly_to(crate::metrics::spool_path().as_deref(), kind, reason)
 }
 
 /// [`unknown_quietly`] with the spool injected — the seam tests use, so a test
 /// never appends to the operator's real spool.
+#[cfg(feature = "quipu")]
 fn unknown_quietly_to(
     spool: Option<&std::path::Path>,
     kind: &str,
@@ -443,7 +447,7 @@ pub(crate) fn unique_test_session(prefix: &str) -> String {
 #[path = "hook_test.rs"]
 mod hook_test;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "quipu"))]
 mod unknown_quietly_tests {
     use super::*;
 
