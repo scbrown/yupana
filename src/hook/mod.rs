@@ -215,6 +215,35 @@ pub fn system_message(message: &str) -> String {
 
 /// A configuration error is actionable on every invocation and must never be
 /// hidden by advisory rate limiting.
+/// A NO-VERDICT result: the hook could not tell (no Quipu history, no CI map,
+/// an unreadable work-item plate, a measurement it could not record). It is
+/// SILENT in the operator's pane — "I dont really need to see this" (Steve,
+/// aegis-qddvr6: ~1,144 such lines against 4 real warnings in a week) — and it
+/// is still COUNTED: the reason goes to the metrics spool under `kind`, so
+/// "could not tell" stays measurable rather than lost. Only a verdict speaks:
+/// a governed warning, a refusal, or a guard that could not be EVALUATED at
+/// all (its own config or projection broken), which stays loud by design.
+// Every caller is in a `quipu` build (disk_guard, ci_shift, landing_guard's
+// projection path), so the helper is too; ungated it is dead code elsewhere.
+#[cfg(feature = "quipu")]
+pub(crate) fn unknown_quietly(kind: &str, reason: impl Into<String>) -> Outcome {
+    unknown_quietly_to(crate::metrics::spool_path().as_deref(), kind, reason)
+}
+
+/// [`unknown_quietly`] with the spool injected — the seam tests use, so a test
+/// never appends to the operator's real spool.
+#[cfg(feature = "quipu")]
+fn unknown_quietly_to(
+    spool: Option<&std::path::Path>,
+    kind: &str,
+    reason: impl Into<String>,
+) -> Outcome {
+    if let Some(path) = spool {
+        crate::metrics::emit_to(path, kind, &[("reason", reason.into().into())]);
+    }
+    Outcome::Allow
+}
+
 pub(super) const CONFIG_ERROR_PREFIX: &str = "yupana: configuration error:";
 
 /// Return an advisory only when this stable cause has not yet spoken in the
@@ -417,3 +446,33 @@ pub(crate) fn unique_test_session(prefix: &str) -> String {
 #[cfg(test)]
 #[path = "hook_test.rs"]
 mod hook_test;
+
+#[cfg(all(test, feature = "quipu"))]
+mod unknown_quietly_tests {
+    use super::*;
+
+    #[test]
+    fn a_no_verdict_result_is_silent_but_counted() {
+        // aegis-qddvr6: the operator must see nothing, and the reason must
+        // still be countable. Both halves, or a "fix" could simply drop it.
+        let dir = tempfile::tempdir().unwrap();
+        let spool = dir.path().join("metrics.jsonl");
+        let outcome = unknown_quietly_to(Some(&spool), "disk_guard_unknown", "no history");
+        assert!(
+            matches!(outcome, Outcome::Allow),
+            "a no-verdict result must not print"
+        );
+        let line = std::fs::read_to_string(&spool).unwrap();
+        let event: serde_json::Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(event["kind"], "disk_guard_unknown");
+        assert_eq!(event["reason"], "no history");
+    }
+
+    #[test]
+    fn no_spool_still_means_silent() {
+        assert!(matches!(
+            unknown_quietly_to(None, "ci_shift_unknown", "x"),
+            Outcome::Allow
+        ));
+    }
+}

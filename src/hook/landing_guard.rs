@@ -120,7 +120,11 @@ fn check_landing(payload: &str, landing: &Landing) -> Outcome {
 
     match decision {
         Decision::Allow { .. } if !request.work_item_readable => {
-            Outcome::Notify("yupana: work-item plate UNKNOWN; fail-open on attribution only".into())
+            // Allowed; only the ATTRIBUTION is unknown. Counted, not printed (aegis-qddvr6).
+            super::unknown_quietly(
+                "landing_unknown",
+                "work-item plate unreadable; allowed, attribution unknown",
+            )
         }
         Decision::Allow { .. } | Decision::NotApplicable { .. } => Outcome::Allow,
         Decision::Refuse { reason, .. } => {

@@ -234,6 +234,10 @@ pub fn spawn_detached(root: &Path, checks: &[CiCheck], state_dir: &Path) -> Resu
     Ok(())
 }
 
+/// Metrics-spool kind for a push with no CI-map verdict (aegis-qddvr6).
+#[cfg(feature = "quipu")]
+const UNKNOWN_KIND: &str = "ci_shift_unknown";
+
 /// Evaluate the already-installed `pre-bash` hook at the push boundary.
 #[cfg(feature = "quipu")]
 pub(crate) fn hook_advisory(payload: &str, command: &str) -> crate::hook::Outcome {
@@ -247,42 +251,36 @@ pub(crate) fn hook_advisory(payload: &str, command: &str) -> crate::hook::Outcom
         return Outcome::Allow;
     }
     let Some(input) = crate::hook::HookInput::parse(payload) else {
-        return Outcome::Notify(
-            "yupana CI shift-left: UNKNOWN (hook payload did not parse)".into(),
-        );
+        return crate::hook::unknown_quietly(UNKNOWN_KIND, "hook payload did not parse");
     };
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let root = input.root(&cwd);
     let config = match crate::config::YupanaConfig::resolve(None, &root) {
         Ok(config) => config,
-        Err(error) => return Outcome::Notify(format!("yupana CI shift-left: UNKNOWN ({error})")),
+        Err(error) => return crate::hook::unknown_quietly(UNKNOWN_KIND, error.to_string()),
     };
     let body = match crate::project::query(&config.quipu.endpoint, CI_MAP_QUERY) {
         Ok(body) => body,
-        Err(error) => return Outcome::Notify(format!("yupana CI shift-left: UNKNOWN ({error})")),
+        Err(error) => return crate::hook::unknown_quietly(UNKNOWN_KIND, error.to_string()),
     };
     let checks = match decode_map(&body) {
         Ok(checks) => checks,
-        Err(error) => return Outcome::Notify(format!("yupana CI shift-left: UNKNOWN ({error})")),
+        Err(error) => return crate::hook::unknown_quietly(UNKNOWN_KIND, error.to_string()),
     };
     let Some(changed) = changed_for_push(&root) else {
-        return Outcome::Notify("yupana CI shift-left: UNKNOWN (push diff did not resolve)".into());
+        return crate::hook::unknown_quietly(UNKNOWN_KIND, "push diff did not resolve");
     };
     match select(&checks, &changed) {
-        Selection::Unknown => {
-            Outcome::Notify("yupana CI shift-left: UNKNOWN (no governed CI map)".into())
-        }
+        Selection::Unknown => crate::hook::unknown_quietly(UNKNOWN_KIND, "no governed CI map"),
         Selection::Quiet => Outcome::Allow,
         Selection::Checks(selected) => {
             let Some(state) = crate::projection_cache::cache_path()
                 .and_then(|path| path.parent().map(|parent| parent.join("ci-shift-left")))
             else {
-                return Outcome::Notify(
-                    "yupana CI shift-left: UNKNOWN (no state directory)".into(),
-                );
+                return crate::hook::unknown_quietly(UNKNOWN_KIND, "no state directory");
             };
             if let Err(error) = spawn_detached(&root, &selected, &state) {
-                return Outcome::Notify(format!("yupana CI shift-left: UNKNOWN ({error})"));
+                return crate::hook::unknown_quietly(UNKNOWN_KIND, error.to_string());
             }
             Outcome::Notify(format!(
                 "yupana CI shift-left: started local CI equivalents in background: {}",

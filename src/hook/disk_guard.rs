@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 use super::pre_edit::Outcome;
 
+/// Metrics-spool kind for a disk-impact result with no verdict (aegis-qddvr6).
+const UNKNOWN_KIND: &str = "disk_guard_unknown";
 const WARN_HEADROOM_NUMERATOR: u64 = 4;
 const WARN_HEADROOM_DENOMINATOR: u64 = 5;
 
@@ -40,7 +42,7 @@ pub(super) fn observe_and_check(payload: &str, command: &str) -> Outcome {
     };
     let reading = match read_disk(&root) {
         Ok(reading) => reading,
-        Err(e) => return Outcome::Notify(format!("yupana: disk impact UNKNOWN: {e}")),
+        Err(e) => return super::unknown_quietly(UNKNOWN_KIND, format!("disk unreadable: {e}")),
     };
     let config = match crate::config::YupanaConfig::resolve(None, &root) {
         Ok(config) => config,
@@ -52,9 +54,7 @@ pub(super) fn observe_and_check(payload: &str, command: &str) -> Outcome {
         }
     };
     if !config.quipu.enabled || config.quipu.endpoint.is_empty() {
-        return Outcome::Notify(
-            "yupana: disk impact UNKNOWN: Quipu history is not configured".into(),
-        );
+        return super::unknown_quietly(UNKNOWN_KIND, "Quipu history is not configured");
     }
 
     let session = input.session_id.as_deref().unwrap_or("anonymous");
@@ -68,17 +68,26 @@ pub(super) fn observe_and_check(payload: &str, command: &str) -> Outcome {
     ) {
         Ok(samples) => samples,
         Err(e) => {
-            return Outcome::Notify(format!(
-                "yupana: disk impact UNKNOWN: history query failed ({e})"
-            ))
+            return super::unknown_quietly(
+                UNKNOWN_KIND,
+                with_measurement(
+                    format!("history query failed ({e})"),
+                    measurement.as_deref(),
+                ),
+            )
         }
     };
     let Some(predicted) = crate::project_disk::p90(&samples) else {
-        return Outcome::Notify(format!(
-            "yupana: disk impact UNKNOWN for `{signature}` on {}: no Quipu-recorded history; command is allowed, not declared safe{}",
-            reading.filesystem,
-            measurement.as_deref().map_or(String::new(), |m| format!("; {m}"))
-        ));
+        return super::unknown_quietly(
+            UNKNOWN_KIND,
+            with_measurement(
+                format!(
+                    "no Quipu-recorded history for `{signature}` on {}",
+                    reading.filesystem
+                ),
+                measurement.as_deref(),
+            ),
+        );
     };
     let available = headroom_override().unwrap_or(reading.available_bytes);
     let limit = available.saturating_mul(WARN_HEADROOM_NUMERATOR) / WARN_HEADROOM_DENOMINATOR;
@@ -99,6 +108,16 @@ pub(super) fn observe_and_check(payload: &str, command: &str) -> Outcome {
         ))
     } else {
         Outcome::Allow
+    }
+}
+
+/// The previous command's measurement (recorded, or NOT RECORDED with why) rides
+/// along in the spooled reason. A failed write is the hook's own fault and
+/// belongs in the spool, not the pane (aegis-qddvr6; the 401 is aegis-3cn50u).
+fn with_measurement(reason: String, measurement: Option<&str>) -> String {
+    match measurement {
+        Some(m) => format!("{reason}; {m}"),
+        None => reason,
     }
 }
 
@@ -379,6 +398,20 @@ mod tests {
                 .sum();
             assert_eq!(wins, 1);
         }
+    }
+
+    #[test]
+    fn a_failed_delta_write_rides_in_the_spooled_reason_not_the_pane() {
+        // The 401 that reached Steve's pane (aegis-qddvr6 / aegis-3cn50u) is now
+        // part of the counted reason, and a missing measurement adds nothing.
+        assert_eq!(
+            with_measurement(
+                "no history".into(),
+                Some("previous-command delta NOT RECORDED (401)")
+            ),
+            "no history; previous-command delta NOT RECORDED (401)"
+        );
+        assert_eq!(with_measurement("no history".into(), None), "no history");
     }
 
     #[test]
