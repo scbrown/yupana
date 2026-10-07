@@ -75,7 +75,7 @@ pub fn resolve_path(
     })
 }
 
-fn spool_path() -> Option<PathBuf> {
+pub(crate) fn spool_path() -> Option<PathBuf> {
     resolve_path(
         std::env::var("YUPANA_METRICS_PATH").ok().as_deref(),
         std::env::var("XDG_STATE_HOME").ok().as_deref(),
