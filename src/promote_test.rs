@@ -4,6 +4,33 @@
 
 use super::*;
 
+#[test]
+fn credential_file_resolution_uses_standard_path_and_explicit_selection() {
+    let root = tempfile::tempdir().unwrap();
+    let standard = root.path().join(".config/quipu/token");
+    std::fs::create_dir_all(standard.parent().unwrap()).unwrap();
+    std::fs::write(&standard, "fixture-standard\n").unwrap();
+    assert_eq!(
+        token_file_from_options(None, Some(root.path())),
+        Some("fixture-standard".into())
+    );
+    let selected = root.path().join("selected");
+    std::fs::write(&selected, "fixture-selected\n").unwrap();
+    assert_eq!(
+        token_file_from_options(selected.to_str(), Some(root.path())),
+        Some("fixture-selected".into())
+    );
+    assert_eq!(
+        token_file_from_options(root.path().join("missing").to_str(), Some(root.path())),
+        None
+    );
+    std::fs::write(&selected, " \n").unwrap();
+    assert_eq!(
+        token_file_from_options(selected.to_str(), Some(root.path())),
+        None
+    );
+}
+
 use super::promote_chunk::CLASS_CONSTRAINED_PREDICATES;
 use super::promote_payload::{dump_payload_to, payload_slug};
 

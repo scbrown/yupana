@@ -224,14 +224,19 @@ pub(crate) fn quipu_auth_token() -> Option<String> {
 /// `QUIPU_AUTH_TOKEN_FILE`, else `~/.config/quipu/token`. Absent/unreadable
 /// is `None`: no auth configured, the open-server default.
 fn token_from_file() -> Option<String> {
-    let path = std::env::var("QUIPU_AUTH_TOKEN_FILE")
-        .ok()
+    let explicit = std::env::var("QUIPU_AUTH_TOKEN_FILE").ok();
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    token_file_from_options(explicit.as_deref(), home.as_deref())
+}
+
+fn token_file_from_options(
+    explicit: Option<&str>,
+    home: Option<&std::path::Path>,
+) -> Option<String> {
+    let path = explicit
         .filter(|p| !p.is_empty())
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .map(|h| format!("{h}/.config/quipu/token"))
-        })?;
+        .map(std::path::PathBuf::from)
+        .or_else(|| home.map(|h| h.join(".config/quipu/token")))?;
     normalize_token(
         std::fs::read_to_string(path)
             .ok()

@@ -273,10 +273,8 @@ fn post_sample(endpoint: &str, pending: &Pending, delta: i64) -> Result<(), Stri
             .map_err(|e| e.to_string())?
     );
     let url = format!("{}/knot", endpoint.trim_end_matches('/'));
-    let mut request = ureq::post(&url)
-        .set("Content-Type", "application/json")
-        .set("X-Quipu-Client", "agent-adhoc");
-    if let Some(token) = auth_token() {
+    let mut request = crate::quipu_label::json_post(&url, crate::quipu_label::HOOK);
+    if let Some(token) = crate::promote::quipu_auth_token() {
         request = request.set("Authorization", &format!("Bearer {token}"));
     }
     let body =
@@ -303,19 +301,6 @@ fn post_sample(endpoint: &str, pending: &Pending, delta: i64) -> Result<(), Stri
         return Err(format!("Quipu wrote zero observation triples: {result}"));
     }
     Ok(())
-}
-
-fn auth_token() -> Option<String> {
-    std::env::var("QUIPU_AUTH_TOKEN")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| {
-            let home = std::env::var_os("HOME")?;
-            std::fs::read_to_string(PathBuf::from(home).join(".config/aegis/quipu_token"))
-                .ok()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-        })
 }
 
 fn headroom_override() -> Option<u64> {
