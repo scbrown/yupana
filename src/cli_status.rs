@@ -59,6 +59,10 @@ impl Cli {
         let policy = config.policy.status_for(self.tenant.as_deref());
 
         let rule_set = measure_rule_set(&config);
+        #[cfg(feature = "quipu")]
+        let auth = crate::quipu_auth::status(&config.quipu.endpoint);
+        #[cfg(not(feature = "quipu"))]
+        let auth = serde_json::json!({"state": "feature_unavailable"});
         if self.json {
             let out = serde_json::json!({
                 "base_ref": config.base_ref,
@@ -72,7 +76,7 @@ impl Cli {
                 // in that language" from the outside. This is the field that
                 // makes a Rust-only deploy detectable without a probe repo.
                 "languages": crate::extract::languages(),
-                "quipu": { "enabled": config.quipu.enabled, "branch_model": config.quipu.branch_model },
+                "quipu": { "enabled": config.quipu.enabled, "branch_model": config.quipu.branch_model, "auth": auth },
                 "policy": policy,
                 "policy_mode_provenance": mode_provenance,
                 // Whether guard records will carry their subject (yupana #77). An
@@ -155,6 +159,13 @@ impl Cli {
                     crate::audit::PathRecording::Relative => "relative",
                     crate::audit::PathRecording::Absolute => "absolute",
                 }
+            );
+            println!(
+                "  quipu auth  : {} — {}",
+                auth["state"].as_str().unwrap_or("unknown"),
+                auth["help"]
+                    .as_str()
+                    .unwrap_or("build without quipu support")
             );
             print_policy_status(&policy, &mode_provenance);
             print_rule_set_status(&config, &rule_set);

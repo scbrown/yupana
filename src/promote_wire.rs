@@ -1,6 +1,5 @@
 //! HTTP promotion envelope and Quipu response handling.
 
-use super::quipu_auth_token;
 use crate::errors::{Error, Result};
 
 /// Post validated Turtle to Quipu's `/knot`. Returns the number of triples the
@@ -32,7 +31,7 @@ pub(super) fn write_knot_request(
     valid_from: Option<&str>,
 ) -> Result<KnotResult> {
     let url = format!("{}/knot", endpoint.trim_end_matches('/'));
-    let auth = quipu_auth_token();
+    let auth = crate::quipu_auth::require(endpoint, None).map_err(Error::Promote)?;
     // Provenance on every write (promotion tail item 4): quipu records actor +
     // source per transaction; an anonymous writer is unauditable, and yupana was
     // the only anonymous one left.
@@ -60,13 +59,14 @@ pub(super) fn write_knot_request(
     let mut last_err = String::new();
     for attempt in 1..=ATTEMPTS {
         let mut req = crate::quipu_label::json_post(&url, crate::quipu_label::PROMOTE);
-        if let Some(token) = &auth {
-            req = req.set("Authorization", &format!("Bearer {token}"));
-        }
+        req = req.set("Authorization", &format!("Bearer {auth}"));
         match req.send_string(&body) {
             Ok(r) => {
                 resp = Some(r);
                 break;
+            }
+            Err(ureq::Error::Status(401, _)) => {
+                return Err(Error::Promote(crate::quipu_auth::rejected(endpoint, None)));
             }
             Err(ureq::Error::Status(code, _)) if code < 500 => {
                 return Err(Error::Promote(format!("POST {url} failed: status {code}")));
