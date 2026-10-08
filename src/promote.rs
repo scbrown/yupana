@@ -226,9 +226,7 @@ fn token_file_from_options(
 
 #[cfg(test)]
 fn normalize_token(raw: Option<&str>) -> Option<String> {
-    crate::quipu_auth::resolve(raw, None, None)
-        .ok()
-        .flatten()
+    crate::quipu_auth::resolve(raw, None, None).ok().flatten()
 }
 
 #[path = "promote_wire.rs"]

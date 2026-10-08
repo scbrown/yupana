@@ -1126,6 +1126,7 @@ fn promote_refuses_dir_name_identity_and_accepts_origin() {
             "--to",
             &format!("http://{addr}"),
         ])
+        .env("QUIPU_AUTH_TOKEN", "isolated-test-fixture")
         .current_dir(dir.path())
         .assert()
         .failure()
@@ -1419,6 +1420,7 @@ fn promote_on_gates_the_declared_trigger() {
                 "--to",
                 &format!("http://{addr}"),
             ])
+            .env("QUIPU_AUTH_TOKEN", "isolated-test-fixture")
             .env("HOME", dir.path())
             .current_dir(dir.path())
             .assert()

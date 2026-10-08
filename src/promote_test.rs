@@ -79,14 +79,32 @@ fn empty_bearer_token_is_unset_not_a_credential() {
     // `Bearer ` would present a wrong credential and 401 confusingly.
     assert_eq!(normalize_token(None), None);
     assert_eq!(normalize_token(Some("")), None);
-    assert_eq!(
-        normalize_token(Some("sekrit")),
-        Some("sekrit".to_string())
-    );
+    assert_eq!(normalize_token(Some("sekrit")), Some("sekrit".to_string()));
 }
 
 #[test]
 fn snapshot_write_names_one_atomic_replacement_envelope() {
+    // Give this real HTTP fixture its own credential without mutating the
+    // multithreaded test process environment or reading an operator's token.
+    const CHILD: &str = "YUPANA_SNAPSHOT_CREDENTIAL_FIXTURE";
+    if std::env::var_os(CHILD).is_none() {
+        let home = tempfile::tempdir().unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "promote::promote_test::snapshot_write_names_one_atomic_replacement_envelope",
+            ])
+            .env(CHILD, "1")
+            .env("HOME", home.path())
+            .env("XDG_STATE_HOME", home.path().join("state"))
+            .env("QUIPU_SESSION", "snapshot-fixture")
+            .env("QUIPU_AUTH_TOKEN", "isolated-test-fixture")
+            .env_remove("QUIPU_AUTH_TOKEN_FILE")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "fixture child failed: {output:?}");
+        return;
+    }
     use std::io::{Read, Write};
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
