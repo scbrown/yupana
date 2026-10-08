@@ -214,39 +214,21 @@ fn parse_report(report: &str) -> Validation {
 /// unset against an open server and nothing changes. An empty value counts as
 /// unset — `Bearer ` (no token) would be sent as a real-but-wrong credential
 /// and turn a misconfigured env into a confusing 401.
-pub(crate) fn quipu_auth_token() -> Option<String> {
-    normalize_token(std::env::var("QUIPU_AUTH_TOKEN").ok()).or_else(token_from_file)
-}
-
-/// The token file — the half of distribution that reaches processes launched
-/// BEFORE the token existed (an env var is captured at spawn; a file is read
-/// per request). Env wins above as the per-invocation override. Path:
-/// `QUIPU_AUTH_TOKEN_FILE`, else `~/.config/quipu/token`. Absent/unreadable
-/// is `None`: no auth configured, the open-server default.
-fn token_from_file() -> Option<String> {
-    let explicit = std::env::var("QUIPU_AUTH_TOKEN_FILE").ok();
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
-    token_file_from_options(explicit.as_deref(), home.as_deref())
-}
-
+#[cfg(test)]
 fn token_file_from_options(
     explicit: Option<&str>,
     home: Option<&std::path::Path>,
 ) -> Option<String> {
-    let path = explicit
-        .filter(|p| !p.is_empty())
-        .map(std::path::PathBuf::from)
-        .or_else(|| home.map(|h| h.join(".config/quipu/token")))?;
-    normalize_token(
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string()),
-    )
+    crate::quipu_auth::resolve(None, explicit.map(std::path::Path::new), home)
+        .ok()
+        .flatten()
 }
 
-/// The pure half of [`quipu_auth_token`]: empty-or-absent collapses to `None`.
+#[cfg(test)]
 fn normalize_token(raw: Option<String>) -> Option<String> {
-    raw.filter(|t| !t.is_empty())
+    crate::quipu_auth::resolve(raw.as_deref(), None, None)
+        .ok()
+        .flatten()
 }
 
 #[path = "promote_wire.rs"]

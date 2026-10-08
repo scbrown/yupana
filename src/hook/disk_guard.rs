@@ -177,7 +177,12 @@ fn finish_previous(session: &str, now: &DiskReading, endpoint: &str) -> Option<S
     }
     let delta = (i128::from(pending.available_bytes) - i128::from(now.available_bytes))
         .clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
-    match post_sample(endpoint, &pending, delta) {
+    match post_sample(
+        endpoint,
+        &pending,
+        delta,
+        (session != "anonymous").then_some(session),
+    ) {
         Ok(()) => Some(format!(
             "recorded previous-command delta {}",
             signed_bytes(delta)
@@ -253,7 +258,12 @@ fn state_path(session: &str) -> Option<PathBuf> {
     )
 }
 
-fn post_sample(endpoint: &str, pending: &Pending, delta: i64) -> Result<(), String> {
+fn post_sample(
+    endpoint: &str,
+    pending: &Pending,
+    delta: i64,
+    session: Option<&str>,
+) -> Result<(), String> {
     let id = hex::encode(Sha256::digest(
         format!(
             "{}\0{}\0{}",
@@ -274,16 +284,18 @@ fn post_sample(endpoint: &str, pending: &Pending, delta: i64) -> Result<(), Stri
     );
     let url = format!("{}/knot", endpoint.trim_end_matches('/'));
     let mut request = crate::quipu_label::json_post(&url, crate::quipu_label::HOOK);
-    if let Some(token) = crate::promote::quipu_auth_token() {
-        request = request.set("Authorization", &format!("Bearer {token}"));
-    }
+    let token = crate::quipu_auth::require(endpoint, session)?;
+    request = request.set("Authorization", &format!("Bearer {token}"));
     let body =
         serde_json::json!({"turtle": turtle, "actor": "yupana", "source": "command-disk-impact"})
             .to_string();
     let response = request
         .timeout(std::time::Duration::from_secs(3))
         .send_string(&body)
-        .map_err(|e| e.to_string())?;
+        .map_err(|error| match error {
+            ureq::Error::Status(401, _) => crate::quipu_auth::rejected(endpoint, session),
+            _ => error.to_string(),
+        })?;
     let response_body = response
         .into_string()
         .map_err(|e| format!("cannot read Quipu knot response: {e}"))?;

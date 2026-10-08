@@ -142,6 +142,8 @@ pub mod promote_subset_cli;
 /// without `quipu`, where it decides whether the feature-off refusal is even
 /// reached.
 pub mod promote_trigger;
+#[cfg(feature = "quipu")]
+mod quipu_auth;
 /// Which yupana caller a quipu request came from (`X-Quipu-Client`).
 #[cfg(feature = "quipu")]
 pub mod quipu_label;
