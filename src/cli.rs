@@ -47,7 +47,7 @@ pub use cli_tracing::init_tracing;
 
 /// Yupana — live, per-tenant code structure for the Bobbin × Quipu stack.
 #[derive(Debug, Parser)]
-#[command(name = "yupana", version, about, long_about = None)]
+#[command(name = "yupana", version = env!("YUPANA_BUILD_VERSION"), about, long_about = None)]
 pub struct Cli {
     /// The subcommand to run.
     #[command(subcommand)]

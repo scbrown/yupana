@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import unittest
 
@@ -17,7 +18,7 @@ assert args[0] == 'build' and '--release' in args
 mode = os.environ.get('FAKE_MODE', 'ok')
 marker = os.environ.get('SOURCE_MARKER', 'new-source')
 with open(os.environ['BUILD_LOG'], 'a') as log:
-    log.write(json.dumps({'target': str(target), 'args': args}) + '\n')
+    log.write(json.dumps({'target': str(target), 'args': args, 'local_build': os.environ.get('YUPANA_LOCAL_BUILD')}) + '\n')
 if mode == 'build-fail': sys.exit(17)
 if mode == 'missing': sys.exit(0)
 # Simulate a wrapper overwriting the environment target. The explicit flag wins.
@@ -28,7 +29,8 @@ release = target / 'release'
 release.mkdir()
 binary = release / 'yupana'
 value = 'stale-same-version' if mode == 'stale' else marker
-binary.write_text('#!/usr/bin/env python3\nimport sys\nprint("yupana 0.6.5" if sys.argv[1] == "--version" else '+repr(value)+')\n')
+version = 'yupana 0.6.5' + ('' if mode == 'unstamped' else '+local.' + os.environ['YUPANA_LOCAL_BUILD'])
+binary.write_text('#!/usr/bin/env python3\nimport sys\nprint('+repr(version)+' if sys.argv[1] == "--version" else '+repr(value)+')\n')
 binary.chmod(0o755)
 contract = release / 'install-contract'
 contract.write_text('#!/usr/bin/env python3\nimport os, pathlib, subprocess, sys, time\nif os.environ.get("REQUIRE_INSTALL_LOCK"): assert (pathlib.Path(os.environ["YUPANA_INSTALL_ROOT"]) / "bin/.yupana-install.lock.d").is_dir(), "publication lock was not acquired"\ntime.sleep(0.05)\nactual=subprocess.check_output([sys.argv[1], "--proof"], text=True).strip()\nassert actual == '+repr(marker)+', "candidate CLI differs from source"\nprint("Verified source contract")\n')
@@ -90,8 +92,49 @@ class InstallerTests(unittest.TestCase):
         self.assertNotEqual(log['target'], self.env['CARGO_TARGET_DIR'])
         self.assert_clean()
 
+    def test_build_script_release_local_and_invalid_identity(self):
+        checker = self.root / 'build-script'
+        subprocess.run(['rustc', str(ROOT / 'build.rs'), '-o', str(checker)], check=True)
+        env = dict(os.environ, CARGO_PKG_VERSION='0.12.0')
+        env.pop('YUPANA_LOCAL_BUILD', None)
+        for identity, expected in ((None, '0.12.0'),
+                                   ('abcdef012345', '0.12.0+local.abcdef012345'),
+                                   ('abcdef012345.dirty', '0.12.0+local.abcdef012345.dirty')):
+            case = dict(env)
+            if identity is not None:
+                case['YUPANA_LOCAL_BUILD'] = identity
+            result = subprocess.run([str(checker)], env=case, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('cargo:rustc-env=YUPANA_BUILD_VERSION=' + expected + '\n', result.stdout)
+        for bad in ('', 'unknown', 'abcdef012345.dev', 'abcdef012345\nINJECT', 'abc+local.def'):
+            result = subprocess.run([str(checker)], env=dict(env, YUPANA_LOCAL_BUILD=bad),
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0, bad)
+
+    def test_clean_and_dirty_checkout_versions(self):
+        repo = self.root / 'checkout'
+        (repo / 'scripts').mkdir(parents=True)
+        for name in ('install-local.sh', 'install-artifacts.py'):
+            shutil.copy2(ROOT / 'scripts' / name, repo / 'scripts' / name)
+        (repo / 'Cargo.toml').write_text('[package]\nversion = "0.6.5"\n')
+        subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Test',
+                        '-c', 'user.email=test@example.com', 'commit', '-qm', 'fixture'], check=True)
+        sha = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()[:12]
+        for dirty in (False, True):
+            if dirty:
+                (repo / 'Cargo.toml').write_text('[package]\nversion = "0.6.5"\n# edit\n')
+            result = subprocess.run([str(repo / 'scripts/install-local.sh')],
+                                    env=self.env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            expected = 'yupana 0.6.5+local.' + sha + ('.dirty' if dirty else '')
+            self.assertEqual(subprocess.check_output([str(self.old), '--version'], text=True).strip(), expected)
+            self.assertIn('Installed ' + expected, result.stdout)
+            self.assert_clean()
+
     def test_refusals_preserve_old_binary_and_alias(self):
-        for mode in ('stale', 'build-fail', 'missing', 'outside', 'symlink', 'duplicate', 'no-contract'):
+        for mode in ('stale', 'build-fail', 'missing', 'outside', 'symlink', 'duplicate', 'no-contract', 'unstamped'):
             with self.subTest(mode=mode):
                 result = self.run_install(mode)
                 self.assertNotEqual(result.returncode, 0)
