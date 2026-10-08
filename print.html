@@ -2084,10 +2084,12 @@ deadline expires, the in-flight analysis is abandoned and the edit is
 <p>Do not rely on the harness <code>timeout</code> field for this: it is expressed in whole
 seconds and defaults to ten minutes — three orders of magnitude past the budget.
 Set it anyway as a backstop (<code>"timeout": 5</code>), but the real deadline is Yupana's.</p>
-<p>Until the Phase-3 resident daemon lands (FR-31), the guard builds the call graph
-transiently and will exceed 100ms on large trees — which, by the rule above,
-means it fails open. That is the intended degradation, not a bug: the guard gets
-teeth on big repos when the daemon does.</p>
+<p>100ms is a deadline, not a measured latency. Without the resident daemon
+(<a href="reference/daemon.html">Resident Daemon</a>, FR-31; opt-in, <code>[yupana.serve] use_daemon</code> defaults
+to <code>false</code>) the guard builds the call graph per invocation and will exceed 100ms
+on large trees — which, by the rule above, means it fails open. That is the
+intended degradation, not a bug: on big repos the guard has teeth only once the
+daemon serves it.</p>
 <h2 id="d-fail-open--non-negotiable"><a class="header" href="#d-fail-open--non-negotiable">(d) Fail open — non-negotiable</a></h2>
 <p><strong>Every failure mode allows the edit.</strong> The harness launches every crew agent
 through this hook; a guard that fails closed bricks the fleet the moment Yupana is
