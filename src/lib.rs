@@ -65,6 +65,7 @@ pub mod goldenpath;
 pub mod graph;
 pub mod grounding;
 pub mod hook;
+pub mod hooks_install;
 pub mod hosting;
 /// The action selector for LANDINGS — `git push` / `gh pr merge` — which the
 /// governed single-writer policy is written against.
