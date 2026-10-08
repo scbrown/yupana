@@ -65,13 +65,21 @@ contract=${artifacts[1]}
 # Serialize publication, not compilation. The lock covers both names and the
 # final readback, so another installer cannot replace them inside our check.
 #
-# `mkdir` rather than `flock`: mkdir is atomic on every POSIX filesystem and
-# needs no external tool, where `flock` does not exist on macOS at all (it is
-# a util-linux program, never shipped by Darwin) — a stock Mac with no
-# additional packages could never pass this line.
+# Directory creation is atomic and portable, unlike the Linux-only flock tool.
+# Use Python (already required above) to preserve the syscall result: some
+# mkdir utilities report success after a concurrent EEXIST, admitting two owners.
 lock_candidate="$bin_dir/.yupana-install.lock.d"
 lock_tries=0
-until mkdir "$lock_candidate" 2>/dev/null; do
+until python3 - "$lock_candidate" <<'PYLOCK'
+import os
+import sys
+
+try:
+    os.mkdir(sys.argv[1])
+except FileExistsError:
+    sys.exit(1)
+PYLOCK
+do
     lock_tries=$((lock_tries + 1))
     if ((lock_tries >= 600)); then
         echo 'ERROR: could not acquire the install lock (held 60s+ by another installer)' >&2

@@ -31,7 +31,7 @@ value = 'stale-same-version' if mode == 'stale' else marker
 binary.write_text('#!/usr/bin/env python3\nimport sys\nprint("yupana 0.6.5" if sys.argv[1] == "--version" else '+repr(value)+')\n')
 binary.chmod(0o755)
 contract = release / 'install-contract'
-contract.write_text('#!/usr/bin/env python3\nimport subprocess, sys, time\ntime.sleep(0.05)\nactual=subprocess.check_output([sys.argv[1], "--proof"], text=True).strip()\nassert actual == '+repr(marker)+', "candidate CLI differs from source"\nprint("Verified source contract")\n')
+contract.write_text('#!/usr/bin/env python3\nimport os, pathlib, subprocess, sys, time\nif os.environ.get("REQUIRE_INSTALL_LOCK"): assert (pathlib.Path(os.environ["YUPANA_INSTALL_ROOT"]) / "bin/.yupana-install.lock.d").is_dir(), "publication lock was not acquired"\ntime.sleep(0.05)\nactual=subprocess.check_output([sys.argv[1], "--proof"], text=True).strip()\nassert actual == '+repr(marker)+', "candidate CLI differs from source"\nprint("Verified source contract")\n')
 contract.chmod(0o755)
 if mode in ('outside', 'symlink'):
     outside = shared / 'foreign'
@@ -110,6 +110,24 @@ class InstallerTests(unittest.TestCase):
         result = self.run_install()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.old.read_bytes(), self.before)
+        self.assert_clean()
+
+    def test_lock_acquisition_does_not_trust_mkdir_false_success(self):
+        # Some mkdir implementations return success after a losing EEXIST race.
+        # Simulate false success without creating a lock; the contract requires
+        # actual ownership throughout candidate and published-binary checks.
+        tools = self.root / 'tools'
+        tools.mkdir()
+        mkdir = tools / 'mkdir'
+        mkdir.write_text('#!/usr/bin/env python3\nimport os, sys\n'
+                         'if sys.argv[1] == "-p":\n'
+                         '    for path in sys.argv[2:]: os.makedirs(path, exist_ok=True)\n')
+        mkdir.chmod(0o755)
+        self.env['PATH'] = str(tools) + os.pathsep + os.environ['PATH']
+        self.env['REQUIRE_INSTALL_LOCK'] = '1'
+        result = self.run_install()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.bin / '.yupana-install.lock.d').exists())
         self.assert_clean()
 
     def test_concurrent_installers_use_distinct_targets_and_publish_whole_binaries(self):
