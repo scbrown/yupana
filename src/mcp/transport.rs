@@ -12,11 +12,17 @@ pub async fn run_stdio(
     root: PathBuf,
     tenant: Option<String>,
     config: Option<PathBuf>,
+    read_only: bool,
 ) -> Result<()> {
     use rmcp::transport::stdio;
     use rmcp::ServiceExt;
 
     let server = YupanaMcpServer::new(root, tenant, config);
+    let server = if read_only {
+        server.read_only()
+    } else {
+        server
+    };
     let service = server.serve(stdio()).await?;
     service.waiting().await?;
     Ok(())
@@ -29,6 +35,7 @@ pub async fn run_http(
     config: Option<PathBuf>,
     bind: String,
     port: u16,
+    read_only: bool,
 ) -> Result<()> {
     use std::sync::Arc;
     use std::time::Duration;
@@ -42,11 +49,12 @@ pub async fn run_http(
     let service: StreamableHttpService<YupanaMcpServer, LocalSessionManager> =
         StreamableHttpService::new(
             move || {
-                Ok::<_, std::io::Error>(YupanaMcpServer::new(
-                    root.clone(),
-                    tenant.clone(),
-                    config.clone(),
-                ))
+                let server = YupanaMcpServer::new(root.clone(), tenant.clone(), config.clone());
+                Ok::<_, std::io::Error>(if read_only {
+                    server.read_only()
+                } else {
+                    server
+                })
             },
             Arc::new(LocalSessionManager::default()),
             StreamableHttpServerConfig {

@@ -13,6 +13,7 @@ mod server;
 /// Request DTOs for the board tools (FR-35/37/38), defined for both arms of the
 /// `game-state` feature — the tool methods are registered on every build.
 mod state_tools;
+mod tool_policy;
 mod tools;
 mod transport;
 

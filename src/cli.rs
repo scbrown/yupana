@@ -80,6 +80,10 @@ enum Commands {
         /// Serve over streamable-HTTP instead of stdio.
         #[arg(long)]
         http: bool,
+        /// Serve only the code-structure query tools (impact, callers,
+        /// references, dataflow, symbols, analyze, status): no tool that writes.
+        #[arg(long)]
+        read_only: bool,
     },
     /// Run the resident-graph daemon: build the base graph once and hold it,
     /// serving a local liveness surface (Phase 3, FR-31). Query endpoints and the
@@ -363,7 +367,7 @@ impl Cli {
             Commands::Certify(args) => args.run(),
             #[cfg(feature = "quipu")]
             Commands::Share(args) => Ok(args.run(self.quipu_endpoint().as_deref())?),
-            Commands::Serve { http } => self.serve(*http).await,
+            Commands::Serve { http, read_only } => self.serve(*http, *read_only).await,
             Commands::Daemon { port } => self.daemon(*port).await,
             Commands::Callers { symbol, path } => {
                 cli_cmds::callers(self.json, self.quiet, symbol, path)
