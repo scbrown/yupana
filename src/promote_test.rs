@@ -78,9 +78,9 @@ fn empty_bearer_token_is_unset_not_a_credential() {
     // An empty env value must behave like no token at all — sending
     // `Bearer ` would present a wrong credential and 401 confusingly.
     assert_eq!(normalize_token(None), None);
-    assert_eq!(normalize_token(Some(String::new())), None);
+    assert_eq!(normalize_token(Some("")), None);
     assert_eq!(
-        normalize_token(Some("sekrit".into())),
+        normalize_token(Some("sekrit")),
         Some("sekrit".to_string())
     );
 }

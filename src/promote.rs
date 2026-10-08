@@ -225,8 +225,8 @@ fn token_file_from_options(
 }
 
 #[cfg(test)]
-fn normalize_token(raw: Option<String>) -> Option<String> {
-    crate::quipu_auth::resolve(raw.as_deref(), None, None)
+fn normalize_token(raw: Option<&str>) -> Option<String> {
+    crate::quipu_auth::resolve(raw, None, None)
         .ok()
         .flatten()
 }
