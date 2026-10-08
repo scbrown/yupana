@@ -1240,6 +1240,23 @@ requiring the write to be spelled out on the command line is the fix.</p>
 <p>The MCP <code>yupana_promote</code> tool keeps its own fallback to the configured endpoint:
 there the target comes from a server an operator deliberately started and pointed
 somewhere, not from whatever config happens to be ambient in an agent's shell.</p>
+<h3 id="quipu-write-credentials"><a class="header" href="#quipu-write-credentials">Quipu write credentials</a></h3>
+<p>Promotion, share writes and disk-impact hook observations use the same credential
+order: a nonempty, trimmed <code>QUIPU_AUTH_TOKEN</code>, then <code>QUIPU_AUTH_TOKEN_FILE</code>, then
+<code>~/.config/quipu/token</code>. An explicit file that is missing or unreadable does not
+fall back to another file. The former legacy token path is used only when selected
+explicitly. Obtain an accepted token from the service administrator; CABOODLE can
+install and verify it without rotating the server credential.</p>
+<p>A missing, unreadable, invalid or rejected credential emits one diagnostic and
+disables later writes to that server for the session. With a harness session ID,
+a private marker under the Yupana state directory carries that refusal across
+hook processes. Without a session ID, or when the marker cannot be persisted,
+the diagnostic states that suppression is process only. Repair the credential and
+start a new session before retrying. Public reads remain available.</p>
+<p><code>yupana status</code> reports the credential state and suppression state without
+printing a token or making a write. <code>configured_acceptance_unproven</code> means a
+credential was found, not that the server accepted it; use <code>caboodle doctor</code> for
+an authenticated verification.</p>
 <h2 id="yupana-promote---dry-run--validate-without-writing"><a class="header" href="#yupana-promote---dry-run--validate-without-writing"><code>yupana promote --dry-run</code> — validate without writing</a></h2>
 <p><code>--dry-run</code> extracts the projection and runs the <strong>same</strong> SHACL gate a real
 promotion runs, then stops. It needs no target — validation is in-process — and
