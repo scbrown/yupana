@@ -21,7 +21,7 @@ The binary is produced at `target/debug/yupana` (or `target/release/yupana`).
 ## Install locally
 
 ```bash
-just install-release 0.11.2
+just install-release 0.12.0
 
 # Developer build from this checkout (includes uncommitted source):
 just install

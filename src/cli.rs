@@ -88,8 +88,8 @@ enum Commands {
         read_only: bool,
     },
     /// Run the resident-graph daemon: build the base graph once and hold it,
-    /// serving a local liveness surface (Phase 3, FR-31). Query endpoints and the
-    /// hook/MCP thin-client cutover land in later stages.
+    /// serving local health and code queries. Hooks and MCP clients can use
+    /// the resident graph when daemon mode is enabled in configuration.
     Daemon {
         /// Port for the daemon's local HTTP surface (defaults to `serve.mcp_http_port`).
         #[arg(long)]

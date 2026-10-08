@@ -6,16 +6,12 @@ actually happened?* That question turns the decision from a waiting game into a
 computation, and answering it needs two things — a corpus of recorded actions,
 and a runner that replays a candidate rule over it.
 
-Yupana has had the corpus design since the trace phase. It did not have the
-records (the `pre-bash` hook was wired nowhere, and the `guard` records carried
-no `session` to group by), and it never had the runner.
-
-Both now exist.
+Yupana records session-grouped actions through its hooks and uses an offline
+runner to evaluate candidate temporal rules against those records.
 
 ## The runner is Dogwood, and it is used offline only
 
-AWS open-sourced [Dogwood] on 2026-08-06: Cedar extended with temporal
-conditions that read an agent's own session event history — `formerly`,
+[Dogwood] extends Cedar with temporal conditions that read an agent's own session event history — `formerly`,
 `count_within`, `count_distinct_within`, `sum_within` — plus
 
 ```bash
