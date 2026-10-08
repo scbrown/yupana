@@ -10,10 +10,14 @@ if [[ ${1:-} == --help || ${1:-} == -h ]]; then
     exit 0
 fi
 [[ $# == 0 ]] || { echo 'ERROR: unexpected argument; use --help' >&2; exit 2; }
-commit=$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || echo UNKNOWN)
-dirty=$(git -C "$repo_root" status --porcelain 2>/dev/null || echo UNKNOWN)
+commit=$(git -C "$repo_root" rev-parse HEAD)
+dirty=$(git -C "$repo_root" status --porcelain)
+local_build=${commit:0:12}
 state=clean
-[[ -z "$dirty" ]] || state=DIRTY
+if [[ -n "$dirty" ]]; then
+    state=DIRTY
+    local_build+=.dirty
+fi
 printf 'SOURCE BUILD from CURRENT CHECKOUT: %s\nCommit: %s; state: %s\n' "$repo_root" "$commit" "$state"
 echo 'This is not a published release install; use install-release.sh VERSION for releases.'
 if [[ $commit != UNKNOWN && -n "$dirty" ]]; then
@@ -53,7 +57,7 @@ trap cleanup EXIT
 
 # A wrapper can overwrite CARGO_TARGET_DIR. The command-line flag wins, and
 # mktemp gives every concurrent installation its own output and Cargo lock.
-"$cargo_bin" build --manifest-path "$repo_root/Cargo.toml" --locked --release \
+YUPANA_LOCAL_BUILD="$local_build" "$cargo_bin" build --manifest-path "$repo_root/Cargo.toml" --locked --release \
     --all-features --bin yupana --example install-contract --target-dir "$build_dir" \
     --message-format=json > "$build_dir/artifacts.jsonl"
 python3 "$repo_root/scripts/install-artifacts.py" "$build_dir/artifacts.jsonl" \
@@ -97,6 +101,11 @@ cmp -- "$source_bin" "$candidate"
 # This checker comes from the SAME private build and derives its contract from
 # Clap, including all nested subcommands. No list of old verbs can certify it.
 "$contract" "$candidate"
+candidate_version=$("$candidate" --version)
+[[ $candidate_version == "yupana "*"+local.$local_build" ]] || {
+    echo 'ERROR: source build does not report the expected local build identity' >&2
+    exit 1
+}
 sha=$(sha256sum "$candidate" | cut -d' ' -f1)
 alias_tmp=$(mktemp "$bin_dir/.hank-yupana.XXXXXX")
 rm -f -- "$alias_tmp"

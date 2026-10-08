@@ -61,6 +61,7 @@ run *args="":
     cargo run -- {{args}}
 
 # Build the CURRENT CHECKOUT, including uncommitted source. Not a release install.
+# Stamps +local.<sha>[.dirty]; temporary on shared hosts until a newer release.
 # Override YUPANA_INSTALL_ROOT for a non-default prefix.
 install:
     scripts/install-local.sh

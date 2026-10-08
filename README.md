@@ -74,6 +74,13 @@ yupana --version
 If `yupana --version` prints an older version than you just installed, another
 copy earlier on your `PATH` is winning; `which -a yupana` lists them in order.
 
+For a developer checkout, `just install` reports
+`0.12.0+local.<12-digit-commit>` (with `.dirty` for uncommitted changes).
+On a shared crew host, a local install is temporary. To keep a fix, merge the
+release-plz release PR so it ships in a published release. Release tracking
+preserves a local build at the same version and replaces it when a newer
+release publishes. Plain release builds retain the package version.
+
 ## First success in three commands
 
 Make a tiny crate where `run` calls `load` and `load` calls `parse`:
