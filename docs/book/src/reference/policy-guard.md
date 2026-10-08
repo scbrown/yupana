@@ -115,10 +115,12 @@ Do not rely on the harness `timeout` field for this: it is expressed in whole
 seconds and defaults to ten minutes — three orders of magnitude past the budget.
 Set it anyway as a backstop (`"timeout": 5`), but the real deadline is Yupana's.
 
-Until the Phase-3 resident daemon lands (FR-31), the guard builds the call graph
-transiently and will exceed 100ms on large trees — which, by the rule above,
-means it fails open. That is the intended degradation, not a bug: the guard gets
-teeth on big repos when the daemon does.
+100ms is a deadline, not a measured latency. Without the resident daemon
+([Resident Daemon](daemon.md), FR-31; opt-in, `[yupana.serve] use_daemon` defaults
+to `false`) the guard builds the call graph per invocation and will exceed 100ms
+on large trees — which, by the rule above, means it fails open. That is the
+intended degradation, not a bug: on big repos the guard has teeth only once the
+daemon serves it.
 
 ## (d) Fail open — non-negotiable
 
