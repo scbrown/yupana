@@ -563,3 +563,159 @@ async fn cpg_dataflow_opt_in_and_feature_refusal() {
         );
     }
 }
+
+#[cfg(feature = "langs-extra")]
+#[tokio::test]
+async fn symbols_matches_python_callers_for_relative_and_absolute_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sample.py");
+    std::fs::write(&file, "def decision_labels():\n    return 1\ndef label_decision():\n    return decision_labels()\n").unwrap();
+    let s = server(&dir);
+    let callers = served(
+        s.yupana_callers(Parameters(NeighborsRequest {
+            symbol: "decision_labels".into(),
+            path: None,
+        }))
+        .await,
+    );
+    assert_eq!(callers["found"], true);
+    assert_eq!(callers["neighbors"][0]["name"], "label_decision");
+    for path in ["sample.py".to_owned(), file.to_string_lossy().into_owned()] {
+        let symbols = served(
+            s.yupana_symbols(Parameters(SymbolsRequest { file: path }))
+                .await,
+        );
+        assert_eq!(symbols["count"], 2, "{symbols}");
+        assert_eq!(symbols["symbols"][0]["name"], "decision_labels");
+        assert_eq!(symbols["symbols"][1]["name"], "label_decision");
+        assert_eq!(
+            symbols["symbols"][1]["start_line"],
+            callers["neighbors"][0]["start_line"]
+        );
+        assert!(symbols["symbols"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| s["tier"] == "treesitter"));
+    }
+}
+
+#[tokio::test]
+async fn symbols_refuses_unknown_unsupported_and_outside_files_without_false_zero() {
+    let dir = fixture();
+    std::fs::write(dir.path().join("empty.rs"), "// no definitions\n").unwrap();
+    std::fs::write(dir.path().join("note.txt"), "def not_indexed(): pass\n").unwrap();
+    let s = server(&dir);
+    for file in ["empty.rs", "note.txt", "missing.rs"] {
+        let error = s
+            .yupana_symbols(Parameters(SymbolsRequest { file: file.into() }))
+            .await
+            .unwrap_err();
+        if file != "missing.rs" {
+            assert!(error.message.contains("graph holds no symbols"), "{error}");
+        }
+    }
+    let outside = fixture();
+    let error = s
+        .yupana_symbols(Parameters(SymbolsRequest {
+            file: outside.path().join("x.rs").to_string_lossy().into_owned(),
+        }))
+        .await
+        .unwrap_err();
+    assert!(error.message.contains("analysis root"));
+    let rust = served(
+        s.yupana_symbols(Parameters(SymbolsRequest {
+            file: "x.rs".into(),
+        }))
+        .await,
+    );
+    assert_eq!(rust["count"], 2);
+    assert_eq!(rust["symbols"][0]["name"], "a");
+    assert_eq!(rust["symbols"][0]["end_line"], 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn symbols_uses_the_callers_resident_snapshot_and_does_not_invent_extents() {
+    let dir = fixture();
+    let engine = crate::daemon::ResidentEngine::build(dir.path(), None).unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let task = tokio::spawn(async move {
+        axum::serve(listener, crate::daemon::http::router(engine))
+            .await
+            .unwrap();
+    });
+    let config = dir.path().join("daemon-config.toml");
+    std::fs::write(
+        &config,
+        format!(
+            "[yupana.serve]\nuse_daemon=true\nbind_address=\"127.0.0.1\"\nmcp_http_port={port}\n"
+        ),
+    )
+    .unwrap();
+    let s = YupanaMcpServer::new(dir.path().to_path_buf(), None, Some(config));
+    std::fs::write(dir.path().join("x.rs"), "fn newer() {}\n").unwrap();
+    std::fs::write(dir.path().join("late.rs"), "fn late() {}\n").unwrap();
+    let callers = served(
+        s.yupana_callers(Parameters(NeighborsRequest {
+            symbol: "b".into(),
+            path: None,
+        }))
+        .await,
+    );
+    assert_eq!(callers["neighbors"][0]["name"], "a");
+    let symbols = served(
+        s.yupana_symbols(Parameters(SymbolsRequest {
+            file: dir.path().join("x.rs").to_string_lossy().into_owned(),
+        }))
+        .await,
+    );
+    assert_eq!(symbols["count"], 2);
+    assert_eq!(symbols["symbols"][0]["name"], "a");
+    assert_eq!(symbols["symbols"][1]["name"], "b");
+    assert!(symbols["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|s| s.get("end_line").is_none()));
+    let error = s
+        .yupana_symbols(Parameters(SymbolsRequest {
+            file: "late.rs".into(),
+        }))
+        .await
+        .unwrap_err();
+    assert!(error.message.contains("graph holds no symbols"), "{error}");
+    task.abort();
+    let _ = task.await;
+}
+
+#[tokio::test]
+async fn symbols_falls_back_to_the_callers_transient_graph_when_daemon_is_down() {
+    let dir = fixture();
+    let config = dir.path().join("daemon-config.toml");
+    std::fs::write(
+        &config,
+        "[yupana.serve]\nuse_daemon=true\nbind_address=\"127.0.0.1\"\nmcp_http_port=1\n",
+    )
+    .unwrap();
+    let s = YupanaMcpServer::new(dir.path().to_path_buf(), None, Some(config));
+    let symbols = served(
+        s.yupana_symbols(Parameters(SymbolsRequest {
+            file: "x.rs".into(),
+        }))
+        .await,
+    );
+    let callers = served(
+        s.yupana_callers(Parameters(NeighborsRequest {
+            symbol: "b".into(),
+            path: None,
+        }))
+        .await,
+    );
+    assert_eq!(symbols["count"], 2);
+    assert_eq!(
+        symbols["symbols"][0]["name"],
+        callers["neighbors"][0]["name"]
+    );
+    assert_eq!(symbols["symbols"][0]["end_line"], 1);
+}
