@@ -41,7 +41,7 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 `yupana_symbols` enumerates the same code graph as callers and impact: the
 expected root-matching resident daemon when available, otherwise the transient
 multi-language graph. Relative and absolute paths within the analysis root are
-accepted. When the graph holds no symbols for a file, the tool returns an error;
+accepted, including cached files deleted from the working tree. When the graph holds no symbols for a file, the tool returns an error;
 that absence cannot distinguish an unindexed, unsupported or symbol-less file.
 It never reports that such a file is empty. Each symbol retains its tier and
 start line. End lines are served when known from the transient graph and omitted

@@ -8,16 +8,42 @@ fn no_symbols(file: &str) -> McpError {
     )
 }
 
+// The graph may legitimately retain a definition after a working-tree deletion.
+// Canonicalize the closest existing ancestor, preserving the missing suffix,
+// so root confinement does not require the snapshot's file to still exist.
+fn graph_path(mut path: PathBuf) -> Result<PathBuf, McpError> {
+    let mut suffix = Vec::new();
+    loop {
+        match path.canonicalize() {
+            Ok(mut prefix) => {
+                for component in suffix.into_iter().rev() {
+                    prefix.push(component);
+                }
+                return Ok(prefix);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let name = path
+                    .file_name()
+                    .ok_or_else(|| {
+                        McpError::invalid_params("file path has no existing ancestor", None)
+                    })?
+                    .to_os_string();
+                suffix.push(name);
+                if !path.pop() {
+                    return Err(internal(error));
+                }
+            }
+            Err(error) => return Err(internal(error)),
+        }
+    }
+}
+
 pub(super) fn symbols(
     server: &YupanaMcpServer,
     req: &SymbolsRequest,
 ) -> Result<CallToolResult, McpError> {
     let root = server.root.canonicalize().map_err(internal)?;
-    let file = server
-        .root
-        .join(&req.file)
-        .canonicalize()
-        .map_err(internal)?;
+    let file = graph_path(server.root.join(&req.file))?;
     let rel = file
         .strip_prefix(&root)
         .map_err(|_| McpError::invalid_params("file must be within the analysis root", None))?;

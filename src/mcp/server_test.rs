@@ -678,6 +678,17 @@ async fn symbols_uses_the_callers_resident_snapshot_and_does_not_invent_extents(
         .unwrap()
         .iter()
         .all(|s| s.get("end_line").is_none()));
+    std::fs::remove_file(dir.path().join("x.rs")).unwrap();
+    let deleted = served(
+        s.yupana_symbols(Parameters(SymbolsRequest {
+            file: "x.rs".into(),
+        }))
+        .await,
+    );
+    assert_eq!(
+        deleted["symbols"], symbols["symbols"],
+        "a cached definition must survive a working-tree deletion"
+    );
     let error = s
         .yupana_symbols(Parameters(SymbolsRequest {
             file: "late.rs".into(),
