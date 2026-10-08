@@ -123,13 +123,15 @@ Every command has `--help`. The full list is in the
 ## Wire it into your agent
 
 **As an MCP server.** `yupana serve` speaks MCP over stdio and analyzes the
-directory it starts in. For Claude Code, from your repository:
+directory it starts in. Register it by **absolute path**: MCP clients launch
+servers without your shell's `PATH`, so a bare `yupana` fails with `ENOENT`.
+For Claude Code, from your repository:
 
 ```bash
-claude mcp add yupana -- yupana serve
+claude mcp add yupana -- "$(command -v yupana)" serve
 ```
 
-Any other MCP client takes the same command. The agent gets fifteen `yupana_*`
+Any other MCP client takes the same command, with the absolute path. The agent gets fifteen `yupana_*`
 tools, for symbols, references, callers, impact and more; see the
 [MCP tools reference](https://scbrown.github.io/yupana/reference/mcp-tools.html).
 
@@ -156,8 +158,9 @@ Rules that come from Quipu are covered in the
 
 ## Before you start
 
-**Platforms.** The release is built for Linux x86_64. On macOS and anywhere
-else, use the source install above; it needs a Rust toolchain and nothing else.
+**Platforms.** Releases ship Linux x86_64 and macOS (Apple Silicon and Intel)
+archives. Anywhere else, use the source install above; it needs a Rust
+toolchain and nothing else.
 
 **Languages.** Rust is always built in. The `langs-extra` feature, included in
 the release and in the source command above, adds the rest.
