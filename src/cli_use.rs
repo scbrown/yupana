@@ -169,7 +169,10 @@ mod caller_kind_tests {
             Some("yupana-cli:status")
         );
         assert_eq!(
-            quipu_caller_kind(&Commands::Serve { http: false }),
+            quipu_caller_kind(&Commands::Serve {
+                http: false,
+                read_only: false
+            }),
             Some(crate::quipu_label::MCP)
         );
     }

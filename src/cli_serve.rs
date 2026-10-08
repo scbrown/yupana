@@ -55,7 +55,7 @@ impl Cli {
     }
 
     /// Run the MCP server (stdio, or streamable-HTTP with `http = true`).
-    pub(super) async fn serve(&self, http: bool) -> anyhow::Result<()> {
+    pub(super) async fn serve(&self, http: bool, read_only: bool) -> anyhow::Result<()> {
         #[cfg(feature = "mcp")]
         {
             let root = std::env::current_dir()?;
@@ -69,15 +69,16 @@ impl Cli {
                     config_override,
                     config.serve.bind_address,
                     config.serve.mcp_http_port,
+                    read_only,
                 )
                 .await
             } else {
-                crate::mcp::run_stdio(root, tenant, config_override).await
+                crate::mcp::run_stdio(root, tenant, config_override, read_only).await
             }
         }
         #[cfg(not(feature = "mcp"))]
         {
-            let _ = http;
+            let _ = (http, read_only);
             self.planned(
                 "serve",
                 1,
