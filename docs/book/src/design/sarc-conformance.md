@@ -109,7 +109,7 @@ that denial caused.
 **G3 — The trace is not derived from Σ.** Violates I3 ([SARC] §3.5: "the trace
 is generated; it is not reconstructed"), and I8 by consequence. **Closed for the
 constraint set in Phase 2**; the attribution half stays open under G7. See
-[Phase 2, as built](#phase-2-as-built).
+[Structured constraint records](#structured-constraint-records).
 
 `src/metrics.rs` emitted `{kind, ts, agent, tenant, item, …}` per event. There
 was no pre/post state, no `constraints_evaluated` set with outcomes, no
@@ -556,10 +556,7 @@ may simply be older than the runtime.
    precondition for derive/test/explain in that document *and* for the checker
    in Phase 5.
 
-### Phase 2, as built
-
-The constraint set landed first, because the verdict has nothing honest to say
-until the record can hold it.
+### Structured constraint records
 
 `src/trace.rs` defines `ConstraintEvaluation` — SARC's `E_i` element — carrying
 the four things the audit checker's passes need per constraint: **which** one,
@@ -575,29 +572,14 @@ that fired and drew no response is a real state — a soft rule under a runtime
 with nowhere to put it, which is exactly where the stack sits before Phase 3 —
 and rounding it to `Logged` would read as a deliberate choice.
 
-**What this replaced, and what it recovered.** `Decision` carried a `+`-joined
-string of rule ids. It answered "what fired" and could not answer "was each
-evaluated at a point compatible with its class", so two rules firing identically
-at different points produced byte-identical records. Worse, the *governed*
-plane never carried names at all: structural violations reached the spool as the
-literal string `"governed-structural"` plus a count, so an operator could see
-that three governed rules fired and not which three. The names existed only
-inside the composed model-facing message. That is the unattributable-record
-shape the audit field was added to prevent, surviving inside the very field
-added to prevent it. `ProjectedViolation` now carries its id, class and point,
-and the record names every rule.
+`ProjectedViolation` carries each rule's id, class and verification point, and
+the spool record names every evaluated rule. The `rule` field is derived from
+the constraint set for dashboards that group on it.
 
-The old `rule` field is **derived** from the constraint set rather than removed:
-live dashboards group on it, and dropping it would silently empty every panel
-built on it. That migration is a separate change from the one adding structure.
-
-**A testing note worth keeping.** Driving the real spool from a test needs
-`std::env::set_var`, which now requires `unsafe` — and this crate sets
-`unsafe_code = "deny"`. Rather than weaken that, `guard` was split into
-`guard_recorded` (decide + compose the record) and a two-line `guard` (emit +
-return). The whole record composition is now under test through the real
-decision path, and exactly one line — the `emit` call, which `metrics.rs` covers
-directly — sits outside it.
+Record composition is tested through `guard_recorded`, which decides and
+composes the record; `guard` emits it and returns. The spool emitter is covered
+separately by the metrics tests. This keeps test setup within the crate's
+`unsafe_code = "deny"` policy.
 
 **Verdict emission (G2) closed.** `src/verdict_spool.rs` signs one verdict per
 evaluated constraint at the moment the constraint fires, and appends it locally;

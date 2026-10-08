@@ -35,8 +35,7 @@ a code fact must be equally impossible to mistake for each other, in both
 directions.
 
 The tier is advertised by `yupana status` exactly when the `game-state` engine is
-compiled in. That is not the empty-feature pattern the removed `lsp`/`cpg` flags
-fell into: `game-state` gates `src/state/`, which *is* the ingestion path, so the
+compiled in. `game-state` gates `src/state/`, which is the ingestion path, so the
 flag and the implementation are the same thing.
 
 ## Ingestion, and the fog-of-war routing decision
