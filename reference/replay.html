@@ -188,13 +188,10 @@
 actually happened?</em> That question turns the decision from a waiting game into a
 computation, and answering it needs two things — a corpus of recorded actions,
 and a runner that replays a candidate rule over it.</p>
-<p>Yupana has had the corpus design since the trace phase. It did not have the
-records (the <code>pre-bash</code> hook was wired nowhere, and the <code>guard</code> records carried
-no <code>session</code> to group by), and it never had the runner.</p>
-<p>Both now exist.</p>
+<p>Yupana records session-grouped actions through its hooks and uses an offline
+runner to evaluate candidate temporal rules against those records.</p>
 <h2 id="the-runner-is-dogwood-and-it-is-used-offline-only"><a class="header" href="#the-runner-is-dogwood-and-it-is-used-offline-only">The runner is Dogwood, and it is used offline only</a></h2>
-<p>AWS open-sourced <a href="https://github.com/dogwood-policy/dogwood">Dogwood</a> on 2026-08-06: Cedar extended with temporal
-conditions that read an agent's own session event history — <code>formerly</code>,
+<p><a href="https://github.com/dogwood-policy/dogwood">Dogwood</a> extends Cedar with temporal conditions that read an agent's own session event history — <code>formerly</code>,
 <code>count_within</code>, <code>count_distinct_within</code>, <code>sum_within</code> — plus</p>
 <pre><code class="language-bash">dogwood replay policy.dw --policy-schema schema.cedarschema --trace events.log
 </code></pre>

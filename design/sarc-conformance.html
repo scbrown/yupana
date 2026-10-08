@@ -275,7 +275,7 @@ that denial caused.</p>
 <p><strong>G3 — The trace is not derived from Σ.</strong> Violates I3 ([SARC] §3.5: "the trace
 is generated; it is not reconstructed"), and I8 by consequence. <strong>Closed for the
 constraint set in Phase 2</strong>; the attribution half stays open under G7. See
-<a href="#phase-2-as-built">Phase 2, as built</a>.</p>
+<a href="#structured-constraint-records">Structured constraint records</a>.</p>
 <p><code>src/metrics.rs</code> emitted <code>{kind, ts, agent, tenant, item, …}</code> per event. There
 was no pre/post state, no <code>constraints_evaluated</code> set with outcomes, no
 attribution tuple. <code>docs/work-scoped-governance.md</code> names this precisely — "records and
@@ -674,9 +674,7 @@ precondition for derive/test/explain in that document <em>and</em> for the check
 in Phase 5.</p>
 </li>
 </ol>
-<h3 id="phase-2-as-built"><a class="header" href="#phase-2-as-built">Phase 2, as built</a></h3>
-<p>The constraint set landed first, because the verdict has nothing honest to say
-until the record can hold it.</p>
+<h3 id="structured-constraint-records"><a class="header" href="#structured-constraint-records">Structured constraint records</a></h3>
 <p><code>src/trace.rs</code> defines <code>ConstraintEvaluation</code> — SARC's <code>E_i</code> element — carrying
 the four things the audit checker's passes need per constraint: <strong>which</strong> one,
 <strong>where</strong> it was evaluated, what it <strong>concluded</strong>, and what was <strong>done</strong> about
@@ -689,27 +687,13 @@ indistinguishable from a passing one.</p>
 that fired and drew no response is a real state — a soft rule under a runtime
 with nowhere to put it, which is exactly where the stack sits before Phase 3 —
 and rounding it to <code>Logged</code> would read as a deliberate choice.</p>
-<p><strong>What this replaced, and what it recovered.</strong> <code>Decision</code> carried a <code>+</code>-joined
-string of rule ids. It answered "what fired" and could not answer "was each
-evaluated at a point compatible with its class", so two rules firing identically
-at different points produced byte-identical records. Worse, the <em>governed</em>
-plane never carried names at all: structural violations reached the spool as the
-literal string <code>"governed-structural"</code> plus a count, so an operator could see
-that three governed rules fired and not which three. The names existed only
-inside the composed model-facing message. That is the unattributable-record
-shape the audit field was added to prevent, surviving inside the very field
-added to prevent it. <code>ProjectedViolation</code> now carries its id, class and point,
-and the record names every rule.</p>
-<p>The old <code>rule</code> field is <strong>derived</strong> from the constraint set rather than removed:
-live dashboards group on it, and dropping it would silently empty every panel
-built on it. That migration is a separate change from the one adding structure.</p>
-<p><strong>A testing note worth keeping.</strong> Driving the real spool from a test needs
-<code>std::env::set_var</code>, which now requires <code>unsafe</code> — and this crate sets
-<code>unsafe_code = "deny"</code>. Rather than weaken that, <code>guard</code> was split into
-<code>guard_recorded</code> (decide + compose the record) and a two-line <code>guard</code> (emit +
-return). The whole record composition is now under test through the real
-decision path, and exactly one line — the <code>emit</code> call, which <code>metrics.rs</code> covers
-directly — sits outside it.</p>
+<p><code>ProjectedViolation</code> carries each rule's id, class and verification point, and
+the spool record names every evaluated rule. The <code>rule</code> field is derived from
+the constraint set for dashboards that group on it.</p>
+<p>Record composition is tested through <code>guard_recorded</code>, which decides and
+composes the record; <code>guard</code> emits it and returns. The spool emitter is covered
+separately by the metrics tests. This keeps test setup within the crate's
+<code>unsafe_code = "deny"</code> policy.</p>
 <p><strong>Verdict emission (G2) closed.</strong> <code>src/verdict_spool.rs</code> signs one verdict per
 evaluated constraint at the moment the constraint fires, and appends it locally;
 <code>yupana verdicts</code> promotes the spool to quipu. It is a spool and not a direct

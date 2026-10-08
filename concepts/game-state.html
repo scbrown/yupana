@@ -212,8 +212,7 @@ provenance is an <strong>adapter id + turn + faction</strong>.</p>
 a code fact must be equally impossible to mistake for each other, in both
 directions.</p>
 <p>The tier is advertised by <code>yupana status</code> exactly when the <code>game-state</code> engine is
-compiled in. That is not the empty-feature pattern the removed <code>lsp</code>/<code>cpg</code> flags
-fell into: <code>game-state</code> gates <code>src/state/</code>, which <em>is</em> the ingestion path, so the
+compiled in. <code>game-state</code> gates <code>src/state/</code>, which is the ingestion path, so the
 flag and the implementation are the same thing.</p>
 <h2 id="ingestion-and-the-fog-of-war-routing-decision"><a class="header" href="#ingestion-and-the-fog-of-war-routing-decision">Ingestion, and the fog-of-war routing decision</a></h2>
 <pre><code class="language-json">POST /ingest
