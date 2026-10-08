@@ -26,6 +26,8 @@ use cli_use::deliberate_use_name;
 mod cli_export;
 #[path = "cli_hook.rs"]
 mod cli_hook;
+#[path = "cli_hooks.rs"]
+mod cli_hooks;
 #[path = "cli_promote.rs"]
 pub mod cli_promote;
 #[path = "cli_serve.rs"]
@@ -268,6 +270,11 @@ enum Commands {
         /// Which hook event to handle.
         event: HookEvent,
     },
+    /// Install, remove or check yupana's own hooks in Claude Code and Codex.
+    Hooks {
+        #[command(subcommand)]
+        action: cli_hooks::HooksAction,
+    },
     /// Generate shell completions.
     Completions {
         /// Target shell.
@@ -347,6 +354,7 @@ impl Cli {
             Commands::Hook { event } => {
                 cli_hook::run(*event, self.tenant.as_deref(), self.config.as_deref())
             }
+            Commands::Hooks { action } => std::process::exit(cli_hooks::run(action)?),
             Commands::Completions { shell } => {
                 let mut cmd = Cli::command();
                 clap_complete::generate(*shell, &mut cmd, "yupana", &mut io::stdout());
