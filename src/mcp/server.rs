@@ -57,7 +57,7 @@ pub struct YupanaMcpServer {
     /// ingested into a DIFFERENT process is not this one.
     #[cfg(feature = "game-state")]
     board: std::sync::Arc<std::sync::RwLock<crate::state::StateRegistry>>,
-    tool_router: ToolRouter<Self>,
+    pub(super) tool_router: ToolRouter<Self>,
 }
 
 impl YupanaMcpServer {
@@ -71,7 +71,7 @@ impl YupanaMcpServer {
             config,
             #[cfg(feature = "game-state")]
             board: std::sync::Arc::new(std::sync::RwLock::new(crate::state::StateRegistry::new())),
-            tool_router: Self::tool_router(),
+            tool_router: super::tool_policy::annotated(Self::tool_router()),
         }
     }
 }
