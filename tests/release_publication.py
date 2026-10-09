@@ -52,7 +52,8 @@ elif verb == 'upload':
     if os.environ.get('PARTIAL_SUCCESS'): files = files[:-1]
     for f in files:
         release['assets'] = [v for v in release['assets'] if v['name'] != f.name]
-        release['assets'].append({'name': f.name, 'size': 0 if os.environ.get('BAD_SIZE') else f.stat().st_size,
+        size = f.stat().st_size + (1 if os.environ.get('WRONG_SIZE') else 0)
+        release['assets'].append({'name': f.name, 'size': 0 if os.environ.get('BAD_SIZE') else size,
                                  'state': 'new' if os.environ.get('BAD_STATE') else 'uploaded'})
         record('asset')
     record('upload')
@@ -144,7 +145,7 @@ class PublicationTests(unittest.TestCase):
         self.assert_latest_complete()
 
     def test_failed_upload_and_false_success_do_not_publish(self):
-        for mode in ('FAIL_UPLOAD', 'PARTIAL_SUCCESS', 'BAD_STATE', 'BAD_SIZE', 'BAD_METADATA'):
+        for mode in ('FAIL_UPLOAD', 'PARTIAL_SUCCESS', 'BAD_STATE', 'BAD_SIZE', 'WRONG_SIZE', 'BAD_METADATA'):
             with self.subTest(mode=mode):
                 self.env[mode] = '1'
                 result = self.run_publish()
@@ -189,6 +190,17 @@ class PublicationTests(unittest.TestCase):
         before = self.snapshot()
         result = self.run_publish()
         self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_public_complete_assets_survive_a_different_rebuild(self):
+        self.assertEqual(self.run_publish().returncode, 0)
+        before = self.snapshot()
+        archive = self.assets / f'yupana-{TAG}-{PLATFORMS[0]}.tar.gz'
+        archive.write_bytes(b'a different, larger rebuilt archive')
+        Path(str(archive) + '.sha256').write_text(
+            hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
+        result = self.run_publish()
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.snapshot(), before)
 
     def test_production_configuration_and_workflow_use_the_gated_publisher(self):

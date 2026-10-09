@@ -58,7 +58,11 @@ if data.get('tagName') != sys.argv[2] or data.get('isDraft') is not (sys.argv[3]
 assets = {a['name']: a for a in data.get('assets', [])}
 for name in sys.argv[4:]:
     asset = assets.get(name, {})
-    if asset.get('state') != 'uploaded' or asset.get('size') != pathlib.Path(name).stat().st_size:
+    size = asset.get('size')
+    ready = asset.get('state') == 'uploaded' and type(size) is int and size > 0
+    # Rebuilt tarballs can differ from immutable published assets. Only this
+    # invocation's new uploads must match the current local candidate sizes.
+    if not ready or (sys.argv[3] != 'published' and size != pathlib.Path(name).stat().st_size):
         sys.exit(f'remote asset is missing, unfinished, or the wrong size: {name}')
 PY
 }
@@ -86,7 +90,7 @@ fi
 if [ "$draft" = false ]; then
   # Re-runs must not clobber public assets and recreate a missing-asset window.
   # A legacy partial public release needs to be made draft before recovery.
-  check_remote false || { echo 'existing public release is incomplete; restore draft state before retrying' >&2; exit 1; }
+  check_remote published || { echo 'existing public release is incomplete; restore draft state before retrying' >&2; exit 1; }
   echo "${tag} is already published with the complete asset set"
   exit 0
 fi

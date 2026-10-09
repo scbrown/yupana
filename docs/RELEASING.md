@@ -13,7 +13,8 @@ draft unpublished, with the previous complete release still latest.
 
 Publication jobs are serialized so one upload cannot race another job's draft
 publication. An already published, complete release is a no-op on rerun; the
-publisher refuses to overwrite public assets. For a legacy incomplete public
+publisher retains those original assets even if the rebuilt archives differ.
+For a legacy incomplete public
 release, restore draft state before rerunning the workflow. Tagged prereleases
 are created with the prerelease flag; existing drafts preserve their flag.
 Prereleases are never marked latest.
