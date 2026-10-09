@@ -10,6 +10,10 @@ on:
       tag:
         type: string
         default: ""
+    outputs:
+      tag:
+        description: "Version tag shared by the native archive matrix"
+        value: ${{ jobs.binary.outputs.tag }}
 
 permissions:
   contents: read
@@ -19,6 +23,8 @@ env:
 
 jobs:
   binary:
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:

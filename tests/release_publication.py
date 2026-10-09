@@ -214,8 +214,12 @@ class PublicationTests(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
         publisher = workflow.split('  publish:\n', 1)[1].split('  release-plz:\n', 1)[0]
         self.assertIn('scripts/publish-release-assets.sh', publisher)
-        self.assertIn('group: yupana-release-publication', publisher)
+        self.assertIn('group: yupana-release-publication-${{ needs.binary.outputs.tag }}', publisher)
+        self.assertIn('test "$tag" = "$EXPECTED_TAG"', publisher)
         self.assertIn('cancel-in-progress: false', publisher)
+        native = (ROOT / '.github/workflows/release-binaries.yml').read_text()
+        self.assertIn('value: ${{ jobs.binary.outputs.tag }}', native)
+        self.assertIn('tag: ${{ steps.tag.outputs.tag }}', native)
 
 
 if __name__ == '__main__':

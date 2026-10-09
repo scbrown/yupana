@@ -61,7 +61,7 @@ jobs:
     needs: binary
     # Serialize publishers so a second upload cannot race draft publication.
     concurrency:
-      group: yupana-release-publication
+      group: yupana-release-publication-${{ needs.binary.outputs.tag }}
       cancel-in-progress: false
     if: always() && needs.binary.result == 'success'
     runs-on: ubuntu-22.04
@@ -77,6 +77,8 @@ jobs:
       - name: Verify complete archive set and checksums
         id: tag
         working-directory: release-assets
+        env:
+          EXPECTED_TAG: ${{ needs.binary.outputs.tag }}
         run: |
           set -euo pipefail
           # Infer the common tag from built assets, then require exactly one of
@@ -85,6 +87,7 @@ jobs:
           test "${#archives[@]}" = 1
           tag=${archives[0]#yupana-}
           tag=${tag%-x86_64-linux-gnu.tar.gz}
+          test "$tag" = "$EXPECTED_TAG"
           expected=()
           for platform in x86_64-linux-gnu aarch64-apple-darwin x86_64-apple-darwin; do
             archive="yupana-${tag}-${platform}.tar.gz"

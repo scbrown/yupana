@@ -11,7 +11,7 @@ asset's uploaded state and size. Only then does it publish the draft and mark
 a stable release latest. A failed build, upload, or verification leaves the
 draft unpublished, with the previous complete release still latest.
 
-Publication jobs are serialized so one upload cannot race another job's draft
+Publication jobs are serialized per tag so one upload cannot race that tag's draft
 publication. An already published, complete release is a no-op on rerun; the
 publisher retains those original assets even if the rebuilt archives differ.
 For a legacy incomplete public
