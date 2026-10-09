@@ -93,7 +93,7 @@ pub fn current() -> &'static str {
 /// someone tries to attribute load and finds an unlabelled bloc, which is the
 /// failure this module was written for.
 pub fn json_post(url: &str, label: &'static str) -> ureq::Request {
-    ureq::post(url)
+    crate::quipu_provenance::apply(ureq::post(url), label)
         .set("Content-Type", "application/json")
         .set("X-Quipu-Client", label)
 }
