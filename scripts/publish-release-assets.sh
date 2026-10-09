@@ -3,9 +3,10 @@
 # Keep latest on the prior complete release while assets are being uploaded.
 set -euo pipefail
 tag=${1:?usage: publish-release-assets.sh VERSION_TAG (from the asset directory)}
-[[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.+-][A-Za-z0-9.+-]+)?$ ]] || {
+[[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(\+[A-Za-z0-9.-]+)?$ ]] || {
   echo 'invalid release tag' >&2; exit 1;
 }
+tag_prerelease=${BASH_REMATCH[1]:-}
 
 retry() {
   local n=1 delay
@@ -63,7 +64,9 @@ PY
 }
 
 if ! view_release; then
-  retry gh release create "$tag" --draft --verify-tag --title "$tag" --generate-notes
+  create_args=(--draft --verify-tag --title "$tag" --generate-notes)
+  [ -z "$tag_prerelease" ] || create_args+=(--prerelease)
+  retry gh release create "$tag" "${create_args[@]}"
   retry view_release
 fi
 # A malformed API reply is not a public release and never a successful no-op.
@@ -76,6 +79,10 @@ print(str(d['isDraft']).lower(), str(d['isPrerelease']).lower())
 PY
 )
 read -r draft prerelease <<< "$flags"
+if [ -n "$tag_prerelease" ] && [ "$prerelease" = false ]; then
+  echo 'prerelease version has stable release metadata; refusing publication' >&2
+  exit 1
+fi
 if [ "$draft" = false ]; then
   # Re-runs must not clobber public assets and recreate a missing-asset window.
   # A legacy partial public release needs to be made draft before recovery.

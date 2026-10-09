@@ -41,7 +41,7 @@ if verb == 'view':
     else: print(tag)
 elif verb == 'create':
     if release is not None: sys.exit(1)
-    s['release'] = {'tagName': tag, 'isDraft': '--draft' in a, 'isPrerelease': False, 'assets': []}
+    s['release'] = {'tagName': tag, 'isDraft': '--draft' in a, 'isPrerelease': '--prerelease' in a, 'assets': []}
     record('create')
 elif verb == 'upload':
     assert release is not None
@@ -84,8 +84,11 @@ class PublicationTests(unittest.TestCase):
             'assets': [{'name': name} for name in self.expected('v1.2.2')]}}))
         self.env = dict(os.environ, RELEASE_STATE=str(self.state), TAG=TAG,
                         PATH=str(self.tools) + os.pathsep + os.environ['PATH'])
+        self.make_artifacts(TAG)
+
+    def make_artifacts(self, tag):
         for platform in PLATFORMS:
-            archive = self.assets / f'yupana-{TAG}-{platform}.tar.gz'
+            archive = self.assets / f'yupana-{tag}-{platform}.tar.gz'
             archive.write_bytes(platform.encode())
             Path(str(archive) + '.sha256').write_text(
                 hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
@@ -99,9 +102,9 @@ class PublicationTests(unittest.TestCase):
     def snapshot(self):
         return json.loads(self.state.read_text())
 
-    def run_publish(self, script=None):
-        return subprocess.run(['bash', str(script or ROOT / 'scripts/publish-release-assets.sh'), TAG],
-                              cwd=self.assets, env=self.env, text=True, capture_output=True)
+    def run_publish(self, script=None, tag=TAG):
+        return subprocess.run(['bash', str(script or ROOT / 'scripts/publish-release-assets.sh'), tag],
+                              cwd=self.assets, env=dict(self.env, TAG=tag), text=True, capture_output=True)
 
     def assert_latest_complete(self):
         for event in self.snapshot()['events']:
@@ -149,6 +152,19 @@ class PublicationTests(unittest.TestCase):
                 self.assertTrue(self.snapshot()['release']['isDraft'])
                 self.assert_latest_complete()
                 self.env.pop(mode)
+
+    def test_manual_prerelease_tag_never_becomes_latest(self):
+        tag = 'v1.2.3-rc.1'
+        for path in self.assets.iterdir():
+            path.unlink()
+        self.make_artifacts(tag)
+        result = self.run_publish(tag=tag)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.snapshot()['release']['isPrerelease'])
+        self.assertFalse(self.snapshot()['release']['isDraft'])
+        self.assertIn('--latest=false', self.snapshot()['events'][-1]['args'])
+        self.assertTrue(all(e['latest']['tagName'] == 'v1.2.2' for e in self.snapshot()['events']))
+        self.assert_latest_complete()
 
     def test_transient_partial_upload_retries_while_draft(self):
         self.env['FAIL_FIRST_UPLOAD'] = '1'
