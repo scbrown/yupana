@@ -1192,7 +1192,7 @@ COMMANDS:
     impact      Blast radius; --cochange reconciles against history (FR-11)
     dataflow    Local data dependence, or opt-in Rust CPG flow across calls
     export      Emit the referential structure as Turtle (bobbin: ontology)
-    hook        Harness hook adapter (post-edit advisory / pre-edit guard)
+    hook        Harness hook adapter (post-edit / pre-edit / post-read)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
     audit-rule  Replay an explicit structural rule on supplied source, offline
     rule-test   Run governed text rules on sample cases, no side effects [quipu feature]
@@ -2022,6 +2022,108 @@ does with it differs by contract:</p>
 <p>The guard's taxonomy keeps "the guard ran and found nothing" distinct from
 "the guard could not run" end to end; killing the daemon is the cheapest
 bypass, so its absence must always be visible.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="read-time-entity-legend"><a class="header" href="#read-time-entity-legend">Read-time entity legend</a></h1>
+<p><code>yupana hook post-read</code> annotates completed reads with entity labels from the
+resident keyword index. It is off by default. This is advisory feedback, so a
+missing allocation, daemon, session ID, snapshot or response means silence.
+It never contacts Quipu from the hook or falls back to loading a gazetteer file.
+Build with <code>quipu,mcp</code> for the hook and resident HTTP surface.</p>
+<h2 id="context-allocation"><a class="header" href="#context-allocation">Context allocation</a></h2>
+<p>The calling context pipeline must add <code>remaining_context_bytes</code> to the completed
+tool payload. It reserves prior signpost/advisory output and separators first.
+The legend spends at most the smaller of that remainder and 600 UTF-8 bytes,
+including its relation annotations. Missing or zero allocation produces no output.
+An independently installed hook therefore does not create another 600-byte budget.</p>
+<pre><code class="language-json">{
+  "hook_event_name": "PostToolUse",
+  "session_id": "example-session",
+  "tool_name": "Read",
+  "tool_input": {"file_path": "notes.md"},
+  "tool_response": {"file": {"content": "build-01.example runs demo-service"}},
+  "remaining_context_bytes": 200
+}
+</code></pre>
+<p>The adapter must reserve the actual prior bytes, invoke this stage with the
+remaining allocation, and combine the returned <code>additionalContext</code> into the
+existing envelope. Supplying a constant 600 to every independent hook does not
+establish a shared budget. Ordinary harness payloads without this adapter remain
+silent, even when the enable flag is set. DP signpost, prefetch, search augmentation
+and command routing stay in DP. Only its entity-legend stage is replaced during
+an approved handover; avoid enabling both entity legends.</p>
+<h2 id="resident-data-and-activation"><a class="header" href="#resident-data-and-activation">Resident data and activation</a></h2>
+<p>The daemon holds first-class <code>keywords::KeywordIndex</code> data shared through
+<code>ResidentEngine::keywords()</code>. Label matching is compiled once per complete
+snapshot replacement. Atomic replacement makes new or renamed labels visible
+to subsequent requests without per-hook compilation.</p>
+<div class="table-wrapper"><table><thead><tr><th>Setting</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>YUPANA_READ_LEGEND=1</code></td><td>Enable the advisory in this agent's environment</td></tr>
+<tr><td><code>YUPANA_KEYWORDS_NAMESPACE</code></td><td>Required ontology class namespace in the daemon environment</td></tr>
+<tr><td><code>YUPANA_KEYWORDS_DICT</code></td><td>Precision word list, default <code>/usr/share/dict/words</code></td></tr>
+<tr><td><code>[yupana.quipu] enabled</code>, <code>endpoint</code></td><td>Configure the daemon's background data source</td></tr>
+<tr><td><code>[yupana.serve] use_daemon</code>, <code>bind_address</code>, <code>mcp_http_port</code></td><td>Configure the hook's resident connection</td></tr>
+</tbody></table>
+</div>
+<p>The hook accepts only numeric loopback bind addresses and follows no redirects.
+The background producer refreshes every five minutes, with a 60-second total
+request budget. It queries the ported governed entity classes, excluding bulk
+code kinds, Formula and credentials. Every class must succeed without truncation
+or exceeded row bounds before replacing the index. Failure retains the prior
+snapshot with its original timestamp; after ten minutes it is refused.</p>
+<p>There is no startup file export or hourly cron requirement. Namespace omission
+leaves this producer inactive. Existing daemon policy refresh is unchanged.
+The keyword snapshot reports its observation time; these are projected Quipu
+entity facts, rather than tree-sitter code facts.</p>
+<h2 id="matching-and-bounded-output"><a class="header" href="#matching-and-bounded-output">Matching and bounded output</a></h2>
+<p>The index preserves DP's case-insensitive ASCII boundary rules, filename-stem
+guard, longest-first non-overlap, precision dictionary and evidence stoplist.
+Multiple IRIs under one label display <code>ambiguous N</code>. At most five entity labels
+are shown. Keywords are deduplicated within a session across calls and snapshot
+replacements. Up to two existing directed relations between unambiguous shown
+entities can use the same remaining budget; co-occurrence never creates an edge.</p>
+<p><code>Read</code> responses and Bash <code>br show</code> or markdown <code>cat</code>, <code>head</code>, <code>tail</code> and <code>sed</code>
+responses are eligible. Failed or interrupted calls stay silent. The current
+adapter supports the Claude completed-tool envelope. Other payload schemas
+require their own tested translation before activation.</p>
+<h2 id="shared-pipeline-entry"><a class="header" href="#shared-pipeline-entry">Shared pipeline entry</a></h2>
+<p><code>yupana hook post-read-pipeline</code> combines DP signpost and the resident legend in
+one process. During an authorized handover it replaces the existing <code>dp signpost</code>
+entry; do not install it alongside that entry or an independent <code>post-read</code> entry.
+Source delivery does not install or activate it. Other DP hooks remain unchanged.</p>
+<p>With <code>YUPANA_READ_LEGEND=1</code>, it disables <code>DP_LEGEND</code> only in its DP child,
+runs <code>dp signpost</code>, and subtracts its actual context UTF-8 bytes plus a newline
+separator from <code>DP_LEGEND_MAX_BYTES</code> (default and maximum 600). It passes that
+remainder to the in-process read adapter. Exhaustion adds nothing; prior output
+is preserved even if signpost alone exceeds the cap. Other DP envelope fields
+survive. Empty, malformed, unavailable or over-budget legend replies preserve
+DP's exact output bytes.</p>
+<p>With the Yupana flag off, DP retains its original environment and legacy legend
+flag, allowing rollback without removing the pipeline entry. <code>YUPANA_DP_BIN</code>
+optionally supplies an executable path, never a shell command. <code>--config</code> selects
+Yupana's configuration as on the ordinary hook. Input is bounded to 256 KiB and
+accepted DP output to 64 KiB. The DP child has a one-second deadline and is killed
+and reaped on timeout; the resident lookup retains its 40 ms deadline. Anonymous
+temporary files avoid pipe deadlocks. Builds without <code>quipu</code> stay silent and
+cannot replace a working signpost entry.</p>
+<p>The shared allocation covers these two stages. Independent harness hooks do not
+report their output bytes to this pipeline and are outside this allocation.</p>
+<p>The resident <code>POST /keywords</code> API accepts <code>session_id</code>, <code>text</code>, <code>reference</code> and
+<code>remaining_bytes</code>, and returns context, shown dedup keys, raw hit count and the
+snapshot's <code>generated_at</code>. Input is bounded to 128 KiB of read text. Snapshot,
+match and session capacities are bounded. Saturation refuses additional output
+instead of evicting active dedup state and repeating annotations. Session state
+expires after 24 hours or daemon restart, so a restart also starts a new dedup
+window and must be accounted for in a continuing trial.</p>
+<h2 id="measurement-and-handover"><a class="header" href="#measurement-and-handover">Measurement and handover</a></h2>
+<p>Successful resident decisions emit <code>read_legend</code> events into the Yupana metrics
+spool with the frozen DP scorer's <code>timestamp</code>, <code>session_id</code>, <code>shown</code>, <code>bytes</code>,
+<code>budget</code> and <code>latency_us</code> fields. Unavailable resident data emits a silent
+<code>read_legend_unknown</code> event. Filter this event kind before using a trial scorer;
+do not mix these events into action or guard denominators.</p>
+<p>Source tests and an isolated replay establish candidate behavior. They do not
+establish an installed hook, delivery to an agent, or a valid continuing trial.
+Live handover requires a functioning context allocation adapter, durable per-agent
+activation, real observed delivery, and the original trial's acceptance criteria.
+Keep the preceding measurement available until that handover is authorized.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-pre-edit-policy-guard--integration-contract"><a class="header" href="#the-pre-edit-policy-guard--integration-contract">The Pre-Edit Policy Guard — Integration Contract</a></h1>
 <p><code>yupana hook pre-edit</code> is a Claude Code <strong><code>PreToolUse</code></strong> hook that can <strong>deny</strong> an
 edit whose blast radius or target path exceeds the calling agent's capability
