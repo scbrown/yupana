@@ -4959,6 +4959,7 @@ dependencies = [
 name = "yupana"
 version = "0.12.2"
 dependencies = [
+ "aho-corasick",
  "anyhow",
  "assert_cmd",
  "axum",

@@ -7,6 +7,8 @@ use clap::ValueEnum;
 /// Supported agent-harness hook events.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(crate) enum HookEvent {
+    /// Completed reads: optional resident entity legend within the pipeline's remaining context budget.
+    PostRead,
     /// Claude Code `PostToolUse` on Edit/Write: advise on cross-file blast radius.
     PostEdit,
     /// Claude Code `PreToolUse` on Edit/Write: deny an edit that exceeds the
@@ -49,6 +51,10 @@ pub(crate) fn run(
     #[cfg(feature = "quipu")]
     crate::projection_budget::open_budget(crate::projection_budget::default_total_budget());
     match event {
+        #[cfg(feature = "quipu")]
+        HookEvent::PostRead => crate::hook::run_post_read(config),
+        #[cfg(not(feature = "quipu"))]
+        HookEvent::PostRead => Ok(()),
         HookEvent::PostEdit => crate::hook::run_post_edit(tenant),
         HookEvent::PostBash => crate::hook::run_post_bash(),
         HookEvent::PreBash => crate::hook::run_pre_bash(),

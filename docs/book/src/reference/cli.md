@@ -14,7 +14,7 @@ COMMANDS:
     impact      Blast radius; --cochange reconciles against history (FR-11)
     dataflow    Local data dependence, or opt-in Rust CPG flow across calls
     export      Emit the referential structure as Turtle (bobbin: ontology)
-    hook        Harness hook adapter (post-edit advisory / pre-edit guard)
+    hook        Harness hook adapter (post-edit / pre-edit / post-read)
     verify      Verdict on a proposed edit buffer (FR-23/FR-24)
     audit-rule  Replay an explicit structural rule on supplied source, offline
     rule-test   Run governed text rules on sample cases, no side effects [quipu feature]

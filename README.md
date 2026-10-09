@@ -155,6 +155,9 @@ The pre-edit rule guard, the session-start briefing and the Bash action hook
 are in [Harness Integration](https://scbrown.github.io/yupana/getting-started/harness-integration.html).
 Rules that come from Quipu are covered in the
 [pre-edit policy guard](https://scbrown.github.io/yupana/reference/policy-guard.html).
+The optional `yupana hook post-read` entity legend uses resident keyword data
+and an explicit remaining context allocation; see
+[Read-time Entity Legend](docs/book/src/reference/read-legend.md).
 
 ## Before you start
 

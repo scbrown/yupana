@@ -40,6 +40,7 @@ pub fn router(engine: ResidentEngine) -> Router {
     let mut router = Router::new()
         .route("/health", get(health))
         .route("/status", get(status))
+        .route("/keywords", post(keywords))
         .route("/callers", get(callers))
         .route("/callees", get(callees))
         .route("/impact", get(impact))
@@ -69,6 +70,21 @@ pub fn router(engine: ResidentEngine) -> Router {
 /// this and nothing else, so it stays a bare, dependency-free 200.
 async fn health() -> &'static str {
     "ok"
+}
+
+async fn keywords(
+    State(engine): State<ResidentEngine>,
+    Json(request): Json<crate::keywords::Request>,
+) -> Result<Json<crate::keywords::Reply>, StatusCode> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
+        .as_secs();
+    engine
+        .keywords()
+        .query(&request, now)
+        .map(Json)
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
 }
 
 /// The resident projected policy (aegis-x894x2) — the endpoint that makes a

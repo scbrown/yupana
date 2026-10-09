@@ -67,6 +67,7 @@ streaming-iterator = "0.1"
 # Regex predicates for structural rules (src/rules.rs). The lexical half of a
 # tree-sitter policy: the Selector query picks nodes, the regex tests their text.
 regex = "1"
+aho-corasick = "1"
 
 # In-memory graph
 petgraph = "0.7"

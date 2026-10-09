@@ -26,6 +26,7 @@
 - [Configuration Reference](reference/config.md)
 - [MCP Tools](reference/mcp-tools.md)
 - [Resident Daemon](reference/daemon.md)
+- [Read-time Entity Legend](reference/read-legend.md)
 - [Pre-Edit Policy Guard](reference/policy-guard.md)
   - [Replay: measuring a rule](reference/replay.md)
   - [Session trajectory advice](reference/session-trajectory.md)
