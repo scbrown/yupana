@@ -364,6 +364,8 @@ fn record(
         evidence_ref: format!("landing:{}:{}", request.repo, request.git_ref),
     }];
     let agent = request.agent.clone().unwrap_or_else(|| "unknown".into());
+    let (recorded_ref, ref_resolution) =
+        super::landing_attribution::recording_ref(landing, &request.git_ref);
     let input = crate::action_certification::ActionInput {
         record_id: landing_record_id(
             ts,
@@ -383,7 +385,7 @@ fn record(
         result: decision.as_str().to_string(),
         repo: request.repo.clone(),
         sha: String::new(),
-        git_ref: request.git_ref.clone(),
+        git_ref: recorded_ref.to_string(),
         remote_authority: String::new(),
         scope_provenance: serde_json::json!({
             "parse_incomplete": request.parse_incomplete,
@@ -393,6 +395,8 @@ fn record(
             // named is the shape a false positive takes here, so the soak has
             // to be able to count those without re-deriving anything.
             "ref_stated_by_command": !request.ref_assumed,
+            "ref_resolution": ref_resolution,
+            "evaluated_ref": request.git_ref,
             "command": landing.evidence,
             "work_item_readable": request.work_item_readable,
             // Whether the host guard granted an override for this landing, and

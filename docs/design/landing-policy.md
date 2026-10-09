@@ -157,6 +157,15 @@ record on the existing spool, promoted by `yupana verdicts`. The attestation
 happens *at* the gate rather than being reconstructed from a log afterwards, so
 the record and the decision cannot drift apart.
 
+An unstated push records `ref: "UNKNOWN"`. The local branch and the guard's
+conservative fallback do not establish the destination selected by Git's push
+configuration. Scope provenance retains `evaluated_ref` for the policy decision
+and `ref_resolution: "unknown"` for attribution. An explicit destination records
+that destination with `ref_resolution: "command"`; merge assumptions remain
+marked `"assumed"`. These are pre-execution evaluations, not confirmed landings.
+Consumers counting main-ref evidence must exclude unknown and non-main refs,
+while retaining every refusal for false-positive adjudication.
+
 An override is the same object: a signed verdict carrying its reason, single
 use and time-limited, promoted to the graph. The exception is therefore
 attributed in the same place as the rule it excepts, rather than only in a

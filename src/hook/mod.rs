@@ -35,6 +35,8 @@ pub(crate) mod daemon_projection;
 mod delegate_line;
 #[cfg(feature = "quipu")]
 mod disk_guard;
+#[cfg(feature = "quipu")]
+mod landing_attribution;
 /// The governed landing policy's decision procedure — pure, every arm testable
 /// without a graph. Gated with the projection that resolves its authority.
 #[cfg(feature = "quipu")]
