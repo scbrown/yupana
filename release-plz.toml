@@ -34,6 +34,10 @@ publish = false
 # open decision as a side effect of a release-lane repair is not a fix.
 git_only = true
 git_release_enable = true
+# The binary matrix uploads later in this same workflow. Keep latest on the
+# preceding complete release until the publisher has observed all seven assets.
+git_release_draft = true
+git_release_latest = false
 git_tag_enable = true
 # release-plz's DEFAULT tag template is `{{ package }}-v{{ version }}`, i.e. it
 # hunts for `yupana-v0.3.1`. Every real tag in this repo is `v{{ version }}`. So it
