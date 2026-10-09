@@ -323,7 +323,7 @@ fn post(
     what: &str,
 ) -> Result<serde_json::Value> {
     let url = format!("{}{route}", base.trim_end_matches('/'));
-    let mut req = ureq::post(&url)
+    let mut req = crate::quipu_label::json_post(&url, "yupana-share")
         .timeout(std::time::Duration::from_secs(300))
         .set("Content-Type", "application/json")
         // quipu attributes request time per caller and falls back to

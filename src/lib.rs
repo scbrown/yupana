@@ -147,6 +147,8 @@ mod quipu_auth;
 /// Which yupana caller a quipu request came from (`X-Quipu-Client`).
 #[cfg(feature = "quipu")]
 pub mod quipu_label;
+#[cfg(feature = "quipu")]
+mod quipu_provenance;
 pub mod reconcile;
 pub mod recurrence;
 mod render;

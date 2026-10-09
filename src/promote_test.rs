@@ -98,6 +98,10 @@ fn snapshot_write_names_one_atomic_replacement_envelope() {
             .env("HOME", home.path())
             .env("XDG_STATE_HOME", home.path().join("state"))
             .env("QUIPU_SESSION", "snapshot-fixture")
+            .env("QUIPU_AGENT", "fixture-producer")
+            .env("QUIPU_HARNESS", "service")
+            .env("QUIPU_MODEL", "fixture-model")
+            .env("QUIPU_HOST", "fixture-host")
             .env("QUIPU_AUTH_TOKEN", "isolated-test-fixture")
             .env_remove("QUIPU_AUTH_TOKEN_FILE")
             .output()
@@ -144,7 +148,10 @@ fn snapshot_write_names_one_atomic_replacement_envelope() {
         )
         .unwrap();
         sock.write_all(response).unwrap();
-        body
+        (
+            String::from_utf8_lossy(&bytes[..split]).to_ascii_lowercase(),
+            body,
+        )
     });
 
     let result = write_knot_snapshot(
@@ -155,7 +162,20 @@ fn snapshot_write_names_one_atomic_replacement_envelope() {
     )
     .unwrap();
     assert_eq!(result.count, 1);
-    let body = server.join().unwrap();
+    let (headers, body) = server.join().unwrap();
+    for line in [
+        "x-quipu-client: yupana-promote",
+        "x-quipu-agent: fixture-producer",
+        "x-quipu-harness: service",
+        "x-quipu-model: fixture-model",
+        "x-quipu-session: snapshot-fixture",
+        "x-quipu-host: fixture-host",
+    ] {
+        assert!(
+            headers.lines().any(|header| header == line),
+            "missing {line}"
+        );
+    }
     assert_eq!(body["replace_snapshot"], true);
     assert_eq!(body["snapshot"], "code:fixture");
     assert_eq!(body["source"], "fixture source");
