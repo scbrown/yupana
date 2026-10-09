@@ -48,9 +48,13 @@ mod memory_guard;
 pub mod paa;
 mod post_bash;
 mod post_edit;
+#[cfg(feature = "quipu")]
+mod post_read;
 mod pre_bash;
 mod pre_bash_grounding;
 mod pre_edit;
+#[cfg(feature = "quipu")]
+mod read_pipeline;
 mod reread;
 mod scope_notice;
 #[cfg(feature = "quipu")]
@@ -58,8 +62,12 @@ mod session_start;
 
 pub use post_bash::run_post_bash;
 pub use post_edit::{advisory_for, run_post_edit};
+#[cfg(feature = "quipu")]
+pub use post_read::run_post_read;
 pub use pre_bash::run_pre_bash;
 pub use pre_edit::{run_pre_edit, Outcome};
+#[cfg(feature = "quipu")]
+pub use read_pipeline::run_post_read_pipeline;
 #[cfg(feature = "quipu")]
 pub use session_start::run_session_start;
 // The resident-graph measurement path (FR-31): the daemon measures an edit against
