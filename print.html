@@ -850,6 +850,19 @@ but IRIs are deterministic and <code>/knot</code> supersedes, so re-running a fa
 promotion converges instead of duplicating — the failure message names exactly
 how many chunks landed.</p>
 <h2 id="commit-provenance--what-work-touched-this-entity"><a class="header" href="#commit-provenance--what-work-touched-this-entity">Commit provenance — what work touched this entity</a></h2>
+<p>Quipu write requests also carry structured writer headers: <code>X-Quipu-Agent</code>,
+<code>X-Quipu-Harness</code>, <code>X-Quipu-Model</code>, <code>X-Quipu-Session</code>, and <code>X-Quipu-Host</code>.
+The corresponding <code>QUIPU_AGENT</code>, <code>QUIPU_HARNESS</code>, <code>QUIPU_MODEL</code>,
+<code>QUIPU_SESSION</code>, and <code>QUIPU_HOST</code> environment overrides win. Otherwise active
+Claude/Codex sessions supply <code>SHANTY_AGENT</code> and <code>SHANTY_MODEL</code>; Codex uses
+<code>CODEX_SESSION_ID</code> before <code>CODEX_THREAD_ID</code>, and Claude uses
+<code>CLAUDE_CODE_SESSION_ID</code>. Without an active session, the producer names itself
+and uses <code>cli</code> (or <code>service</code> for daemon/MCP). Scheduled wrappers can declare
+<code>QUIPU_HARNESS=cron</code>. Host identity comes from the platform <code>hostname</code> command.
+Unknown fields are omitted, and values are sanitized to printable ASCII and
+limited to 128 characters. Missing session/model remains partial provenance
+rather than a guessed identity. Existing caller-kind and authorization headers
+are retained. This applies to promotion, disk observations, and share writes.</p>
 <p>Every promotion also writes the commit it promoted, and one edge per code module
 that commit changed (spec §9.7):</p>
 <pre><code class="language-turtle">&lt;…/code/myrepo/commit/2f1c…&gt; a bobbin:GitCommit ;
