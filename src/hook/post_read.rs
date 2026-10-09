@@ -11,36 +11,51 @@ pub fn run_post_read(config_override: Option<&Path>) -> anyhow::Result<()> {
     if std::env::var("YUPANA_READ_LEGEND").as_deref() != Ok("1") {
         return Ok(());
     }
-    let started = Instant::now();
+    if let Some(value) = read_payload() {
+        if let Some(output) = evaluate(&value, config_override)? {
+            println!("{output}");
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn read_payload() -> Option<Value> {
     let mut raw = String::new();
-    if std::io::stdin()
+    std::io::stdin()
         .take(256 * 1024 + 1)
         .read_to_string(&mut raw)
-        .is_err()
-        || raw.len() > 256 * 1024
-    {
-        return Ok(());
+        .ok()?;
+    if raw.len() > 256 * 1024 {
+        return None;
     }
-    let Ok(value) = serde_json::from_str::<Value>(&raw) else {
-        return Ok(());
-    };
-    let Some(request) = request(&value) else {
-        return Ok(());
+    serde_json::from_str(&raw).ok()
+}
+
+pub(super) fn evaluate(
+    value: &Value,
+    config_override: Option<&Path>,
+) -> anyhow::Result<Option<Value>> {
+    if std::env::var("YUPANA_READ_LEGEND").as_deref() != Ok("1") {
+        return Ok(None);
+    }
+    let started = Instant::now();
+    let Some(request) = request(value) else {
+        return Ok(None);
     };
     let root = value["cwd"]
         .as_str()
         .map_or_else(|| std::env::current_dir().ok(), |p| Some(p.into()));
     let Some(root) = root else {
-        return Ok(());
+        return Ok(None);
     };
     let Ok(config) = crate::config::YupanaConfig::resolve(config_override, &root) else {
-        return Ok(());
+        return Ok(None);
     };
     // Read text must stay on loopback, even if a guard's configured daemon is
     // reachable on another host. No DNS lookup or remote failover for this hook.
     let host = &config.serve.bind_address;
     if !config.serve.use_daemon || !["127.0.0.1", "::1"].contains(&host.as_str()) {
-        return Ok(());
+        return Ok(None);
     }
     let timeout = Duration::from_millis(40);
     let agent = ureq::AgentBuilder::new().redirects(0).build();
@@ -65,10 +80,10 @@ pub fn run_post_read(config_override: Option<&Path>) -> anyhow::Result<()> {
                 ("session_id", request.session_id.into()),
             ],
         );
-        return Ok(());
+        return Ok(None);
     };
     if reply.context.len() > request.remaining_bytes.min(600) || reply.shown.len() > 5 {
-        return Ok(());
+        return Ok(None);
     }
     // Scoring contract shared with the frozen DP value scorer. Separate event
     // kind keeps read traffic out of action/guard evaluation denominators.
@@ -87,14 +102,11 @@ pub fn run_post_read(config_override: Option<&Path>) -> anyhow::Result<()> {
         ],
     );
     if !reply.context.is_empty() {
-        println!(
-            "{}",
-            serde_json::json!({"hookSpecificOutput": {
-                "hookEventName": "PostToolUse", "additionalContext": reply.context
-            }})
-        );
+        return Ok(Some(serde_json::json!({"hookSpecificOutput": {
+            "hookEventName": "PostToolUse", "additionalContext": reply.context
+        }})));
     }
-    Ok(())
+    Ok(None)
 }
 
 pub(crate) fn request(value: &Value) -> Option<Request> {

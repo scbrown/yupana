@@ -54,6 +54,7 @@ toml = "0.8"
 # Error handling
 thiserror = "2"
 anyhow = "1"
+tempfile = "3"
 
 # Tree-sitter (fast structural extraction — always-on breadth)
 tree-sitter = "0.25"
@@ -155,7 +156,6 @@ game-state = []
 golden-path = []
 
 [dev-dependencies]
-tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
 

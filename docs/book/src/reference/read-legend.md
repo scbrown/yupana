@@ -74,6 +74,33 @@ responses are eligible. Failed or interrupted calls stay silent. The current
 adapter supports the Claude completed-tool envelope. Other payload schemas
 require their own tested translation before activation.
 
+## Shared pipeline entry
+
+`yupana hook post-read-pipeline` combines DP signpost and the resident legend in
+one process. During an authorized handover it replaces the existing `dp signpost`
+entry; do not install it alongside that entry or an independent `post-read` entry.
+Source delivery does not install or activate it. Other DP hooks remain unchanged.
+
+With `YUPANA_READ_LEGEND=1`, it disables `DP_LEGEND` only in its DP child,
+runs `dp signpost`, and subtracts its actual context UTF-8 bytes plus a newline
+separator from `DP_LEGEND_MAX_BYTES` (default and maximum 600). It passes that
+remainder to the in-process read adapter. Exhaustion adds nothing; prior output
+is preserved even if signpost alone exceeds the cap. Other DP envelope fields
+survive. Empty, malformed, unavailable or over-budget legend replies preserve
+DP's exact output bytes.
+
+With the Yupana flag off, DP retains its original environment and legacy legend
+flag, allowing rollback without removing the pipeline entry. `YUPANA_DP_BIN`
+optionally supplies an executable path, never a shell command. `--config` selects
+Yupana's configuration as on the ordinary hook. Input is bounded to 256 KiB and
+accepted DP output to 64 KiB. The DP child has a one-second deadline and is killed
+and reaped on timeout; the resident lookup retains its 40 ms deadline. Anonymous
+temporary files avoid pipe deadlocks. Builds without `quipu` stay silent and
+cannot replace a working signpost entry.
+
+The shared allocation covers these two stages. Independent harness hooks do not
+report their output bytes to this pipeline and are outside this allocation.
+
 The resident `POST /keywords` API accepts `session_id`, `text`, `reference` and
 `remaining_bytes`, and returns context, shown dedup keys, raw hit count and the
 snapshot's `generated_at`. Input is bounded to 128 KiB of read text. Snapshot,
