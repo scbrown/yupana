@@ -325,6 +325,24 @@ pub fn fetch_impact(
         .map_err(|e| format!("daemon at {host}:{port} sent an unparseable impact reply ({e})"))
 }
 
+/// The symbols held for one root-relative file in the RESIDENT graph.
+/// Transport/protocol failures are errors, not an empty symbol list.
+pub fn fetch_file_symbols(
+    host: &str,
+    port: u16,
+    file: &str,
+    timeout: Duration,
+) -> Result<super::FileSymbols, String> {
+    let body = http_get(
+        host,
+        port,
+        &format!("/symbols?file={}", urlencode(file)),
+        timeout,
+    )?;
+    serde_json::from_str(&body)
+        .map_err(|e| format!("daemon at {host}:{port} sent an unparseable symbols reply ({e})"))
+}
+
 /// The daemon address from `config`, IF one is expected AND it serves `root`.
 ///
 /// Three-state on purpose — the caller's loudness depends on which:

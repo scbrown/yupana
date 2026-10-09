@@ -100,6 +100,23 @@ pub(super) fn neighbors(
     }
 }
 
+/// File symbols from the SAME expected, root-matching daemon as callers.
+/// A successful `known:false` reply is retained; only transport failure falls back.
+pub(super) fn file_symbols(
+    config_override: Option<&Path>,
+    root: &Path,
+    file: &str,
+) -> Option<crate::daemon::FileSymbols> {
+    let (host, port) = usable_daemon(config_override, root)?;
+    match crate::daemon::client::fetch_file_symbols(&host, port, file, DAEMON_TIMEOUT) {
+        Ok(reply) => Some(reply),
+        Err(reason) => {
+            eprintln!("yupana mcp: daemon symbols query failed, transient fallback: {reason}");
+            None
+        }
+    }
+}
+
 /// `yupana_impact` from the resident daemon, or `None` to fall back. The
 /// co-change reconciliation (FR-11) is computed HERE, over the daemon's file
 /// set — the daemon serves structure; reconciliation stays a client concern so

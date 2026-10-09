@@ -38,6 +38,16 @@ yupana serve --http     # streamable-HTTP at http://127.0.0.1:3040/mcp
 | `yupana_whatif` | Speculative, uncommitted impact of an order set over the board (FR-38; needs the `game-state` feature) |
 | `yupana_path_check` | Conformance of a plan or work-in-progress against a blessed golden path under gp-grammar/1 (FR-41/FR-42; needs the `golden-path` feature) |
 
+`yupana_symbols` enumerates the same code graph as callers and impact: the
+expected root-matching resident daemon when available, otherwise the transient
+multi-language graph. Relative and absolute paths within the analysis root are
+accepted, including cached files deleted from the working tree. When the graph holds no symbols for a file, the tool returns an error;
+that absence cannot distinguish an unindexed, unsupported or symbol-less file.
+It never reports that such a file is empty. Each symbol retains its tier and
+start line. End lines are served when known from the transient graph and omitted
+when the resident protocol does not carry them; the tool does not re-parse a
+newer file to invent extents for an older snapshot.
+
 The last three are the **game-state harness**. They are registered on every
 build, as `yupana_promote` is, and refuse with a message naming the feature when
 it is absent — a tool that accepted a board and silently did nothing would be

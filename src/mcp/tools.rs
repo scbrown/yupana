@@ -76,8 +76,9 @@ pub struct SymbolItem {
     pub kind: String,
     /// 1-based start line.
     pub start_line: usize,
-    /// 1-based end line.
-    pub end_line: usize,
+    /// 1-based end line, omitted when the resident graph does not serve extents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_line: Option<usize>,
     /// Provenance tier (`treesitter`, `lsp`, `cpg`).
     pub tier: String,
 }

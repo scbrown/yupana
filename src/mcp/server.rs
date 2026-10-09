@@ -102,30 +102,13 @@ impl YupanaMcpServer {
     }
 
     #[tool(
-        description = "List the symbols (functions, structs, traits, ...) defined in one file. Each symbol carries a tier tag. Best for: 'what's defined in src/auth.rs?'."
+        description = "List symbols for a file from the same code graph as callers/impact. Refuses when that graph has no symbols for the path, rather than claiming the file is empty. Each symbol carries a tier tag. Best for: 'what's defined in src/auth.rs?'."
     )]
     async fn yupana_symbols(
         &self,
         Parameters(req): Parameters<SymbolsRequest>,
     ) -> Result<CallToolResult, McpError> {
-        let file = self.root.join(&req.file);
-        let source = std::fs::read_to_string(&file).map_err(internal)?;
-        let symbols = extract_symbols(&source, "rust").map_err(internal)?;
-        let response = SymbolsResponse {
-            file: req.file.clone(),
-            count: symbols.len(),
-            symbols: symbols
-                .iter()
-                .map(|symbol| SymbolItem {
-                    name: symbol.name.clone(),
-                    kind: symbol.kind.as_str().to_string(),
-                    start_line: symbol.start_line,
-                    end_line: symbol.end_line,
-                    tier: symbol.tier.as_str().to_string(),
-                })
-                .collect(),
-        };
-        json_result(&response)
+        symbols_handler::symbols(self, &req)
     }
 
     #[tool(
@@ -484,3 +467,6 @@ mod goldenpath_handlers;
 #[cfg(all(test, feature = "mcp"))]
 #[path = "server_test.rs"]
 mod server_test;
+
+#[path = "symbols_handler.rs"]
+mod symbols_handler;
