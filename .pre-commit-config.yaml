@@ -121,6 +121,14 @@ repos:
         pass_filenames: false
         verbose: true
 
+      - id: release-publication-test
+        name: draft release publication ordering
+        entry: python3 tests/release_publication.py
+        language: system
+        files: ^(scripts/publish-release-assets\.sh|tests/release_publication\.py|\.github/workflows/release.*\.yml|release-plz\.toml|justfile)$
+        pass_filenames: false
+        verbose: true
+
       - id: session-reread-tests
         name: session reread discrimination (python)
         entry: python3 scripts/session-reread-guard.py --selftest

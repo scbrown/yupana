@@ -44,6 +44,11 @@ test *args="":
     just session-guard --selftest
     python3 tests/session_depth.py
     just install-tests
+    just release-tests
+
+# Exercise draft/upload/publish ordering without contacting a public forge.
+release-tests:
+    python3 tests/release_publication.py
 
 # Run the linter (matches CI: deny warnings, allow missing-docs)
 # --all-targets so TESTS are linted too. Without it the lint gate skipped every

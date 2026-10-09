@@ -59,6 +59,10 @@ jobs:
   publish:
     name: Publish release assets
     needs: binary
+    # Serialize publishers so a second upload cannot race draft publication.
+    concurrency:
+      group: yupana-release-publication
+      cancel-in-progress: false
     if: always() && needs.binary.result == 'success'
     runs-on: ubuntu-22.04
     permissions:
@@ -102,46 +106,7 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          # The API is the flaky part, not the build. v0.1.0's first run built and
-          # packaged fine and then lost the whole release to a transient
-          # "HTTP 503: No server is currently available" from api.github.com. A
-          # release that discards a good binary because an API blipped is a
-          # publish step that fails for reasons unrelated to the artifact — so
-          # retry with backoff before giving up.
-          # Be patient: a tag fires this workflow once, so giving up early
-          # strands the release behind a blip that has already passed. v0.1.0's
-          # second run burned all 5 attempts inside a ~4min uploads.github.com
-          # 503/504 window and failed with a perfectly good binary in hand; the
-          # same job re-run untouched published first try. Backoff caps at 60s
-          # and runs ~9min total — longer than the outages actually observed,
-          # still bounded so a real failure doesn't hang the runner.
-          retry() {
-            local n=1 max=12 delay
-            until "$@"; do
-              if [ "$n" -ge "$max" ]; then
-                echo "::error::giving up after $n attempts: $*"
-                return 1
-              fi
-              delay=$((n * 15))
-              [ "$delay" -gt 60 ] && delay=60
-              echo "attempt $n failed: $* — retrying in ${delay}s"
-              sleep "$delay"
-              n=$((n + 1))
-            done
-          }
-          # Create the release if the tag has none yet; either way, attach the asset.
-          if ! gh release view "${TAG}" >/dev/null 2>&1; then
-            retry gh release create "${TAG}" \
-              --title "${TAG}" --generate-notes
-          fi
-          retry gh release upload "${TAG}" \
-            *.tar.gz *.sha256 SHA256SUMS --clobber
-          # Assert the effect, not the exit code: the asset must actually be listed.
-          gh release view "${TAG}" --json assets --jq '.assets[].name' > listed-assets
-          for asset in *.tar.gz *.sha256 SHA256SUMS; do
-            grep -Fx "$asset" listed-assets
-          done
-          echo "published all platform archives on ${TAG}"
+          ../scripts/publish-release-assets.sh "$TAG"
 
   # Open/refresh the release PR on every main push; merging it tags + releases.
   # This job is WHY releases happen at all: release-plz.toml existed here for

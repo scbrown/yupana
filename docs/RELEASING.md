@@ -4,6 +4,19 @@ Releases are cut by `release-plz` from conventional commits on `main`. The
 `Release` workflow builds and attaches the platform archives to the GitHub
 release. The crates.io lane remains separately gated as described below.
 
+`release-plz` creates a **draft**, which is excluded from `/releases/latest`.
+After the native builds finish, the publisher checks all three archives and
+checksum sidecars, uploads them with `SHA256SUMS`, and verifies each remote
+asset's uploaded state and size. Only then does it publish the draft and mark
+a stable release latest. A failed build, upload, or verification leaves the
+draft unpublished, with the previous complete release still latest.
+
+Publication jobs are serialized so one upload cannot race another job's draft
+publication. An already published, complete release is a no-op on rerun; the
+publisher refuses to overwrite public assets. For a legacy incomplete public
+release, restore draft state before rerunning the workflow. Prereleases keep
+their prerelease flag and are never marked latest.
+
 ## Binary archives
 
 The shared `release-binaries.yml` workflow builds natively on three runners:
@@ -111,6 +124,20 @@ suite could not tell a correctly strict guard from a uniformly broken one. CI
 runs it in `Pre-commit checks`.
 
 ## Rehearsing
+
+`just release-tests` exercises the actual publisher with an isolated `gh`
+transport and `/releases/latest` model. Its positive control demonstrates the
+old early-publication failure; the draft tests check latest at every mutation,
+including partial uploads, transient errors and falsely successful uploads.
+It neither contacts GitHub nor creates a tag. CI runs the same tests through
+the pre-commit publication hook, and `just test` includes them.
+
+For an authorized live binary rehearsal, use an approved version tag whose
+release is still draft or absent, and the `Release` workflow's manual input.
+The tag must match the manifest version. Observe the draft and latest release
+throughout the run, then confirm all seven uploaded assets precede the final
+publication. An already published complete tag exercises the idempotent rerun.
+Do not use this to bypass a publication hold.
 
 Do not rehearse by pushing a throwaway tag named for a release. The guard
 refuses `rehearsal-*` and `test-*` refs by name, which is the intended
