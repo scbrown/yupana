@@ -4957,7 +4957,7 @@ dependencies = [
 
 [[package]]
 name = "yupana"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "aho-corasick",
  "anyhow",
