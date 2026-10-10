@@ -1,6 +1,41 @@
 use super::*;
 use std::collections::BTreeMap;
 
+#[test]
+fn hook_payload_fills_missing_session_without_changing_other_headers() {
+    let request = ureq::post("http://127.0.0.1:9/knot")
+        .set("X-Quipu-Client", crate::quipu_label::HOOK)
+        .set("Authorization", "Bearer private-fixture-only");
+    let request = with_hook_session(request, Some("payload-session"));
+    assert_eq!(request.header("X-Quipu-Session"), Some("payload-session"));
+    assert_eq!(
+        request.header("X-Quipu-Client"),
+        Some(crate::quipu_label::HOOK)
+    );
+    assert_eq!(
+        request.header("Authorization"),
+        Some("Bearer private-fixture-only")
+    );
+}
+
+#[test]
+fn hook_payload_preserves_explicit_or_environment_session() {
+    let request = ureq::post("http://127.0.0.1:9/knot").set("X-Quipu-Session", "declared-session");
+    let request = with_hook_session(request, Some("payload-session"));
+    assert_eq!(request.header("X-Quipu-Session"), Some("declared-session"));
+}
+
+#[test]
+fn absent_hook_session_is_not_manufactured_and_values_stay_bounded() {
+    for session in [None, Some(""), Some(" \n\r ")] {
+        let request = with_hook_session(ureq::post("http://127.0.0.1:9/knot"), session);
+        assert!(request.header("X-Quipu-Session").is_none());
+    }
+    let session = "s".repeat(200);
+    let request = with_hook_session(ureq::post("http://127.0.0.1:9/knot"), Some(&session));
+    assert_eq!(request.header("X-Quipu-Session").unwrap().len(), 128);
+}
+
 fn build(env: &[(&str, &str)]) -> BTreeMap<&'static str, String> {
     headers(
         |key| {

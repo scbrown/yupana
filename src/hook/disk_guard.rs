@@ -284,6 +284,9 @@ fn post_sample(
     );
     let url = format!("{}/knot", endpoint.trim_end_matches('/'));
     let mut request = crate::quipu_label::json_post(&url, crate::quipu_label::HOOK);
+    // The harness supplies session_id in stdin even when its hook process has
+    // no session environment variable. Reuse that observed value, not a guess.
+    request = crate::quipu_provenance::with_hook_session(request, session);
     let token = crate::quipu_auth::require(endpoint, session)?;
     request = request.set("Authorization", &format!("Bearer {token}"));
     let body =

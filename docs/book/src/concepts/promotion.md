@@ -93,6 +93,11 @@ limited to 128 characters. Missing session/model remains partial provenance
 rather than a guessed identity. Existing caller-kind and authorization headers
 are retained. This applies to promotion, disk observations, and share writes.
 
+For disk observations from a harness hook, an omitted session header is filled
+from the hook payload's `session_id`. An existing declared header takes
+precedence. Unknown sessions remain omitted; this fallback changes request
+attribution only, preserving authentication and its session refusal markers.
+
 Every promotion also writes the commit it promoted, and one edge per code module
 that commit changed (spec §9.7):
 

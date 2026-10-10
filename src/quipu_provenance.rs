@@ -78,6 +78,19 @@ pub(crate) fn apply(mut request: ureq::Request, producer: &str) -> ureq::Request
     request
 }
 
+/// Preserve declared headers, filling an omitted session from this hook's input.
+/// This is request attribution only; authentication and its session markers are
+/// deliberately unchanged. An unknown hook session remains absent.
+pub(crate) fn with_hook_session(request: ureq::Request, session: Option<&str>) -> ureq::Request {
+    if request.header("X-Quipu-Session").is_some() {
+        return request;
+    }
+    match session.and_then(clean) {
+        Some(session) => request.set("X-Quipu-Session", &session),
+        None => request,
+    }
+}
+
 #[cfg(test)]
 #[path = "quipu_provenance_test.rs"]
 mod tests;
