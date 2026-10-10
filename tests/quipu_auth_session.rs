@@ -6,7 +6,7 @@ use std::{
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -14,6 +14,7 @@ struct Server {
     address: std::net::SocketAddr,
     knots: Arc<AtomicUsize>,
     queries: Arc<AtomicUsize>,
+    sessions: Arc<Mutex<Vec<Option<String>>>>,
     stop: Arc<AtomicBool>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -24,6 +25,8 @@ impl Server {
         let knots = Arc::new(AtomicUsize::new(0));
         let queries = Arc::new(AtomicUsize::new(0));
         let stop = Arc::new(AtomicBool::new(false));
+        let sessions = Arc::new(Mutex::new(Vec::new()));
+        let recorded_sessions = sessions.clone();
         let (k, q, stopped) = (knots.clone(), queries.clone(), stop.clone());
         let thread = std::thread::spawn(move || {
             for connection in listener.incoming() {
@@ -59,6 +62,15 @@ impl Server {
                 let knot = bytes.starts_with(b"POST /knot ");
                 if knot {
                     k.fetch_add(1, Ordering::SeqCst);
+                    // Only fixture session attribution is retained, never auth
+                    // headers or the observation body.
+                    let headers = String::from_utf8_lossy(&bytes);
+                    let session = headers.lines().find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("X-Quipu-Session")
+                            .then(|| value.trim().to_string())
+                    });
+                    recorded_sessions.lock().unwrap().push(session);
                 } else {
                     q.fetch_add(1, Ordering::SeqCst);
                 }
@@ -76,6 +88,7 @@ impl Server {
             address,
             knots,
             queries,
+            sessions,
             stop,
             thread: Some(thread),
         }
@@ -102,6 +115,11 @@ fn hook(
     command
         .args(["hook", "pre-bash"])
         .current_dir(root)
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .env("CODEX_HOME", home.join("codex"))
+        .env("SHANTY_AGENT", "fixture-agent")
+        .env("SHANTY_MODEL", "fixture-model")
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home.join(".config"))
         .env("XDG_STATE_HOME", home.join("state"))
@@ -135,6 +153,29 @@ fn setup(root: &std::path::Path, server: &Server) {
         ),
     )
     .unwrap();
+}
+
+#[test]
+fn hook_stdin_session_reaches_the_write_without_environment_session() {
+    let root = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let server = Server::new(false);
+    setup(root.path(), &server);
+    std::fs::create_dir_all(home.path().join(".config/quipu")).unwrap();
+    std::fs::write(
+        home.path().join(".config/quipu/token"),
+        "fixture-good-token",
+    )
+    .unwrap();
+    for _ in 0..2 {
+        hook(home.path(), root.path(), "payload-only-session", None);
+    }
+    assert_eq!(server.knots.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        *server.sessions.lock().unwrap(),
+        vec![Some("payload-only-session".into())]
+    );
+    assert!(server.queries.load(Ordering::SeqCst) >= 2);
 }
 
 #[test]
