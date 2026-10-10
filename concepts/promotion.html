@@ -258,6 +258,10 @@ Unknown fields are omitted, and values are sanitized to printable ASCII and
 limited to 128 characters. Missing session/model remains partial provenance
 rather than a guessed identity. Existing caller-kind and authorization headers
 are retained. This applies to promotion, disk observations, and share writes.</p>
+<p>For disk observations from a harness hook, an omitted session header is filled
+from the hook payload's <code>session_id</code>. An existing declared header takes
+precedence. Unknown sessions remain omitted; this fallback changes request
+attribution only, preserving authentication and its session refusal markers.</p>
 <p>Every promotion also writes the commit it promoted, and one edge per code module
 that commit changed (spec §9.7):</p>
 <pre><code class="language-turtle">&lt;…/code/myrepo/commit/2f1c…&gt; a bobbin:GitCommit ;
