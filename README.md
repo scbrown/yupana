@@ -39,21 +39,26 @@ More on the design, and how it compares with LSP, Joern and embedding search:
 
 ## Install
 
-**Debian and Ubuntu (amd64):** install from the signed apt repository,
-which republishes each checksum-verified release, so `apt upgrade` (or
-unattended-upgrades) keeps it current. The package puts `yupana` in `/usr/bin`.
+**Debian and Ubuntu (amd64):** install from the signed apt repository, which
+republishes each checksum-verified release. The package puts `yupana` in
+`/usr/bin`. Check the signing key's fingerprint before trusting it; the
+commands stop if it does not match:
 
 ```bash
-sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://scbrown.github.io/apt/key.gpg | sudo tee /etc/apt/keyrings/scbrown-stack.gpg >/dev/null
-echo "deb [signed-by=/etc/apt/keyrings/scbrown-stack.gpg] https://scbrown.github.io/apt stable main" \
-  | sudo tee /etc/apt/sources.list.d/scbrown-stack.list
-sudo apt update && sudo apt install yupana
+curl -fsSL https://scbrown.github.io/apt/key.gpg -o scbrown-stack.gpg
+gpg --show-keys --with-colons scbrown-stack.gpg \
+  | grep -qx 'fpr:::::::::AB5625C5612F643BF76464DF0DC99924994EC959:' \
+  && sudo install -D -m 0644 scbrown-stack.gpg /etc/apt/keyrings/scbrown-stack.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/scbrown-stack.gpg] https://scbrown.github.io/apt stable main" \
+     | sudo tee /etc/apt/sources.list.d/scbrown-stack.list \
+  && sudo apt update && sudo apt install yupana
 ```
 
-Before trusting the key, `gpg --show-keys /etc/apt/keyrings/scbrown-stack.gpg`
-must print `AB5625C5612F643BF76464DF0DC99924994EC959`. Channels, pinning and
-rollback: [scbrown/apt](https://github.com/scbrown/apt#channels-and-pinning).
+`apt upgrade` then picks up new releases. unattended-upgrades only installs
+from origins it allows, so to have it upgrade yupana too, add
+`"origin=scbrown,codename=stable";` to `Unattended-Upgrade::Origins-Pattern`.
+Channels, pinning and rollback:
+[scbrown/apt](https://github.com/scbrown/apt#channels-and-pinning).
 
 **Linux x86_64 and macOS (Apple Silicon or Intel): download the release.**
 No Rust toolchain needed. Mac archives are available starting with the first
